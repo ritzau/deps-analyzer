@@ -119,14 +119,19 @@ function displayDependencyGraph(graphData) {
             {
                 selector: 'node',
                 style: {
+                    'shape': 'roundrectangle',
                     'background-color': '#3b82f6',
                     'label': 'data(label)',
-                    'color': '#333',
+                    'color': 'white',
                     'text-valign': 'center',
                     'text-halign': 'center',
-                    'font-size': '12px',
-                    'width': '60px',
-                    'height': '60px',
+                    'font-size': '11px',
+                    'font-weight': 'bold',
+                    'text-wrap': 'wrap',
+                    'text-max-width': '120px',
+                    'width': 'label',
+                    'height': 'label',
+                    'padding': '12px',
                     'border-width': '2px',
                     'border-color': '#1e40af'
                 }
