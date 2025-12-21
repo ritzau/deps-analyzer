@@ -285,38 +285,36 @@ async function loadAndCheckComplete() {
         if (currentHash !== lastDataHash) {
             lastDataHash = currentHash;
 
-            // Step 1: Finding source files complete
-            if (data.totalFiles > 0 && !graphSectionShown) {
-                // Mark step 1 complete, activate step 2
+            // Use backend's analysisStep to drive UI progress
+            const step = data.analysisStep || 0;
+
+            // Step 1: Coverage complete
+            if (step >= 1 && !graphSectionShown) {
                 updateLoadingProgress(1, 2);
                 document.getElementById('graphSection').style.display = 'block';
                 graphSectionShown = true;
             }
 
-            // Step 2: Building dependency graph complete
-            if (data.graph && !hasShownGraph) {
+            // Step 2: Graph complete
+            if (step >= 2 && data.graph && !hasShownGraph) {
                 displayDependencyGraph(data.graph);
-                // Hide the graph loading spinner
                 const graphLoading = document.getElementById('graphLoading');
                 if (graphLoading) {
                     graphLoading.style.display = 'none';
                 }
-                // Mark step 2 complete, activate step 3
                 updateLoadingProgress(2, 3);
                 hasShownGraph = true;
+
+                // Populate tree browser
+                if (data.graph.nodes) {
+                    populateTreeBrowser(data);
+                }
             }
 
-            // Populate tree browser when we have graph data
-            if (data.graph && data.graph.nodes) {
-                populateTreeBrowser(data);
-            }
-
-            // Step 3 & 4: Analyzing file dependencies and detecting cycles
-            // Both crossPackageDeps and fileCycles are set together on server
-            // crossPackageDeps will be undefined until analysis is done, then becomes array (possibly empty)
-            if (data.crossPackageDeps !== undefined && !hasShownCrossDeps) {
+            // Step 4: File deps and cycles complete (steps 3 & 4 happen together)
+            if (step >= 4 && !hasShownCrossDeps) {
                 // Display cross-package deps if any
-                if (data.crossPackageDeps.length > 0) {
+                if (data.crossPackageDeps && data.crossPackageDeps.length > 0) {
                     displayCrossPackageDeps(data.crossPackageDeps);
                     document.getElementById('crossPackageSection').style.display = 'block';
                 }
@@ -327,12 +325,8 @@ async function loadAndCheckComplete() {
                     document.getElementById('cyclesSection').style.display = 'block';
                 }
 
-                // Steps 3 and 4 both complete together
+                // Complete steps 3 and 4
                 updateLoadingProgress(3, 4);
-                hasShownCrossDeps = true;
-                hasShownCycles = true;
-
-                // Immediately complete step 4 and hide overlay
                 setTimeout(() => {
                     updateLoadingProgress(4, null);
                     setTimeout(() => {
@@ -343,6 +337,9 @@ async function loadAndCheckComplete() {
                         }
                     }, 800);
                 }, 100);
+
+                hasShownCrossDeps = true;
+                hasShownCycles = true;
             }
         }
     } catch (e) {

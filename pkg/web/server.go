@@ -46,6 +46,7 @@ type AnalysisData struct {
 	Graph             *GraphData                  `json:"graph,omitempty"`
 	CrossPackageDeps  []analysis.CrossPackageDep  `json:"crossPackageDeps,omitempty"`
 	FileCycles        []cycles.FileCycle          `json:"fileCycles,omitempty"`
+	AnalysisStep      int                         `json:"analysisStep"` // 1-4, which step is complete
 }
 
 // Server represents the web server
