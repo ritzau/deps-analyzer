@@ -71,7 +71,12 @@
             <div id="graphSection" class="card" style="display: none;">
                 <h2>📊 Dependency Graph</h2>
                 <p class="help-text">Interactive visualization of target dependencies. Click and drag to explore.</p>
-                <div id="cy" class="graph-container"></div>
+                <div id="cy" class="graph-container">
+                    <div id="graphLoading" class="graph-loading">
+                        <div class="graph-spinner"></div>
+                        <div class="graph-loading-message">Building dependency graph...</div>
+                    </div>
+                </div>
                 <div class="graph-legend">
                     <div class="legend-item">
                         <div class="legend-color library"></div>

@@ -215,6 +215,7 @@ function hashData(data) {
 let hasShownGraph = false;
 let hasShownCrossDeps = false;
 let hasShownCoverageResult = false;
+let graphSectionShown = false;
 
 // Load data and check if analysis is complete
 async function loadAndCheckComplete() {
@@ -264,13 +265,23 @@ async function loadAndCheckComplete() {
                     }
                     hasShownCoverageResult = true;
                 }
+
+                // Show graph section with loading spinner once coverage is complete
+                if (!graphSectionShown) {
+                    updateLoadingMessage('[2/4] Building dependency graph...');
+                    document.getElementById('graphSection').style.display = 'block';
+                    graphSectionShown = true;
+                }
             }
 
-            // Show graph when it becomes available
+            // Display graph when it becomes available (hide loading spinner)
             if (data.graph && !hasShownGraph) {
-                updateLoadingMessage('[2/4] Building dependency graph...');
                 displayDependencyGraph(data.graph);
-                document.getElementById('graphSection').style.display = 'block';
+                // Hide the graph loading spinner
+                const graphLoading = document.getElementById('graphLoading');
+                if (graphLoading) {
+                    graphLoading.style.display = 'none';
+                }
                 hasShownGraph = true;
             }
 
