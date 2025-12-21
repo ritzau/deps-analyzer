@@ -246,9 +246,30 @@ function displayDependencyGraph(graphData) {
             }
             console.log('No matching tree node found for:', nodeId);
         } else if (currentView === 'file') {
-            // At file level, could highlight the file in the tree
-            // For now, just log it
-            console.log('File node clicked:', nodeId);
+            // At file level, check what type of node was clicked
+            if (nodeType === 'target-group') {
+                // Clicked a target group - switch to that target's file view
+                // Extract target label from parent node ID (format: "parent-//target:name")
+                const targetLabel = nodeId.replace('parent-', '');
+                console.log('Target group clicked, switching to:', targetLabel);
+
+                // Find and click the corresponding target in the tree
+                const targetNodes = document.querySelectorAll('.tree-node[data-type="target"]');
+                for (const treeNode of targetNodes) {
+                    if (treeNode.dataset.id === targetLabel) {
+                        console.log('Match found! Clicking tree node for:', targetLabel);
+                        const label = treeNode.querySelector('.tree-label');
+                        if (label) {
+                            label.click();
+                            return;
+                        }
+                    }
+                }
+                console.log('No matching tree node found for:', targetLabel);
+            } else {
+                // Clicked a file node - could highlight it in the tree
+                console.log('File node clicked:', nodeId);
+            }
         }
     });
 
