@@ -40,6 +40,32 @@ func QueryAllCCTargets(workspaceRoot string) ([]Target, error) {
 	return targets, nil
 }
 
+// QueryDeps returns the dependencies of a specific target (only cc_* rules in workspace)
+func QueryDeps(workspaceRoot, targetLabel string) ([]string, error) {
+	// Query for cc_* rule dependencies of this target
+	query := fmt.Sprintf(`kind("cc_.* rule", deps(%s)) - %s`, targetLabel, targetLabel)
+	cmd := exec.Command("bazel", "query", query)
+	cmd.Dir = workspaceRoot
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("bazel query failed: %w\nOutput: %s", err, string(output))
+	}
+
+	var deps []string
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines and Bazel informational output
+		if line == "" || !strings.HasPrefix(line, "//") {
+			continue
+		}
+		deps = append(deps, line)
+	}
+
+	return deps, nil
+}
+
 // QuerySourceFiles returns all source files (from the workspace, not external)
 // that are part of any cc_* target in the workspace
 func QueryAllSourceFiles(workspaceRoot string) ([]string, error) {

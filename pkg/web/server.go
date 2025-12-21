@@ -15,13 +15,33 @@ import (
 //go:embed static/*
 var staticFiles embed.FS
 
+// GraphNode represents a node in the dependency graph
+type GraphNode struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Type  string `json:"type"` // "cc_library", "cc_binary", etc.
+}
+
+// GraphEdge represents an edge in the dependency graph
+type GraphEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+}
+
+// GraphData holds the dependency graph for visualization
+type GraphData struct {
+	Nodes []GraphNode `json:"nodes"`
+	Edges []GraphEdge `json:"edges"`
+}
+
 // AnalysisData holds all the analysis results to send to the frontend
 type AnalysisData struct {
-	Workspace      string                    `json:"workspace"`
-	TotalFiles     int                       `json:"totalFiles"`
-	CoveredFiles   int                       `json:"coveredFiles"`
-	UncoveredFiles []analysis.UncoveredFile  `json:"uncoveredFiles"`
+	Workspace       string                   `json:"workspace"`
+	TotalFiles      int                      `json:"totalFiles"`
+	CoveredFiles    int                      `json:"coveredFiles"`
+	UncoveredFiles  []analysis.UncoveredFile `json:"uncoveredFiles"`
 	CoveragePercent float64                  `json:"coveragePercent"`
+	Graph           *GraphData               `json:"graph,omitempty"`
 }
 
 // Server represents the web server

@@ -9,6 +9,7 @@ import (
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
 	"github.com/ritzau/deps-analyzer/pkg/finder"
+	"github.com/ritzau/deps-analyzer/pkg/graph"
 	"github.com/ritzau/deps-analyzer/pkg/output"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 )
@@ -63,6 +64,37 @@ func startWebServer(workspace string, totalFiles, coveredFiles int, uncovered []
 		percentage = float64(coveredFiles) / float64(totalFiles) * 100.0
 	}
 
+	// Build dependency graph
+	fmt.Println("Building dependency graph...")
+	targetGraph, err := graph.BuildTargetGraph(workspace)
+	var graphData *web.GraphData
+	if err != nil {
+		fmt.Printf("Warning: Could not build dependency graph: %v\n", err)
+	} else {
+		// Convert to web format
+		graphData = &web.GraphData{
+			Nodes: make([]web.GraphNode, 0),
+			Edges: make([]web.GraphEdge, 0),
+		}
+
+		for _, node := range targetGraph.Nodes() {
+			graphData.Nodes = append(graphData.Nodes, web.GraphNode{
+				ID:    node.Label,
+				Label: node.Label,
+				Type:  node.Kind,
+			})
+		}
+
+		for _, edge := range targetGraph.Edges() {
+			graphData.Edges = append(graphData.Edges, web.GraphEdge{
+				Source: edge[0],
+				Target: edge[1],
+			})
+		}
+
+		fmt.Printf("Graph: %d nodes, %d edges\n", len(graphData.Nodes), len(graphData.Edges))
+	}
+
 	// Create analysis data
 	data := &web.AnalysisData{
 		Workspace:       workspace,
@@ -70,6 +102,7 @@ func startWebServer(workspace string, totalFiles, coveredFiles int, uncovered []
 		CoveredFiles:    coveredFiles,
 		UncoveredFiles:  uncovered,
 		CoveragePercent: percentage,
+		Graph:           graphData,
 	}
 
 	// Create and start server

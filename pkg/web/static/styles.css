@@ -188,6 +188,46 @@ header h1 {
     font-size: 0.95em;
 }
 
+/* Graph visualization */
+.graph-container {
+    width: 100%;
+    height: 600px;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.graph-legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 2px solid #333;
+}
+
+.legend-color.library {
+    background: #3b82f6;
+}
+
+.legend-color.binary {
+    background: #10b981;
+}
+
 @media (max-width: 768px) {
     header h1 {
         font-size: 2em;
@@ -199,5 +239,9 @@ header h1 {
 
     .stat-value {
         font-size: 2em;
+    }
+
+    .graph-container {
+        height: 400px;
     }
 }

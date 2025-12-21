@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bazel C++ Analyzer</title>
     <link rel="stylesheet" href="/styles.css">
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -61,6 +62,23 @@
             <div id="successMessage" class="card success-message" style="display: none;">
                 <h2>✅ All Files Covered!</h2>
                 <p>Every source file in the workspace is part of a Bazel target.</p>
+            </div>
+
+            <!-- Dependency Graph -->
+            <div id="graphSection" class="card" style="display: none;">
+                <h2>📊 Dependency Graph</h2>
+                <p class="help-text">Interactive visualization of target dependencies. Click and drag to explore.</p>
+                <div id="cy" class="graph-container"></div>
+                <div class="graph-legend">
+                    <div class="legend-item">
+                        <div class="legend-color library"></div>
+                        <span>Library</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color binary"></div>
+                        <span>Binary</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
