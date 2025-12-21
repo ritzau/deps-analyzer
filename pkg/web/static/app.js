@@ -183,7 +183,7 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'node[type = "target-group"][focused = true]',
+                selector: 'node[type = "target-group"][focused]',
                 style: {
                     'border-width': '3px',
                     'border-color': '#ff8c00',
