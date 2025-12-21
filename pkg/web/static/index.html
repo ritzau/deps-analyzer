@@ -60,6 +60,7 @@
                     </div>
                 </div>
                 <div class="graph-legend">
+                    <div style="font-weight: bold; margin-bottom: 8px;">Node Types:</div>
                     <div class="legend-item">
                         <div class="legend-color library"></div>
                         <span>Library</span>
@@ -71,6 +72,23 @@
                     <div class="legend-item">
                         <div class="legend-color shared"></div>
                         <span>Shared Library</span>
+                    </div>
+                    <div style="font-weight: bold; margin: 12px 0 8px 0;">Edge Types:</div>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #6a6a6a;"></div>
+                        <span>File dependency (#include)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dashed" style="background: #4ec9b0;"></div>
+                        <span>Symbol (static link)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dashed" style="background: #c586c0;"></div>
+                        <span>Symbol (dynamic link)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dashed" style="background: #d7ba7d;"></div>
+                        <span>Symbol (cross binary)</span>
                     </div>
                 </div>
             </div>

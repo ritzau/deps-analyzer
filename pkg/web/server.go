@@ -12,6 +12,7 @@ import (
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/cycles"
 	"github.com/ritzau/deps-analyzer/pkg/graph"
+	"github.com/ritzau/deps-analyzer/pkg/symbols"
 )
 
 //go:embed static/*
@@ -27,8 +28,11 @@ type GraphNode struct {
 
 // GraphEdge represents an edge in the dependency graph
 type GraphEdge struct {
-	Source string `json:"source"`
-	Target string `json:"target"`
+	Source  string `json:"source"`
+	Target  string `json:"target"`
+	Type    string `json:"type"`    // "file" (from .d files) or "symbol" (from nm)
+	Linkage string `json:"linkage"` // For symbol edges: "static", "dynamic", or "cross"
+	Symbol  string `json:"symbol"`  // For symbol edges: the symbol name
 }
 
 // GraphData holds the dependency graph for visualization
@@ -56,6 +60,7 @@ type Server struct {
 	analysisData     *AnalysisData
 	fileGraph        *graph.FileGraph
 	crossPackageDeps []analysis.CrossPackageDep
+	symbolDeps       []symbols.SymbolDependency
 }
 
 // NewServer creates a new web server
@@ -80,6 +85,11 @@ func (s *Server) SetFileGraph(fg *graph.FileGraph) {
 // SetCrossPackageDeps stores cross-package dependencies for target detail queries
 func (s *Server) SetCrossPackageDeps(deps []analysis.CrossPackageDep) {
 	s.crossPackageDeps = deps
+}
+
+// SetSymbolDeps stores symbol-level dependencies for target detail queries
+func (s *Server) SetSymbolDeps(deps []symbols.SymbolDependency) {
+	s.symbolDeps = deps
 }
 
 func (s *Server) setupRoutes() {
@@ -149,13 +159,13 @@ func (s *Server) handleTargetGraph(w http.ResponseWriter, r *http.Request) {
 	details := analysis.GetTargetFileDetails(targetLabel, s.fileGraph, s.crossPackageDeps)
 
 	// Build file-level graph for this target
-	graphData := buildFileGraphData(targetLabel, details, s.fileGraph)
+	graphData := buildFileGraphData(targetLabel, details, s.fileGraph, s.symbolDeps)
 
 	json.NewEncoder(w).Encode(graphData)
 }
 
 // buildFileGraphData creates a graph visualization for files within and connected to a target
-func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails, fileGraph *graph.FileGraph) *GraphData {
+func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails, fileGraph *graph.FileGraph, symbolDeps []symbols.SymbolDependency) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
@@ -230,7 +240,7 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 		}
 	}
 
-	// Add internal edges (dependencies within this target)
+	// Add internal edges (dependencies within this target from .d files)
 	for _, sourceNode := range fileGraph.Nodes() {
 		if !filesInTarget[sourceNode.Path] {
 			continue
@@ -244,25 +254,53 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 				graphData.Edges = append(graphData.Edges, GraphEdge{
 					Source: sourceNode.Path,
 					Target: targetPath,
+					Type:   "file",
 				})
 			}
 		}
 	}
 
-	// Add cross-target edges (outgoing)
+	// Add cross-target edges (outgoing) from .d files
 	for _, dep := range details.OutgoingFileDeps {
 		graphData.Edges = append(graphData.Edges, GraphEdge{
 			Source: dep.SourceFile,
 			Target: dep.TargetFile,
+			Type:   "file",
 		})
 	}
 
-	// Add cross-target edges (incoming)
+	// Add cross-target edges (incoming) from .d files
 	for _, dep := range details.IncomingFileDeps {
 		graphData.Edges = append(graphData.Edges, GraphEdge{
 			Source: dep.SourceFile,
 			Target: dep.TargetFile,
+			Type:   "file",
 		})
+	}
+
+	// Add symbol-level edges
+	if symbolDeps != nil {
+		// Create a map of files in this target or connected targets
+		allFiles := make(map[string]bool)
+		for file := range filesInTarget {
+			allFiles[file] = true
+		}
+		for file := range externalFiles {
+			allFiles[file] = true
+		}
+
+		for _, symDep := range symbolDeps {
+			// Only include symbol edges that involve files in this view
+			if allFiles[symDep.SourceFile] && allFiles[symDep.TargetFile] {
+				graphData.Edges = append(graphData.Edges, GraphEdge{
+					Source:  symDep.SourceFile,
+					Target:  symDep.TargetFile,
+					Type:    "symbol",
+					Linkage: string(symDep.Linkage),
+					Symbol:  symDep.Symbol,
+				})
+			}
+		}
 	}
 
 	return graphData

@@ -273,6 +273,23 @@ header h1 {
     background: var(--purple-primary);
 }
 
+.legend-line {
+    width: 30px;
+    height: 3px;
+    border-radius: 1px;
+}
+
+.legend-line.dashed {
+    height: 2px;
+    background: repeating-linear-gradient(
+        to right,
+        currentColor 0,
+        currentColor 4px,
+        transparent 4px,
+        transparent 8px
+    ) !important;
+}
+
 /* File lists */
 .file-list {
     display: flex;

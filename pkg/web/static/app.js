@@ -91,7 +91,10 @@ function displayDependencyGraph(graphData) {
         ...graphData.edges.map(edge => ({
             data: {
                 source: edge.source,
-                target: edge.target
+                target: edge.target,
+                type: edge.type,
+                linkage: edge.linkage,
+                symbol: edge.symbol
             }
         }))
     ];
@@ -199,6 +202,41 @@ function displayDependencyGraph(graphData) {
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
                     'arrow-scale': 1.5
+                }
+            },
+            {
+                selector: 'edge[type = "file"]',
+                style: {
+                    'line-color': '#6a6a6a',
+                    'target-arrow-color': '#6a6a6a'
+                }
+            },
+            {
+                selector: 'edge[type = "symbol"]',
+                style: {
+                    'line-style': 'dashed',
+                    'width': 1.5
+                }
+            },
+            {
+                selector: 'edge[type = "symbol"][linkage = "static"]',
+                style: {
+                    'line-color': '#4ec9b0',
+                    'target-arrow-color': '#4ec9b0'
+                }
+            },
+            {
+                selector: 'edge[type = "symbol"][linkage = "dynamic"]',
+                style: {
+                    'line-color': '#c586c0',
+                    'target-arrow-color': '#c586c0'
+                }
+            },
+            {
+                selector: 'edge[type = "symbol"][linkage = "cross"]',
+                style: {
+                    'line-color': '#d7ba7d',
+                    'target-arrow-color': '#d7ba7d'
                 }
             },
             {

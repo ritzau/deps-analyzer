@@ -16,6 +16,7 @@ import (
 	"github.com/ritzau/deps-analyzer/pkg/finder"
 	"github.com/ritzau/deps-analyzer/pkg/graph"
 	"github.com/ritzau/deps-analyzer/pkg/output"
+	"github.com/ritzau/deps-analyzer/pkg/symbols"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 )
 
@@ -183,6 +184,26 @@ func startWebServerAsync(workspace string, port int) {
 
 			fileCycles = cycles.FindFileCycles(fileGraph)
 			log.Printf("[3/4] Complete: Found %d cross-package file dependencies, %d circular dependencies", len(crossPackageDeps), len(fileCycles))
+
+			// Build symbol dependencies if we have file-to-target mapping
+			if fileToTarget != nil {
+				log.Println("[3/4] Analyzing symbol-level dependencies...")
+				// Build target-to-kind mapping for linkage detection
+				targetToKind := make(map[string]string)
+				if targetGraph != nil {
+					for _, node := range targetGraph.Nodes() {
+						targetToKind[node.Label] = node.Kind
+					}
+				}
+
+				symbolDeps, err := symbols.BuildSymbolGraph(workspace, fileToTarget, targetToKind)
+				if err != nil {
+					log.Printf("[3/4] Warning: Could not build symbol graph: %v", err)
+				} else {
+					log.Printf("[3/4] Found %d symbol-level dependencies", len(symbolDeps))
+					server.SetSymbolDeps(symbolDeps)
+				}
+			}
 
 			// Store file graph and cross-package deps in server for target detail queries
 			server.SetFileGraph(fileGraph)

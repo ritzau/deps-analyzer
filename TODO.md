@@ -36,3 +36,7 @@ Track link time dependencies.
 ## Caching the result
 
 Store a cache so that we don't have to reanalyze unless there is a change.
+
+## CI
+
+## Test using a (headless?) browser
