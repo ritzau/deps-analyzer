@@ -1,0 +1,17 @@
+# Core package BUILD file
+
+cc_library(
+    name = "core",
+    srcs = [
+        "engine.cc",
+        "state.cc",
+    ],
+    hdrs = [
+        "engine.h",
+        "state.h",
+    ],
+    deps = [
+        "//util:util",  # Depends on the monolithic util library
+    ],
+    visibility = ["//visibility:public"],
+)

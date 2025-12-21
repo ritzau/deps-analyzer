@@ -1,0 +1,16 @@
+# Plugins package BUILD file
+# This builds a shared library (.so file)
+
+cc_binary(
+    name = "renderer_plugin",
+    srcs = [
+        "renderer.cc",
+        "renderer.h",
+    ],
+    deps = [
+        "//core:core",
+        "//util:util",  # This creates duplicate dependencies issue
+    ],
+    linkshared = True,  # Build as .so
+    visibility = ["//visibility:public"],
+)

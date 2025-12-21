@@ -1,0 +1,13 @@
+# Test Bazel workspace for C++ dependency analyzer
+# This workspace demonstrates common issues in C++ Bazel projects
+
+module(
+    name = "bazel_test_workspace",
+    version = "0.1.0",
+)
+
+# C++ rules for Bazel
+bazel_dep(name = "rules_cc", version = "0.1.1")
+
+# Platforms for platform-specific configurations
+bazel_dep(name = "platforms", version = "0.0.11")

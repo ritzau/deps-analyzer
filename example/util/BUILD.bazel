@@ -1,0 +1,50 @@
+# Util package BUILD file
+# This is intentionally a monolithic library that should be split
+
+cc_library(
+    name = "util",
+    srcs = [
+        "strings.cc",
+        "file_io.cc",
+        "time.cc",
+        "math.cc",
+        # Note: orphaned.cc is intentionally NOT included
+    ],
+    hdrs = [
+        "strings.h",
+        "file_io.h",
+        "time.h",
+        "math.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Alternative: could be split into separate targets
+# cc_library(
+#     name = "strings",
+#     srcs = ["strings.cc"],
+#     hdrs = ["strings.h"],
+#     visibility = ["//visibility:public"],
+# )
+# 
+# cc_library(
+#     name = "file_io",
+#     srcs = ["file_io.cc"],
+#     hdrs = ["file_io.h"],
+#     visibility = ["//visibility:public"],
+# )
+# 
+# cc_library(
+#     name = "time",
+#     srcs = ["time.cc"],
+#     hdrs = ["time.h"],
+#     visibility = ["//visibility:public"],
+# )
+# 
+# cc_library(
+#     name = "math",
+#     srcs = ["math.cc"],
+#     hdrs = ["math.h"],
+#     deps = [":strings"],
+#     visibility = ["//visibility:public"],
+# )

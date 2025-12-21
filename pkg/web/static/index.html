@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bazel C++ Analyzer</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Bazel C++ Analyzer</h1>
+            <p class="subtitle">Coverage Analysis</p>
+        </header>
+
+        <div id="loading" class="loading">Loading analysis data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <!-- Summary Card -->
+            <div class="card summary-card">
+                <h2>Coverage Summary</h2>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="totalFiles">-</div>
+                        <div class="stat-label">Total Files</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="coveredFiles">-</div>
+                        <div class="stat-label">Covered Files</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="uncoveredCount">-</div>
+                        <div class="stat-label">Uncovered Files</div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="progress-label">
+                        <span id="coveragePercent">0%</span> coverage
+                    </div>
+                </div>
+
+                <div class="workspace-info">
+                    <strong>Workspace:</strong> <span id="workspace">-</span>
+                </div>
+            </div>
+
+            <!-- Uncovered Files Section -->
+            <div id="uncoveredSection" class="card" style="display: none;">
+                <h2>⚠️ Uncovered Files</h2>
+                <p class="help-text">These files are not included in any BUILD.bazel target:</p>
+                <div id="uncoveredList" class="file-list"></div>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="card success-message" style="display: none;">
+                <h2>✅ All Files Covered!</h2>
+                <p>Every source file in the workspace is part of a Bazel target.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

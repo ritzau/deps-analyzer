@@ -1,0 +1,13 @@
+# Main application BUILD file
+
+cc_binary(
+    name = "test_app",
+    srcs = ["main.cc"],
+    deps = [
+        "//core:core",
+        "//util:util",
+    ],
+    linkopts = [
+        "-Wl,-export_dynamic",  # Export symbols for plugins (macOS compatible)
+    ],
+)
