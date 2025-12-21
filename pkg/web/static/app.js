@@ -83,35 +83,37 @@ function displayDependencyGraph(graphData) {
                 selector: 'node',
                 style: {
                     'shape': 'roundrectangle',
-                    'background-color': '#3b82f6',
+                    'background-color': '#4fc1ff',
                     'label': 'data(label)',
-                    'color': 'white',
+                    'color': '#1e1e1e',
                     'text-valign': 'center',
                     'text-halign': 'center',
-                    'font-size': '11px',
-                    'font-weight': 'bold',
+                    'font-size': '12px',
+                    'font-family': 'Consolas, Monaco, monospace',
+                    'font-weight': '600',
                     'text-wrap': 'wrap',
-                    'text-max-width': '120px',
+                    'text-max-width': '140px',
                     'width': 'label',
                     'height': 'label',
-                    'padding': '12px',
+                    'padding': '14px',
                     'border-width': '2px',
-                    'border-color': '#1e40af'
+                    'border-color': '#3e3e42'
                 }
             },
             {
                 selector: 'node[type*="binary"]',
                 style: {
-                    'background-color': '#10b981',
-                    'border-color': '#059669'
+                    'background-color': '#ff8c00',
+                    'color': 'white',
+                    'border-color': '#cc7000'
                 }
             },
             {
                 selector: 'edge',
                 style: {
                     'width': 2,
-                    'line-color': '#9ca3af',
-                    'target-arrow-color': '#9ca3af',
+                    'line-color': '#6a6a6a',
+                    'target-arrow-color': '#6a6a6a',
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
                     'arrow-scale': 1.5
@@ -120,8 +122,8 @@ function displayDependencyGraph(graphData) {
             {
                 selector: 'node:selected',
                 style: {
-                    'border-width': '4px',
-                    'border-color': '#fbbf24'
+                    'border-width': '3px',
+                    'border-color': '#ff8c00'
                 }
             }
         ],
