@@ -1,18 +1,22 @@
 // Update loading checklist progress
-function updateLoadingProgress(step) {
-    // Mark previous steps as completed
-    for (let i = 1; i < step; i++) {
-        const item = document.querySelector(`.loading-checklist-item[data-step="${i}"]`);
+// completedStep: the step that just finished (will show ✓)
+// activeStep: the step that is now running (will show spinner), or null if all done
+function updateLoadingProgress(completedStep, activeStep = null) {
+    // Mark the completed step
+    if (completedStep) {
+        const item = document.querySelector(`.loading-checklist-item[data-step="${completedStep}"]`);
         if (item) {
             item.classList.remove('active');
             item.classList.add('completed');
         }
     }
 
-    // Mark current step as active
-    const currentItem = document.querySelector(`.loading-checklist-item[data-step="${step}"]`);
-    if (currentItem) {
-        currentItem.classList.add('active');
+    // Mark the active step (if any)
+    if (activeStep) {
+        const item = document.querySelector(`.loading-checklist-item[data-step="${activeStep}"]`);
+        if (item) {
+            item.classList.add('active');
+        }
     }
 }
 
@@ -281,15 +285,15 @@ async function loadAndCheckComplete() {
         if (currentHash !== lastDataHash) {
             lastDataHash = currentHash;
 
-            // Update stats when we have coverage data
+            // Step 1: Finding source files complete
             if (data.totalFiles > 0 && !graphSectionShown) {
-                // Coverage complete - show graph section and move to step 2
-                updateLoadingProgress(2);
+                // Mark step 1 complete, activate step 2
+                updateLoadingProgress(1, 2);
                 document.getElementById('graphSection').style.display = 'block';
                 graphSectionShown = true;
             }
 
-            // Display graph when it becomes available (hide loading spinner)
+            // Step 2: Building dependency graph complete
             if (data.graph && !hasShownGraph) {
                 displayDependencyGraph(data.graph);
                 // Hide the graph loading spinner
@@ -297,6 +301,8 @@ async function loadAndCheckComplete() {
                 if (graphLoading) {
                     graphLoading.style.display = 'none';
                 }
+                // Mark step 2 complete, activate step 3
+                updateLoadingProgress(2, 3);
                 hasShownGraph = true;
             }
 
@@ -305,11 +311,14 @@ async function loadAndCheckComplete() {
                 populateTreeBrowser(data);
             }
 
-            // Show cross-package deps when they become available
-            if (data.crossPackageDeps && data.crossPackageDeps.length > 0 && !hasShownCrossDeps) {
-                updateLoadingProgress(3);
-                displayCrossPackageDeps(data.crossPackageDeps);
-                document.getElementById('crossPackageSection').style.display = 'block';
+            // Step 3: Analyzing file dependencies complete
+            if (data.crossPackageDeps && !hasShownCrossDeps) {
+                if (data.crossPackageDeps.length > 0) {
+                    displayCrossPackageDeps(data.crossPackageDeps);
+                    document.getElementById('crossPackageSection').style.display = 'block';
+                }
+                // Mark step 3 complete, activate step 4
+                updateLoadingProgress(3, 4);
                 hasShownCrossDeps = true;
             }
 
@@ -320,17 +329,14 @@ async function loadAndCheckComplete() {
                 hasShownCycles = true;
             }
 
-            // Check if all analysis is complete
-            const hasCrossData = hasShownCrossDeps || (data.crossPackageDeps && data.crossPackageDeps.length === 0);
+            // Step 4: Check if all analysis is complete
+            const hasCrossData = hasShownCrossDeps;
             const hasCycleData = hasShownCycles || (data.fileCycles && data.fileCycles.length === 0);
             const analysisComplete = data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData;
 
             if (analysisComplete) {
-                // Mark all steps as completed
-                document.querySelectorAll('.loading-checklist-item').forEach(item => {
-                    item.classList.remove('active');
-                    item.classList.add('completed');
-                });
+                // Mark step 4 complete (no next step)
+                updateLoadingProgress(4, null);
 
                 // Hide overlay after showing completion
                 setTimeout(() => {
@@ -351,6 +357,9 @@ async function loadAndCheckComplete() {
 
 // Load data when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    // Activate step 1 immediately
+    updateLoadingProgress(null, 1);
+
     // Start polling immediately
     loadAndCheckComplete();
 
