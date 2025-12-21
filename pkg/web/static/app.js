@@ -164,13 +164,19 @@ function displayDependencyGraph(graphData) {
         ],
 
         layout: {
-            name: 'breadthfirst',
+            name: 'cose',
             directed: true,
-            spacingFactor: 1.75,
             padding: 50,
-            avoidOverlap: true,
-            fit: true,
-            circle: false
+            animate: false,
+            nodeRepulsion: 8000,
+            idealEdgeLength: 100,
+            edgeElasticity: 100,
+            nestingFactor: 1.2,
+            gravity: 1,
+            numIter: 1000,
+            initialTemp: 200,
+            coolingFactor: 0.95,
+            minTemp: 1.0
         }
     });
 
@@ -180,9 +186,17 @@ function displayDependencyGraph(graphData) {
         console.log('Tapped node:', node.data('label'));
     });
 
-    // Fit the graph to viewport with padding after layout completes
+    // Center and fit the graph after layout completes and canvas is ready
     cy.one('layoutstop', function() {
-        cy.fit(50);
+        // Small delay to ensure canvas has final dimensions
+        setTimeout(function() {
+            // Notify cytoscape that container dimensions are finalized
+            cy.resize();
+            // Center on all elements (the entire graph)
+            cy.center(cy.elements());
+            // Then fit to viewport with padding
+            cy.fit(cy.elements(), 50);
+        }, 10);
     });
 }
 
@@ -235,8 +249,52 @@ function displayCrossPackageDeps(deps) {
     });
 }
 
-// Load data when page loads
-document.addEventListener('DOMContentLoaded', loadAnalysisData);
+let refreshInterval;
+let lastDataHash = '';
 
-// Optionally refresh every 5 seconds (useful when file watching is added later)
-// setInterval(loadAnalysisData, 5000);
+// Hash the data to detect changes
+function hashData(data) {
+    return JSON.stringify({
+        total: data.totalFiles,
+        covered: data.coveredFiles,
+        hasGraph: !!data.graph,
+        hasCrossDeps: !!data.crossPackageDeps && data.crossPackageDeps.length > 0
+    });
+}
+
+// Load data and check if analysis is complete
+async function loadAndCheckComplete() {
+    try {
+        const response = await fetch('/api/analysis');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const currentHash = hashData(data);
+
+        // Only reload if data changed
+        if (currentHash !== lastDataHash) {
+            lastDataHash = currentHash;
+            await loadAnalysisData();
+
+            // Stop polling if we have all the data (graph + cross-package deps or no files)
+            if (data.totalFiles > 0 && data.graph &&
+                (data.crossPackageDeps !== undefined && data.crossPackageDeps !== null)) {
+                console.log('Analysis complete, stopping auto-refresh');
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                    refreshInterval = null;
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Error checking for updates:', e);
+    }
+}
+
+// Load data when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadAnalysisData();
+
+    // Poll every 1 second for updates during analysis
+    refreshInterval = setInterval(loadAndCheckComplete, 1000);
+});

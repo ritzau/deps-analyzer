@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"runtime"
+	"time"
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
@@ -22,19 +25,18 @@ func main() {
 	port := flag.Int("port", 8080, "Port for web server (only used with --web)")
 	flag.Parse()
 
-	// Run analysis
-	allFiles, _, uncovered, err := runAnalysis(*workspace)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	coveredCount := len(allFiles) - len(uncovered)
-
 	if *webMode {
-		// Start web server
-		startWebServer(*workspace, len(allFiles), coveredCount, uncovered, *port)
+		// Start web server first, then run analysis in background
+		startWebServerAsync(*workspace, *port)
 	} else {
+		// Run analysis synchronously for CLI mode
+		allFiles, _, uncovered, err := runAnalysis(*workspace)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		coveredCount := len(allFiles) - len(uncovered)
 		// Print colorized coverage report to console
 		output.PrintCoverageReport(*workspace, len(allFiles), coveredCount, uncovered)
 	}
@@ -59,76 +61,144 @@ func runAnalysis(workspace string) ([]string, []string, []analysis.UncoveredFile
 	return allFiles, coveredFiles, uncovered, nil
 }
 
-func startWebServer(workspace string, totalFiles, coveredFiles int, uncovered []analysis.UncoveredFile, port int) {
-	percentage := 100.0
-	if totalFiles > 0 {
-		percentage = float64(coveredFiles) / float64(totalFiles) * 100.0
-	}
-
-	// Build dependency graph
-	fmt.Println("Building dependency graph...")
-	targetGraph, err := graph.BuildTargetGraph(workspace)
-	var graphData *web.GraphData
-	if err != nil {
-		fmt.Printf("Warning: Could not build dependency graph: %v\n", err)
-	} else {
-		// Convert to web format
-		graphData = &web.GraphData{
-			Nodes: make([]web.GraphNode, 0),
-			Edges: make([]web.GraphEdge, 0),
-		}
-
-		for _, node := range targetGraph.Nodes() {
-			graphData.Nodes = append(graphData.Nodes, web.GraphNode{
-				ID:    node.Label,
-				Label: node.Label,
-				Type:  node.Kind,
-			})
-		}
-
-		for _, edge := range targetGraph.Edges() {
-			graphData.Edges = append(graphData.Edges, web.GraphEdge{
-				Source: edge[0],
-				Target: edge[1],
-			})
-		}
-
-		fmt.Printf("Graph: %d nodes, %d edges\n", len(graphData.Nodes), len(graphData.Edges))
-	}
-
-	// Build file dependency graph and find cross-package dependencies
-	fmt.Println("Analyzing file-level dependencies...")
-	var crossPackageDeps []analysis.CrossPackageDep
-	fileDeps, err := deps.ParseAllDFiles(workspace)
-	if err != nil {
-		fmt.Printf("Warning: Could not parse .d files: %v\n", err)
-	} else if len(fileDeps) == 0 {
-		fmt.Println("Note: No .d files found. Run 'bazel build //... --save_temps' to generate them.")
-	} else {
-		fileGraph := graph.BuildFileGraph(fileDeps)
-		crossPackageDeps = analysis.FindCrossPackageDeps(fileGraph)
-		fmt.Printf("Found %d cross-package file dependencies\n", len(crossPackageDeps))
-	}
-
-	// Create analysis data
-	data := &web.AnalysisData{
-		Workspace:        workspace,
-		TotalFiles:       totalFiles,
-		CoveredFiles:     coveredFiles,
-		UncoveredFiles:   uncovered,
-		CoveragePercent:  percentage,
-		Graph:            graphData,
-		CrossPackageDeps: crossPackageDeps,
-	}
-
-	// Create and start server
+func startWebServerAsync(workspace string, port int) {
+	// Create server with initial empty data
 	server := web.NewServer()
-	server.SetAnalysisData(data)
 
-	fmt.Printf("Starting web server on http://localhost:%d\n", port)
-	fmt.Printf("Coverage: %.0f%% (%d/%d files)\n", percentage, coveredFiles, totalFiles)
+	// Set initial "loading" state
+	initialData := &web.AnalysisData{
+		Workspace:       workspace,
+		TotalFiles:      0,
+		CoveredFiles:    0,
+		UncoveredFiles:  []analysis.UncoveredFile{},
+		CoveragePercent: 0,
+	}
+	server.SetAnalysisData(initialData)
 
-	if err := server.Start(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	url := fmt.Sprintf("http://localhost:%d", port)
+	fmt.Printf("Starting web server on %s\n", url)
+
+	// Start server in background
+	go func() {
+		if err := server.Start(port); err != nil {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Wait a moment for server to start
+	time.Sleep(500 * time.Millisecond)
+
+	// Open browser
+	fmt.Println("Opening browser...")
+	openBrowser(url)
+
+	// Run analysis in background and update server data progressively
+	go func() {
+		log.Println("[1/4] Finding source files...")
+		allFiles, _, uncovered, err := runAnalysis(workspace)
+		if err != nil {
+			log.Printf("Error during analysis: %v", err)
+			return
+		}
+
+		coveredCount := len(allFiles) - len(uncovered)
+		percentage := 100.0
+		if len(allFiles) > 0 {
+			percentage = float64(coveredCount) / float64(len(allFiles)) * 100.0
+		}
+
+		log.Printf("[1/4] Complete: Found %d source files, %d covered (%.0f%%)", len(allFiles), coveredCount, percentage)
+
+		// Update with coverage data
+		data := &web.AnalysisData{
+			Workspace:       workspace,
+			TotalFiles:      len(allFiles),
+			CoveredFiles:    coveredCount,
+			UncoveredFiles:  uncovered,
+			CoveragePercent: percentage,
+		}
+		server.SetAnalysisData(data)
+
+		// Build dependency graph
+		log.Println("[2/4] Building target dependency graph...")
+		targetGraph, err := graph.BuildTargetGraph(workspace)
+		var graphData *web.GraphData
+		if err != nil {
+			log.Printf("[2/4] Warning: Could not build dependency graph: %v", err)
+		} else {
+			graphData = &web.GraphData{
+				Nodes: make([]web.GraphNode, 0),
+				Edges: make([]web.GraphEdge, 0),
+			}
+
+			for _, node := range targetGraph.Nodes() {
+				graphData.Nodes = append(graphData.Nodes, web.GraphNode{
+					ID:    node.Label,
+					Label: node.Label,
+					Type:  node.Kind,
+				})
+			}
+
+			for _, edge := range targetGraph.Edges() {
+				graphData.Edges = append(graphData.Edges, web.GraphEdge{
+					Source: edge[0],
+					Target: edge[1],
+				})
+			}
+
+			log.Printf("[2/4] Complete: Graph has %d nodes, %d edges", len(graphData.Nodes), len(graphData.Edges))
+		}
+
+		// Update with graph data
+		data.Graph = graphData
+		server.SetAnalysisData(data)
+
+		// Build file dependency graph
+		log.Println("[3/4] Parsing .d files for file-level dependencies...")
+		var crossPackageDeps []analysis.CrossPackageDep
+		fileDeps, err := deps.ParseAllDFiles(workspace)
+		if err != nil {
+			log.Printf("[3/4] Warning: Could not parse .d files: %v", err)
+		} else if len(fileDeps) == 0 {
+			log.Println("[3/4] Note: No .d files found. Run 'bazel build //... --save_temps' to generate them.")
+		} else {
+			log.Printf("[3/4] Found %d .d files", len(fileDeps))
+			fileGraph := graph.BuildFileGraph(fileDeps)
+			crossPackageDeps = analysis.FindCrossPackageDeps(fileGraph)
+			log.Printf("[3/4] Complete: Found %d cross-package file dependencies", len(crossPackageDeps))
+		}
+
+		// Update with cross-package deps
+		data.CrossPackageDeps = crossPackageDeps
+		server.SetAnalysisData(data)
+
+		log.Println("[4/4] Analysis complete! View results at", url)
+	}()
+
+	// Block forever (server runs in goroutine)
+	select {}
+}
+
+func openBrowser(url string) {
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = "open"
+		args = []string{url}
+	case "linux":
+		cmd = "xdg-open"
+		args = []string{url}
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start", url}
+	default:
+		log.Printf("Cannot open browser on platform: %s", runtime.GOOS)
+		return
+	}
+
+	if err := exec.Command(cmd, args...).Start(); err != nil {
+		log.Printf("Failed to open browser: %v", err)
 	}
 }
