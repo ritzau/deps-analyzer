@@ -332,7 +332,8 @@ async function loadAndCheckComplete() {
 
             // Step 4: Check if all analysis is complete
             const hasCrossData = hasShownCrossDeps;
-            const hasCycleData = hasShownCycles || (data.fileCycles !== undefined && data.fileCycles.length === 0);
+            // fileCycles can be null (no cycles), undefined (not done), or array with cycles
+            const hasCycleData = hasShownCycles || (data.fileCycles !== undefined && (data.fileCycles === null || data.fileCycles.length === 0));
             const analysisComplete = data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData;
 
             if (analysisComplete) {

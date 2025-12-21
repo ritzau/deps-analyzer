@@ -343,10 +343,15 @@ header h1 {
     content: '☐';
 }
 
-/* Active: spinner */
+/* Active: CSS spinner */
 .loading-checklist-item.active .checklist-icon::before {
-    content: '⏳';
-    animation: spin 2s linear infinite;
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e0e0e0;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }
 
 /* Completed: checked box */
