@@ -37,7 +37,6 @@ body {
     max-height: calc(100vh - 180px);
     display: flex;
     flex-direction: column;
-    order: 2; /* Place tree on the right */
 }
 
 .tree-header {

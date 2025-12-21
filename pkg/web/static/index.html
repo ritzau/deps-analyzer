@@ -21,7 +21,7 @@
         <div id="error" class="error" style="display: none;"></div>
 
         <div class="main-layout">
-            <!-- Tree Browser (Right Panel) -->
+            <!-- Tree Browser (Left Panel) -->
             <div id="treeBrowser" class="tree-browser">
                 <div class="tree-header">
                     <h3>📁 Project Structure</h3>
@@ -31,54 +31,8 @@
                 </div>
             </div>
 
-            <!-- Main Content Area (Left) -->
+            <!-- Main Content Area (Right) -->
             <div id="content" class="content-area">
-            <!-- Summary Card -->
-            <div class="card summary-card">
-                <h2>Coverage Summary</h2>
-                <div class="stats">
-                    <div class="stat">
-                        <div class="stat-value" id="totalFiles">-</div>
-                        <div class="stat-label">Total Files</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value" id="coveredFiles">-</div>
-                        <div class="stat-label">Covered Files</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value" id="uncoveredCount">-</div>
-                        <div class="stat-label">Uncovered Files</div>
-                    </div>
-                </div>
-
-                <!-- Progress Bar -->
-                <div class="progress-container">
-                    <div class="progress-bar">
-                        <div id="progressFill" class="progress-fill" style="width: 0%;"></div>
-                    </div>
-                    <div class="progress-label">
-                        <span id="coveragePercent">0%</span> coverage
-                    </div>
-                </div>
-
-                <div class="workspace-info">
-                    <strong>Workspace:</strong> <span id="workspace">-</span>
-                </div>
-            </div>
-
-            <!-- Uncovered Files Section -->
-            <div id="uncoveredSection" class="card" style="display: none;">
-                <h2>⚠️ Uncovered Files</h2>
-                <p class="help-text">These files are not included in any BUILD.bazel target:</p>
-                <div id="uncoveredList" class="file-list"></div>
-            </div>
-
-            <!-- Success Message -->
-            <div id="successMessage" class="card success-message" style="display: none;">
-                <h2>✅ All Files Covered!</h2>
-                <p>Every source file in the workspace is part of a Bazel target.</p>
-            </div>
-
             <!-- Dependency Graph -->
             <div id="graphSection" class="card" style="display: none;">
                 <h2>📊 Dependency Graph</h2>
