@@ -82,10 +82,10 @@ func (s *Server) SetCrossPackageDeps(deps []analysis.CrossPackageDep) {
 }
 
 func (s *Server) setupRoutes() {
-	// API routes
+	// API routes - more specific routes must come first
 	s.router.HandleFunc("/api/analysis", s.handleAnalysis).Methods("GET")
-	s.router.HandleFunc("/api/target/{label:.*}", s.handleTargetDetails).Methods("GET")
 	s.router.HandleFunc("/api/target/{label:.*}/graph", s.handleTargetGraph).Methods("GET")
+	s.router.HandleFunc("/api/target/{label:.*}", s.handleTargetDetails).Methods("GET")
 
 	// Serve static files
 	staticFS, err := fs.Sub(staticFiles, "static")
