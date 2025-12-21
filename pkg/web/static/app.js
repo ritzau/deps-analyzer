@@ -289,9 +289,11 @@ async function loadAndCheckComplete() {
 
             // Use backend's analysisStep to drive UI progress
             const step = data.analysisStep || 0;
+            console.log('Analysis step:', step, 'Flags:', {graphSectionShown, hasShownGraph, hasShownCrossDeps});
 
             // Step 1: Coverage complete
             if (step >= 1 && !graphSectionShown) {
+                console.log('Step 1 -> 2');
                 updateLoadingProgress(1, 2);
                 document.getElementById('graphSection').style.display = 'block';
                 graphSectionShown = true;
@@ -299,6 +301,7 @@ async function loadAndCheckComplete() {
 
             // Step 2: Graph complete
             if (step >= 2 && data.graph && !hasShownGraph) {
+                console.log('Step 2 -> 3');
                 displayDependencyGraph(data.graph);
                 const graphLoading = document.getElementById('graphLoading');
                 if (graphLoading) {
@@ -315,6 +318,7 @@ async function loadAndCheckComplete() {
 
             // Step 4: All complete
             if (step >= 4 && !hasShownCrossDeps) {
+                console.log('Step 4 - completing all');
                 // Display cross-package deps if any
                 if (data.crossPackageDeps && data.crossPackageDeps.length > 0) {
                     displayCrossPackageDeps(data.crossPackageDeps);
@@ -332,6 +336,7 @@ async function loadAndCheckComplete() {
                 updateLoadingProgress(4, null);
 
                 setTimeout(() => {
+                    console.log('Hiding overlay');
                     hideLoadingOverlay();
                     if (refreshInterval) {
                         clearInterval(refreshInterval);
@@ -532,9 +537,10 @@ function createTreeNode(item, type) {
         label.textContent = `${icon} ${fileName}`;
         label.title = item.path || item; // Show full path on hover
     } else if (type === 'uncovered') {
-        const fileName = item.split('/').pop();
+        const filePath = item.Path || item;
+        const fileName = filePath.split('/').pop();
         label.textContent = `⚠️ ${fileName}`;
-        label.title = item; // Show full path on hover
+        label.title = filePath; // Show full path on hover
     }
 
     content.appendChild(label);
