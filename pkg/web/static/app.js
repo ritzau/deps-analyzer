@@ -199,6 +199,34 @@ function displayDependencyGraph(graphData) {
         }
     });
 
+    // Click on nodes to select them in the tree or navigate
+    cy.on('tap', 'node', function(evt) {
+        const node = evt.target;
+        const nodeId = node.data('id');
+        const nodeType = node.data('type');
+
+        console.log('Node clicked:', nodeId, 'Type:', nodeType);
+
+        if (currentView === 'package') {
+            // At package level, clicking a target should zoom into it
+            // Find and click the corresponding target in the tree
+            const targetNodes = document.querySelectorAll('.tree-node[data-type="target"]');
+            for (const treeNode of targetNodes) {
+                if (treeNode.dataset.id === nodeId) {
+                    const content = treeNode.querySelector('.tree-node-content');
+                    if (content) {
+                        content.click();
+                        return;
+                    }
+                }
+            }
+        } else if (currentView === 'file') {
+            // At file level, could highlight the file in the tree
+            // For now, just log it
+            console.log('File node clicked:', nodeId);
+        }
+    });
+
     // Center and fit the graph after layout completes and canvas is ready
     cy.one('layoutstop', function() {
         // Small delay to ensure canvas has final dimensions
