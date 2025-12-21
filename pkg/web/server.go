@@ -19,9 +19,10 @@ var staticFiles embed.FS
 
 // GraphNode represents a node in the dependency graph
 type GraphNode struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-	Type  string `json:"type"` // "cc_library", "cc_binary", etc.
+	ID     string `json:"id"`
+	Label  string `json:"label"`
+	Type   string `json:"type"`   // "cc_library", "cc_binary", "source", "header", "external"
+	Parent string `json:"parent"` // Parent node ID for grouping (optional)
 }
 
 // GraphEdge represents an edge in the dependency graph
@@ -160,28 +161,57 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 		Edges: make([]GraphEdge, 0),
 	}
 
+	// Track which targets we've seen for creating parent nodes
+	targetParents := make(map[string]bool)
+
+	// Create parent node for the current target
+	currentTargetParent := "parent-" + targetLabel
+	targetParents[currentTargetParent] = true
+	graphData.Nodes = append(graphData.Nodes, GraphNode{
+		ID:    currentTargetParent,
+		Label: targetLabel,
+		Type:  "target-group",
+	})
+
 	// Create nodes for all files in this target
 	filesInTarget := make(map[string]bool)
 	for _, file := range details.Files {
 		filesInTarget[file.Path] = true
 		graphData.Nodes = append(graphData.Nodes, GraphNode{
-			ID:    file.Path,
-			Label: getFileName(file.Path),
-			Type:  file.Type, // "source" or "header"
+			ID:     file.Path,
+			Label:  getFileName(file.Path),
+			Type:   file.Type, // "source" or "header"
+			Parent: currentTargetParent,
 		})
 	}
 
 	// Create nodes for external files (files from other targets that this target depends on)
 	externalFiles := make(map[string]bool)
 
+	// Helper function to ensure parent node exists for a target
+	ensureParentNode := func(targetLabel string) string {
+		parentID := "parent-" + targetLabel
+		if !targetParents[parentID] {
+			targetParents[parentID] = true
+			graphData.Nodes = append(graphData.Nodes, GraphNode{
+				ID:    parentID,
+				Label: targetLabel,
+				Type:  "target-group",
+			})
+		}
+		return parentID
+	}
+
 	// Add outgoing dependency files (files this target depends on)
 	for _, dep := range details.OutgoingFileDeps {
 		if !filesInTarget[dep.TargetFile] && !externalFiles[dep.TargetFile] {
 			externalFiles[dep.TargetFile] = true
+			parentID := ensureParentNode(dep.TargetTarget)
 			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:    dep.TargetFile,
-				Label: getFileName(dep.TargetFile),
-				Type:  "external",
+				ID:     dep.TargetFile,
+				Label:  getFileName(dep.TargetFile),
+				Type:   "external",
+				Parent: parentID,
 			})
 		}
 	}
@@ -190,10 +220,12 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 	for _, dep := range details.IncomingFileDeps {
 		if !filesInTarget[dep.SourceFile] && !externalFiles[dep.SourceFile] {
 			externalFiles[dep.SourceFile] = true
+			parentID := ensureParentNode(dep.SourceTarget)
 			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:    dep.SourceFile,
-				Label: getFileName(dep.SourceFile),
-				Type:  "external",
+				ID:     dep.SourceFile,
+				Label:  getFileName(dep.SourceFile),
+				Type:   "external",
+				Parent: parentID,
 			})
 		}
 	}

@@ -73,7 +73,8 @@ function displayDependencyGraph(graphData) {
             data: {
                 id: node.id,
                 label: node.label,
-                type: node.type
+                type: node.type,
+                parent: node.parent // For compound nodes (grouping)
             }
         })),
         // Edges
@@ -151,6 +152,24 @@ function displayDependencyGraph(graphData) {
                     'background-color': '#6a6a6a',
                     'color': '#cccccc',
                     'border-color': '#505050'
+                }
+            },
+            {
+                selector: 'node[type = "target-group"]',
+                style: {
+                    'shape': 'roundrectangle',
+                    'background-color': '#2d2d30',
+                    'background-opacity': 0.5,
+                    'border-width': '2px',
+                    'border-color': '#4a4a4e',
+                    'border-style': 'dashed',
+                    'label': 'data(label)',
+                    'color': '#969696',
+                    'text-valign': 'top',
+                    'text-halign': 'center',
+                    'font-size': '14px',
+                    'font-weight': 'bold',
+                    'padding': '20px'
                 }
             },
             {
