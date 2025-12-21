@@ -262,6 +262,9 @@ function hashData(data) {
     });
 }
 
+let hasShownGraph = false;
+let hasShownCrossDeps = false;
+
 // Load data and check if analysis is complete
 async function loadAndCheckComplete() {
     try {
@@ -271,14 +274,43 @@ async function loadAndCheckComplete() {
         const data = await response.json();
         const currentHash = hashData(data);
 
-        // Only reload if data changed
+        // Only update if data changed
         if (currentHash !== lastDataHash) {
             lastDataHash = currentHash;
-            await loadAnalysisData();
 
-            // Stop polling if we have all the data (graph + cross-package deps or no files)
-            if (data.totalFiles > 0 && data.graph &&
-                (data.crossPackageDeps !== undefined && data.crossPackageDeps !== null)) {
+            // Update stats without full reload
+            if (data.totalFiles > 0) {
+                document.getElementById('workspace').textContent = data.workspace;
+                document.getElementById('totalFiles').textContent = data.totalFiles;
+                document.getElementById('coveredFiles').textContent = data.coveredFiles;
+                document.getElementById('uncoveredCount').textContent = data.uncoveredFiles.length;
+
+                const percentage = data.coveragePercent;
+                document.getElementById('coveragePercent').textContent = percentage.toFixed(0) + '%';
+
+                const progressFill = document.getElementById('progressFill');
+                progressFill.style.width = percentage + '%';
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+            }
+
+            // Show graph when it becomes available
+            if (data.graph && !hasShownGraph) {
+                displayDependencyGraph(data.graph);
+                document.getElementById('graphSection').style.display = 'block';
+                hasShownGraph = true;
+            }
+
+            // Show cross-package deps when they become available
+            if (data.crossPackageDeps && data.crossPackageDeps.length > 0 && !hasShownCrossDeps) {
+                displayCrossPackageDeps(data.crossPackageDeps);
+                document.getElementById('crossPackageSection').style.display = 'block';
+                hasShownCrossDeps = true;
+            }
+
+            // Stop polling if we have all the data
+            if (data.totalFiles > 0 && hasShownGraph && hasShownCrossDeps) {
                 console.log('Analysis complete, stopping auto-refresh');
                 if (refreshInterval) {
                     clearInterval(refreshInterval);
