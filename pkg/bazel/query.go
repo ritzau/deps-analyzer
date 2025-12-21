@@ -104,9 +104,10 @@ func QueryAllSourceFiles(workspaceRoot string) ([]string, error) {
 
 // QuerySourceFilesForTarget returns source files for a specific target
 func QuerySourceFilesForTarget(workspaceRoot, targetLabel string) ([]string, error) {
-	// Query for source files in this target's dependencies
-	// Filter to only workspace files (starting with //)
-	query := fmt.Sprintf(`filter("^//", kind("source file", deps(%s)))`, targetLabel)
+	// Query for source files that are directly listed in this target's srcs/hdrs attributes
+	// Use labels() to get only direct sources, not transitive dependencies
+	// This prevents files from being incorrectly attributed to targets that depend on them
+	query := fmt.Sprintf(`labels("srcs", %s) + labels("hdrs", %s)`, targetLabel, targetLabel)
 	cmd := exec.Command("bazel", "query", query)
 	cmd.Dir = workspaceRoot
 
