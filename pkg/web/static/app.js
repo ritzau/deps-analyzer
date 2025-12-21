@@ -601,10 +601,14 @@ function createTreeNode(item, type) {
         node.appendChild(children);
 
         // Click to toggle expansion
-        content.addEventListener('click', (e) => {
+        content.addEventListener('click', async (e) => {
             console.log('Target node clicked:', item.label);
             e.stopPropagation();
-            toggleTreeNode(node, item);
+            try {
+                await toggleTreeNode(node, item);
+            } catch (error) {
+                console.error('Error in toggleTreeNode:', error);
+            }
         });
     } else {
         // Click handler for files
@@ -654,7 +658,11 @@ async function toggleTreeNode(node, item) {
         }
 
         // Also select this target
-        selectTreeNode(node, item, 'target');
+        try {
+            await selectTreeNode(node, item, 'target');
+        } catch (error) {
+            console.error('Error in selectTreeNode:', error);
+        }
     } else {
         // Collapse
         node.classList.add('collapsed');
