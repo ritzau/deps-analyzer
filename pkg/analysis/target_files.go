@@ -63,16 +63,16 @@ func GetTargetFileDetails(targetLabel string, fileGraph *graph.FileGraph, crossP
 
 	// Analyze cross-package dependencies to find incoming/outgoing file deps
 	for _, dep := range crossPackageDeps {
-		sourceTargetLabel := packageToTarget(dep.SourcePackage)
-		targetTargetLabel := packageToTarget(dep.TargetPackage)
+		// Use package names instead of trying to guess target labels
+		// since a package may contain multiple targets
 
 		// Incoming: other targets depending on this target's files
 		if filesInTarget[dep.TargetFile] {
 			details.IncomingFileDeps = append(details.IncomingFileDeps, FileDependencyDetail{
 				SourceFile:   dep.SourceFile,
 				TargetFile:   dep.TargetFile,
-				SourceTarget: sourceTargetLabel,
-				TargetTarget: targetLabel, // Use actual target label, not derived one
+				SourceTarget: dep.SourcePackage, // Use package, not guessed target
+				TargetTarget: targetLabel,       // Use actual target label for current target
 			})
 		}
 
@@ -81,8 +81,8 @@ func GetTargetFileDetails(targetLabel string, fileGraph *graph.FileGraph, crossP
 			details.OutgoingFileDeps = append(details.OutgoingFileDeps, FileDependencyDetail{
 				SourceFile:   dep.SourceFile,
 				TargetFile:   dep.TargetFile,
-				SourceTarget: targetLabel, // Use actual target label, not derived one
-				TargetTarget: targetTargetLabel,
+				SourceTarget: targetLabel,       // Use actual target label for current target
+				TargetTarget: dep.TargetPackage, // Use package, not guessed target
 			})
 		}
 	}
@@ -101,27 +101,6 @@ func extractPackage(targetLabel string) string {
 	}
 
 	return targetLabel
-}
-
-// packageToTarget converts a package name to a target label
-// e.g., "//util" -> "//util:util", "//core/engine" -> "//core/engine:engine"
-// Also handles input without leading "//": "util" -> "//util:util"
-func packageToTarget(pkg string) string {
-	// Strip leading "//" if present
-	pkgPath := pkg
-	if len(pkgPath) > 2 && pkgPath[:2] == "//" {
-		pkgPath = pkgPath[2:]
-	}
-
-	// Extract the last component for the target name
-	targetName := pkgPath
-	for i := len(pkgPath) - 1; i >= 0; i-- {
-		if pkgPath[i] == '/' {
-			targetName = pkgPath[i+1:]
-			break
-		}
-	}
-	return "//" + pkgPath + ":" + targetName
 }
 
 // isHeaderFile checks if a file is a header file
