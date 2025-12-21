@@ -57,26 +57,39 @@ function displayUncoveredFiles(files) {
 }
 
 function displayDependencyGraph(graphData) {
-    const cy = cytoscape({
-        container: document.getElementById('cy'),
+    console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
 
-        elements: [
-            // Nodes
-            ...graphData.nodes.map(node => ({
-                data: {
-                    id: node.id,
-                    label: node.label,
-                    type: node.type
-                }
-            })),
-            // Edges
-            ...graphData.edges.map(edge => ({
-                data: {
-                    source: edge.source,
-                    target: edge.target
-                }
-            }))
-        ],
+    // If we already have a cytoscape instance, destroy it first
+    if (cy) {
+        console.log('Destroying existing cytoscape instance');
+        cy.destroy();
+        cy = null;
+    }
+
+    // Create elements array
+    const elements = [
+        // Nodes
+        ...graphData.nodes.map(node => ({
+            data: {
+                id: node.id,
+                label: node.label,
+                type: node.type
+            }
+        })),
+        // Edges
+        ...graphData.edges.map(edge => ({
+            data: {
+                source: edge.source,
+                target: edge.target
+            }
+        }))
+    ];
+
+    console.log('Creating new cytoscape instance with', elements.length, 'elements');
+
+    cy = cytoscape({
+        container: document.getElementById('cy'),
+        elements: elements,
 
         style: [
             {
@@ -515,6 +528,7 @@ let treeData = null;
 let selectedNode = null;
 let analysisData = null; // Store full analysis data
 let packageGraph = null; // Store the original package-level graph
+let cy = null; // Store the Cytoscape instance
 
 // Build tree structure from analysis data
 function buildTreeData(data) {
@@ -683,20 +697,32 @@ async function selectTreeNode(node, item, type) {
 // Show file-level graph for a target
 async function showFileGraphForTarget(targetLabel) {
     try {
+        console.log('Fetching file graph for target:', targetLabel);
+
         // Encode the target label for URL (strip leading // for the path)
         const encodedLabel = targetLabel.startsWith('//') ? targetLabel.substring(2) : targetLabel;
-        const response = await fetch(`/api/target/${encodedLabel}/graph`);
+        const url = `/api/target/${encodedLabel}/graph`;
+        console.log('Fetching from URL:', url);
+
+        const response = await fetch(url);
 
         if (!response.ok) {
-            console.error('Failed to fetch target graph:', response.statusText);
+            console.error('Failed to fetch target graph:', response.status, response.statusText);
+            const text = await response.text();
+            console.error('Response body:', text);
             return;
         }
 
         const graphData = await response.json();
-        console.log('File graph for target:', targetLabel, graphData);
+        console.log('Received file graph data:', graphData);
+        console.log('Nodes:', graphData.nodes?.length, 'Edges:', graphData.edges?.length);
 
         // Display the file-level graph
-        displayDependencyGraph(graphData);
+        if (graphData && graphData.nodes) {
+            displayDependencyGraph(graphData);
+        } else {
+            console.error('Invalid graph data received:', graphData);
+        }
     } catch (error) {
         console.error('Error fetching target graph:', error);
     }
