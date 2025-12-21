@@ -190,8 +190,14 @@ function displayDependencyGraph(graphData) {
         }
     });
 
-    // Node clicks are now handled by the tree browser
-    // (removed old modal popup behavior)
+    // Click on graph background to zoom out one level
+    cy.on('tap', function(evt) {
+        // Check if we clicked on the background (not a node or edge)
+        if (evt.target === cy) {
+            console.log('Background clicked - zooming out');
+            zoomOutOneLevel();
+        }
+    });
 
     // Center and fit the graph after layout completes and canvas is ready
     cy.one('layoutstop', function() {
@@ -529,6 +535,8 @@ let selectedNode = null;
 let analysisData = null; // Store full analysis data
 let packageGraph = null; // Store the original package-level graph
 let cy = null; // Store the Cytoscape instance
+let currentView = 'package'; // Track current view: 'package' or 'file'
+let currentTarget = null; // Track which target we're viewing at file level
 
 // Build tree structure from analysis data
 function buildTreeData(data) {
@@ -685,12 +693,16 @@ async function selectTreeNode(node, item, type) {
     if (type === 'project') {
         // Show package-level graph (the default view)
         console.log('Selected project - showing package graph');
+        currentView = 'package';
+        currentTarget = null;
         if (packageGraph) {
             displayDependencyGraph(packageGraph);
         }
     } else if (type === 'target') {
         // Show file-level graph for this target
         console.log('Selected target:', item.label);
+        currentView = 'file';
+        currentTarget = item.label;
         await showFileGraphForTarget(item.label);
     } else if (type === 'file') {
         // Keep showing the current target's file graph
@@ -699,6 +711,30 @@ async function selectTreeNode(node, item, type) {
     } else if (type === 'uncovered') {
         // Show uncovered file (maybe highlight in uncovered section?)
         console.log('Selected uncovered file:', item);
+    }
+}
+
+// Zoom out one level in the graph hierarchy
+function zoomOutOneLevel() {
+    if (currentView === 'file') {
+        // We're at file level, zoom out to package level
+        console.log('Zooming out from file view to package view');
+
+        // Find and click the project node in the tree
+        const projectNode = document.querySelector('.tree-node.project-node .tree-node-content');
+        if (projectNode) {
+            projectNode.click();
+        } else {
+            // Fallback: directly show package graph
+            currentView = 'package';
+            currentTarget = null;
+            if (packageGraph) {
+                displayDependencyGraph(packageGraph);
+            }
+        }
+    } else {
+        // Already at package level, can't zoom out further
+        console.log('Already at top level (package view)');
     }
 }
 
