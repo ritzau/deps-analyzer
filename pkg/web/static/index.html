@@ -14,10 +14,13 @@
             <p class="subtitle">Coverage Analysis</p>
         </header>
 
-        <div id="loading" class="loading">Loading analysis data...</div>
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <div id="loadingMessage" class="loading-message">Starting analysis...</div>
+        </div>
         <div id="error" class="error" style="display: none;"></div>
 
-        <div id="content" style="display: none;">
+        <div id="content">
             <!-- Summary Card -->
             <div class="card summary-card">
                 <h2>Coverage Summary</h2>

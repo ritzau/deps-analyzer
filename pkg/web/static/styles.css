@@ -169,17 +169,51 @@ header h1 {
     margin-bottom: 10px;
 }
 
-.loading, .error {
-    text-align: center;
-    padding: 40px;
+/* Loading overlay with spinner */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(102, 126, 234, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 6px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-message {
     color: white;
-    font-size: 1.2em;
+    font-size: 1.3em;
+    font-weight: 500;
+    text-align: center;
+    padding: 0 20px;
 }
 
 .error {
     background: #dc3545;
     border-radius: 12px;
     margin-bottom: 20px;
+    text-align: center;
+    padding: 40px;
+    color: white;
+    font-size: 1.2em;
 }
 
 .help-text {

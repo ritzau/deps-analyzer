@@ -1,67 +1,16 @@
-// Fetch and display analysis data
-async function loadAnalysisData() {
-    const loadingEl = document.getElementById('loading');
-    const errorEl = document.getElementById('error');
-    const contentEl = document.getElementById('content');
+// Update loading message
+function updateLoadingMessage(message) {
+    const loadingMsg = document.getElementById('loadingMessage');
+    if (loadingMsg) {
+        loadingMsg.textContent = message;
+    }
+}
 
-    try {
-        const response = await fetch('/api/analysis');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Hide loading, show content
-        loadingEl.style.display = 'none';
-        contentEl.style.display = 'block';
-
-        // Update summary stats
-        document.getElementById('workspace').textContent = data.workspace;
-        document.getElementById('totalFiles').textContent = data.totalFiles;
-        document.getElementById('coveredFiles').textContent = data.coveredFiles;
-        document.getElementById('uncoveredCount').textContent = data.uncoveredFiles.length;
-
-        // Update coverage percentage
-        const percentage = data.coveragePercent;
-        document.getElementById('coveragePercent').textContent = percentage.toFixed(0) + '%';
-
-        // Update progress bar
-        const progressFill = document.getElementById('progressFill');
-        progressFill.style.width = percentage + '%';
-
-        // Color code the progress bar
-        if (percentage === 100) {
-            progressFill.classList.add('success');
-        } else if (percentage < 80) {
-            progressFill.classList.add('warning');
-        }
-
-        // Show uncovered files or success message
-        if (data.uncoveredFiles && data.uncoveredFiles.length > 0) {
-            displayUncoveredFiles(data.uncoveredFiles);
-            document.getElementById('uncoveredSection').style.display = 'block';
-        } else {
-            document.getElementById('successMessage').style.display = 'block';
-        }
-
-        // Show dependency graph if available
-        if (data.graph && data.graph.nodes && data.graph.nodes.length > 0) {
-            displayDependencyGraph(data.graph);
-            document.getElementById('graphSection').style.display = 'block';
-        }
-
-        // Show cross-package dependencies if available
-        if (data.crossPackageDeps && data.crossPackageDeps.length > 0) {
-            displayCrossPackageDeps(data.crossPackageDeps);
-            document.getElementById('crossPackageSection').style.display = 'block';
-        }
-
-    } catch (error) {
-        console.error('Error loading analysis data:', error);
-        loadingEl.style.display = 'none';
-        errorEl.textContent = 'Failed to load analysis data: ' + error.message;
-        errorEl.style.display = 'block';
+// Hide loading overlay
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
     }
 }
 
@@ -257,6 +206,7 @@ function hashData(data) {
     return JSON.stringify({
         total: data.totalFiles,
         covered: data.coveredFiles,
+        uncoveredCount: data.uncoveredFiles ? data.uncoveredFiles.length : 0,
         hasGraph: !!data.graph,
         hasCrossDeps: !!data.crossPackageDeps && data.crossPackageDeps.length > 0
     });
@@ -264,6 +214,7 @@ function hashData(data) {
 
 let hasShownGraph = false;
 let hasShownCrossDeps = false;
+let hasShownCoverageResult = false;
 
 // Load data and check if analysis is complete
 async function loadAndCheckComplete() {
@@ -278,8 +229,10 @@ async function loadAndCheckComplete() {
         if (currentHash !== lastDataHash) {
             lastDataHash = currentHash;
 
-            // Update stats without full reload
+            // Update stats when we have coverage data
             if (data.totalFiles > 0) {
+                updateLoadingMessage('[1/4] Coverage analysis complete...');
+
                 document.getElementById('workspace').textContent = data.workspace;
                 document.getElementById('totalFiles').textContent = data.totalFiles;
                 document.getElementById('coveredFiles').textContent = data.coveredFiles;
@@ -291,12 +244,31 @@ async function loadAndCheckComplete() {
                 const progressFill = document.getElementById('progressFill');
                 progressFill.style.width = percentage + '%';
 
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('content').style.display = 'block';
+                // Color code the progress bar
+                progressFill.className = 'progress-fill'; // Reset classes
+                if (percentage === 100) {
+                    progressFill.classList.add('success');
+                } else if (percentage < 80) {
+                    progressFill.classList.add('warning');
+                }
+
+                // Show uncovered files or success message ONLY when we have data
+                if (!hasShownCoverageResult) {
+                    if (data.uncoveredFiles && data.uncoveredFiles.length > 0) {
+                        displayUncoveredFiles(data.uncoveredFiles);
+                        document.getElementById('uncoveredSection').style.display = 'block';
+                        document.getElementById('successMessage').style.display = 'none';
+                    } else if (data.totalFiles > 0) {
+                        document.getElementById('uncoveredSection').style.display = 'none';
+                        document.getElementById('successMessage').style.display = 'block';
+                    }
+                    hasShownCoverageResult = true;
+                }
             }
 
             // Show graph when it becomes available
             if (data.graph && !hasShownGraph) {
+                updateLoadingMessage('[2/4] Building dependency graph...');
                 displayDependencyGraph(data.graph);
                 document.getElementById('graphSection').style.display = 'block';
                 hasShownGraph = true;
@@ -304,13 +276,20 @@ async function loadAndCheckComplete() {
 
             // Show cross-package deps when they become available
             if (data.crossPackageDeps && data.crossPackageDeps.length > 0 && !hasShownCrossDeps) {
+                updateLoadingMessage('[3/4] Analyzing file dependencies...');
                 displayCrossPackageDeps(data.crossPackageDeps);
                 document.getElementById('crossPackageSection').style.display = 'block';
                 hasShownCrossDeps = true;
             }
 
+            // Hide loading overlay when we have coverage data
+            if (data.totalFiles > 0) {
+                hideLoadingOverlay();
+            }
+
             // Stop polling if we have all the data
-            if (data.totalFiles > 0 && hasShownGraph && hasShownCrossDeps) {
+            if (data.totalFiles > 0 && hasShownGraph && (hasShownCrossDeps || (data.crossPackageDeps && data.crossPackageDeps.length === 0))) {
+                updateLoadingMessage('[4/4] Analysis complete!');
                 console.log('Analysis complete, stopping auto-refresh');
                 if (refreshInterval) {
                     clearInterval(refreshInterval);
@@ -325,7 +304,8 @@ async function loadAndCheckComplete() {
 
 // Load data when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    loadAnalysisData();
+    // Start polling immediately
+    loadAndCheckComplete();
 
     // Poll every 1 second for updates during analysis
     refreshInterval = setInterval(loadAndCheckComplete, 1000);
