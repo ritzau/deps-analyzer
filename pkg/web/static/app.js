@@ -69,14 +69,24 @@ function displayDependencyGraph(graphData) {
     // Create elements array
     const elements = [
         // Nodes
-        ...graphData.nodes.map(node => ({
-            data: {
+        ...graphData.nodes.map(node => {
+            const nodeData = {
                 id: node.id,
                 label: node.label,
                 type: node.type,
                 parent: node.parent // For compound nodes (grouping)
+            };
+
+            // Mark the currently focused target-group with a special attribute
+            if (node.type === 'target-group' && currentView === 'file') {
+                const targetLabel = node.id.replace('parent-', '');
+                if (targetLabel === currentTarget) {
+                    nodeData.focused = true;
+                }
             }
-        })),
+
+            return { data: nodeData };
+        }),
         // Edges
         ...graphData.edges.map(edge => ({
             data: {
@@ -170,6 +180,14 @@ function displayDependencyGraph(graphData) {
                     'font-size': '14px',
                     'font-weight': 'bold',
                     'padding': '20px'
+                }
+            },
+            {
+                selector: 'node[type = "target-group"][focused = true]',
+                style: {
+                    'border-width': '3px',
+                    'border-color': '#ff8c00',
+                    'border-style': 'dashed'
                 }
             },
             {
