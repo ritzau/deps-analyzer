@@ -313,7 +313,7 @@ async function loadAndCheckComplete() {
                 }
             }
 
-            // Step 4: File deps and cycles complete (steps 3 & 4 happen together)
+            // Step 4: All complete
             if (step >= 4 && !hasShownCrossDeps) {
                 // Display cross-package deps if any
                 if (data.crossPackageDeps && data.crossPackageDeps.length > 0) {
@@ -327,18 +327,17 @@ async function loadAndCheckComplete() {
                     document.getElementById('cyclesSection').style.display = 'block';
                 }
 
-                // Complete steps 3 and 4
+                // Complete steps 3 and 4, then hide overlay
                 updateLoadingProgress(3, 4);
+                updateLoadingProgress(4, null);
+
                 setTimeout(() => {
-                    updateLoadingProgress(4, null);
-                    setTimeout(() => {
-                        hideLoadingOverlay();
-                        if (refreshInterval) {
-                            clearInterval(refreshInterval);
-                            refreshInterval = null;
-                        }
-                    }, 800);
-                }, 100);
+                    hideLoadingOverlay();
+                    if (refreshInterval) {
+                        clearInterval(refreshInterval);
+                        refreshInterval = null;
+                    }
+                }, 1000);
 
                 hasShownCrossDeps = true;
                 hasShownCycles = true;
