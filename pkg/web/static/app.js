@@ -320,24 +320,22 @@ async function loadAndCheckComplete() {
                 hasShownCycles = true;
             }
 
-            // Hide loading overlay when we have coverage data
-            if (data.totalFiles > 0) {
-                hideLoadingOverlay();
-            }
-
-            // Stop polling if we have all the data (cross-package deps and cycles are optional)
+            // Check if all analysis is complete
             const hasCrossData = hasShownCrossDeps || (data.crossPackageDeps && data.crossPackageDeps.length === 0);
             const hasCycleData = hasShownCycles || (data.fileCycles && data.fileCycles.length === 0);
-            if (data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData) {
-                updateLoadingProgress(4);
+            const analysisComplete = data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData;
 
+            if (analysisComplete) {
                 // Mark all steps as completed
+                document.querySelectorAll('.loading-checklist-item').forEach(item => {
+                    item.classList.remove('active');
+                    item.classList.add('completed');
+                });
+
+                // Hide overlay after showing completion
                 setTimeout(() => {
-                    document.querySelectorAll('.loading-checklist-item').forEach(item => {
-                        item.classList.remove('active');
-                        item.classList.add('completed');
-                    });
-                }, 500);
+                    hideLoadingOverlay();
+                }, 800);
 
                 console.log('Analysis complete, stopping auto-refresh');
                 if (refreshInterval) {
