@@ -330,17 +330,28 @@ header h1 {
 }
 
 .checklist-icon {
-    font-size: 1.5em;
-    width: 30px;
+    font-size: 1.3em;
+    width: 24px;
     text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.loading-checklist-item.active .checklist-icon {
+/* Default: unchecked box */
+.checklist-icon::before {
+    content: '☐';
+}
+
+/* Active: spinner */
+.loading-checklist-item.active .checklist-icon::before {
+    content: '⏳';
     animation: spin 2s linear infinite;
 }
 
+/* Completed: checked box */
 .loading-checklist-item.completed .checklist-icon::before {
-    content: '✓';
+    content: '☑';
 }
 
 @keyframes spin {

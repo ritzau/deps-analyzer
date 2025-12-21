@@ -312,7 +312,8 @@ async function loadAndCheckComplete() {
             }
 
             // Step 3: Analyzing file dependencies complete
-            if (data.crossPackageDeps && !hasShownCrossDeps) {
+            // crossPackageDeps will be undefined until analysis is done, then becomes array (possibly empty)
+            if (data.crossPackageDeps !== undefined && !hasShownCrossDeps) {
                 if (data.crossPackageDeps.length > 0) {
                     displayCrossPackageDeps(data.crossPackageDeps);
                     document.getElementById('crossPackageSection').style.display = 'block';
@@ -331,7 +332,7 @@ async function loadAndCheckComplete() {
 
             // Step 4: Check if all analysis is complete
             const hasCrossData = hasShownCrossDeps;
-            const hasCycleData = hasShownCycles || (data.fileCycles && data.fileCycles.length === 0);
+            const hasCycleData = hasShownCycles || (data.fileCycles !== undefined && data.fileCycles.length === 0);
             const analysisComplete = data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData;
 
             if (analysisComplete) {
