@@ -110,6 +110,11 @@ func (s *Server) handleTargetDetails(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	targetLabel := vars["label"]
 
+	// HTTP path normalization strips leading //, so restore it if missing
+	if len(targetLabel) > 0 && targetLabel[0] != '/' {
+		targetLabel = "//" + targetLabel
+	}
+
 	if s.fileGraph == nil {
 		http.Error(w, "File graph not available", http.StatusServiceUnavailable)
 		return

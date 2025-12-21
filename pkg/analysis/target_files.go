@@ -55,27 +55,33 @@ func GetTargetFileDetails(targetLabel string, fileGraph *graph.FileGraph, crossP
 		}
 	}
 
+	// Create a map of files in this target for quick lookup
+	filesInTarget := make(map[string]bool)
+	for _, file := range details.Files {
+		filesInTarget[file.Path] = true
+	}
+
 	// Analyze cross-package dependencies to find incoming/outgoing file deps
 	for _, dep := range crossPackageDeps {
 		sourceTargetLabel := packageToTarget(dep.SourcePackage)
 		targetTargetLabel := packageToTarget(dep.TargetPackage)
 
-		// Incoming: other targets depending on this target
-		if targetTargetLabel == targetLabel {
+		// Incoming: other targets depending on this target's files
+		if filesInTarget[dep.TargetFile] {
 			details.IncomingFileDeps = append(details.IncomingFileDeps, FileDependencyDetail{
 				SourceFile:   dep.SourceFile,
 				TargetFile:   dep.TargetFile,
 				SourceTarget: sourceTargetLabel,
-				TargetTarget: targetTargetLabel,
+				TargetTarget: targetLabel, // Use actual target label, not derived one
 			})
 		}
 
-		// Outgoing: this target depending on other targets
-		if sourceTargetLabel == targetLabel {
+		// Outgoing: this target's files depending on other targets
+		if filesInTarget[dep.SourceFile] {
 			details.OutgoingFileDeps = append(details.OutgoingFileDeps, FileDependencyDetail{
 				SourceFile:   dep.SourceFile,
 				TargetFile:   dep.TargetFile,
-				SourceTarget: sourceTargetLabel,
+				SourceTarget: targetLabel, // Use actual target label, not derived one
 				TargetTarget: targetTargetLabel,
 			})
 		}
@@ -85,14 +91,9 @@ func GetTargetFileDetails(targetLabel string, fileGraph *graph.FileGraph, crossP
 }
 
 // extractPackage extracts the package name from a target label
-// e.g., "//util:util" -> "util", "//core/engine:engine" -> "core/engine"
+// e.g., "//util:util" -> "//util", "//core/engine:engine" -> "//core/engine"
 func extractPackage(targetLabel string) string {
-	// Remove leading "//"
-	if len(targetLabel) > 2 && targetLabel[:2] == "//" {
-		targetLabel = targetLabel[2:]
-	}
-
-	// Split on ":"
+	// Split on ":" to get the package part
 	for i := 0; i < len(targetLabel); i++ {
 		if targetLabel[i] == ':' {
 			return targetLabel[:i]
@@ -103,17 +104,24 @@ func extractPackage(targetLabel string) string {
 }
 
 // packageToTarget converts a package name to a target label
-// e.g., "util" -> "//util:util", "core/engine" -> "//core/engine:engine"
+// e.g., "//util" -> "//util:util", "//core/engine" -> "//core/engine:engine"
+// Also handles input without leading "//": "util" -> "//util:util"
 func packageToTarget(pkg string) string {
+	// Strip leading "//" if present
+	pkgPath := pkg
+	if len(pkgPath) > 2 && pkgPath[:2] == "//" {
+		pkgPath = pkgPath[2:]
+	}
+
 	// Extract the last component for the target name
-	targetName := pkg
-	for i := len(pkg) - 1; i >= 0; i-- {
-		if pkg[i] == '/' {
-			targetName = pkg[i+1:]
+	targetName := pkgPath
+	for i := len(pkgPath) - 1; i >= 0; i-- {
+		if pkgPath[i] == '/' {
+			targetName = pkgPath[i+1:]
 			break
 		}
 	}
-	return "//" + pkg + ":" + targetName
+	return "//" + pkgPath + ":" + targetName
 }
 
 // isHeaderFile checks if a file is a header file
