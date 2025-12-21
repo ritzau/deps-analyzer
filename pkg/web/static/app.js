@@ -636,14 +636,25 @@ function createTreeNode(item, type) {
         children.className = 'tree-children';
         node.appendChild(children);
 
-        // Click to toggle expansion
-        content.addEventListener('click', async (e) => {
-            console.log('Target node clicked:', item.label);
+        // Click on arrow to toggle expansion only
+        toggle.addEventListener('click', async (e) => {
+            console.log('Toggle arrow clicked');
             e.stopPropagation();
             try {
-                await toggleTreeNode(node, item);
+                await toggleExpansion(node, item);
             } catch (error) {
-                console.error('Error in toggleTreeNode:', error);
+                console.error('Error in toggleExpansion:', error);
+            }
+        });
+
+        // Click on label to always select/zoom (regardless of expansion)
+        label.addEventListener('click', async (e) => {
+            console.log('Target label clicked:', item.label);
+            e.stopPropagation();
+            try {
+                await selectTreeNode(node, item, 'target');
+            } catch (error) {
+                console.error('Error in selectTreeNode:', error);
             }
         });
     } else {
@@ -657,8 +668,8 @@ function createTreeNode(item, type) {
     return node;
 }
 
-// Toggle tree node expansion
-async function toggleTreeNode(node, item) {
+// Toggle tree node expansion (without selecting)
+async function toggleExpansion(node, item) {
     const toggle = node.querySelector('.tree-toggle');
     const children = node.querySelector('.tree-children');
 
@@ -691,13 +702,6 @@ async function toggleTreeNode(node, item) {
             } catch (error) {
                 console.error('Failed to load target files:', error);
             }
-        }
-
-        // Also select this target
-        try {
-            await selectTreeNode(node, item, 'target');
-        } catch (error) {
-            console.error('Error in selectTreeNode:', error);
         }
     } else {
         // Collapse
