@@ -326,6 +326,11 @@ async function loadAndCheckComplete() {
                 hasShownGraph = true;
             }
 
+            // Populate tree browser when we have graph data
+            if (data.graph && data.graph.nodes) {
+                populateTreeBrowser(data);
+            }
+
             // Show cross-package deps when they become available
             if (data.crossPackageDeps && data.crossPackageDeps.length > 0 && !hasShownCrossDeps) {
                 updateLoadingMessage('[3/4] Analyzing file dependencies...');
@@ -481,3 +486,209 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 });
+
+// ============================================================================
+// Tree Browser Implementation
+// ============================================================================
+
+let treeData = null;
+let selectedNode = null;
+
+// Build tree structure from analysis data
+function buildTreeData(data) {
+    const tree = {
+        targets: [],
+        uncoveredFiles: data.uncoveredFiles || []
+    };
+
+    // Build targets section with their files
+    if (data.graph && data.graph.nodes) {
+        for (const node of data.graph.nodes) {
+            tree.targets.push({
+                label: node.label,
+                type: 'target',
+                id: node.id,
+                files: [] // Will be populated when fetched
+            });
+        }
+    }
+
+    return tree;
+}
+
+// Create a tree node element
+function createTreeNode(item, type) {
+    const node = document.createElement('div');
+    node.className = 'tree-node';
+    node.dataset.type = type;
+    node.dataset.id = item.label || item.path || item;
+
+    const content = document.createElement('div');
+    content.className = 'tree-node-content';
+
+    // Toggle arrow for expandable nodes
+    const toggle = document.createElement('span');
+    toggle.className = 'tree-toggle';
+    if (type === 'target') {
+        toggle.textContent = '▶';
+        node.classList.add('collapsed');
+    } else {
+        toggle.classList.add('empty');
+    }
+    content.appendChild(toggle);
+
+    // Icon and label
+    const label = document.createElement('span');
+    label.className = 'tree-label';
+
+    if (type === 'target') {
+        label.textContent = `📦 ${item.label}`;
+    } else if (type === 'file') {
+        const fileName = item.path ? item.path.split('/').pop() : item.split('/').pop();
+        const icon = item.path && item.path.endsWith('.h') ? '📄' : '📝';
+        label.textContent = `${icon} ${fileName}`;
+        label.title = item.path || item; // Show full path on hover
+    } else if (type === 'uncovered') {
+        const fileName = item.split('/').pop();
+        label.textContent = `⚠️ ${fileName}`;
+        label.title = item; // Show full path on hover
+    }
+
+    content.appendChild(label);
+    node.appendChild(content);
+
+    // Add children container for targets
+    if (type === 'target') {
+        const children = document.createElement('div');
+        children.className = 'tree-children';
+        node.appendChild(children);
+
+        // Click to toggle expansion
+        content.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTreeNode(node, item);
+        });
+    } else {
+        // Click handler for files
+        content.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectTreeNode(node, item, type);
+        });
+    }
+
+    return node;
+}
+
+// Toggle tree node expansion
+async function toggleTreeNode(node, item) {
+    const toggle = node.querySelector('.tree-toggle');
+    const children = node.querySelector('.tree-children');
+
+    if (node.classList.contains('collapsed')) {
+        // Expand: load files if not already loaded
+        node.classList.remove('collapsed');
+        toggle.textContent = '▼';
+
+        if (children.children.length === 0 && item.label) {
+            // Fetch target details
+            try {
+                const encodedLabel = encodeURIComponent(item.label);
+                const response = await fetch(`/api/target/${encodedLabel}`);
+                if (response.ok) {
+                    const details = await response.json();
+                    if (details.files && details.files.length > 0) {
+                        details.files.forEach(file => {
+                            const fileNode = createTreeNode(file, 'file');
+                            children.appendChild(fileNode);
+                        });
+                    } else {
+                        const emptyMsg = document.createElement('div');
+                        emptyMsg.className = 'tree-label';
+                        emptyMsg.style.color = '#999';
+                        emptyMsg.style.fontStyle = 'italic';
+                        emptyMsg.textContent = 'No files found';
+                        children.appendChild(emptyMsg);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load target files:', error);
+            }
+        }
+
+        // Also select this target
+        selectTreeNode(node, item, 'target');
+    } else {
+        // Collapse
+        node.classList.add('collapsed');
+        toggle.textContent = '▶';
+    }
+}
+
+// Select a tree node and update the view
+function selectTreeNode(node, item, type) {
+    // Remove previous selection
+    document.querySelectorAll('.tree-node.selected').forEach(n => {
+        n.classList.remove('selected');
+    });
+
+    // Add selection to this node
+    node.classList.add('selected');
+    selectedNode = { node, item, type };
+
+    // Update the main view based on selection
+    if (type === 'target') {
+        // Show target-level graph (existing behavior)
+        console.log('Selected target:', item.label);
+        // The graph already shows all targets, so no change needed
+        // Could highlight this target in the graph
+    } else if (type === 'file') {
+        // Show file-level dependencies
+        console.log('Selected file:', item.path);
+        // TODO: Implement file-level graph view
+    } else if (type === 'uncovered') {
+        // Show uncovered file (maybe highlight in uncovered section?)
+        console.log('Selected uncovered file:', item);
+    }
+}
+
+// Populate the tree browser
+function populateTreeBrowser(data) {
+    const treeContent = document.getElementById('treeContent');
+    treeContent.innerHTML = '';
+
+    treeData = buildTreeData(data);
+
+    // Targets Section
+    const targetsSection = document.createElement('div');
+    targetsSection.className = 'tree-section';
+
+    const targetsTitle = document.createElement('div');
+    targetsTitle.className = 'tree-section-title';
+    targetsTitle.innerHTML = `📦 Targets <span class="tree-count">${treeData.targets.length}</span>`;
+    targetsSection.appendChild(targetsTitle);
+
+    treeData.targets.forEach(target => {
+        const targetNode = createTreeNode(target, 'target');
+        targetsSection.appendChild(targetNode);
+    });
+
+    treeContent.appendChild(targetsSection);
+
+    // Uncovered Files Section
+    if (treeData.uncoveredFiles.length > 0) {
+        const uncoveredSection = document.createElement('div');
+        uncoveredSection.className = 'tree-section';
+
+        const uncoveredTitle = document.createElement('div');
+        uncoveredTitle.className = 'tree-section-title';
+        uncoveredTitle.innerHTML = `⚠️ Uncovered <span class="tree-count">${treeData.uncoveredFiles.length}</span>`;
+        uncoveredSection.appendChild(uncoveredTitle);
+
+        treeData.uncoveredFiles.forEach(file => {
+            const fileNode = createTreeNode(file, 'uncovered');
+            uncoveredSection.appendChild(fileNode);
+        });
+
+        treeContent.appendChild(uncoveredSection);
+    }
+}

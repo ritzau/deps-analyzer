@@ -20,7 +20,19 @@
         </div>
         <div id="error" class="error" style="display: none;"></div>
 
-        <div id="content">
+        <div class="main-layout">
+            <!-- Tree Browser (Right Panel) -->
+            <div id="treeBrowser" class="tree-browser">
+                <div class="tree-header">
+                    <h3>📁 Project Structure</h3>
+                </div>
+                <div class="tree-content" id="treeContent">
+                    <!-- Tree will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Main Content Area (Left) -->
+            <div id="content" class="content-area">
             <!-- Summary Card -->
             <div class="card summary-card">
                 <h2>Coverage Summary</h2>
@@ -101,6 +113,7 @@
                 <h2>🔄 Circular Dependencies</h2>
                 <p class="help-text">Files that have circular include dependencies. These can cause compilation issues and should be refactored.</p>
                 <div id="cyclesList" class="file-list"></div>
+            </div>
             </div>
         </div>
     </div>
