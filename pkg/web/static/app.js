@@ -166,9 +166,11 @@ function displayDependencyGraph(graphData) {
         layout: {
             name: 'breadthfirst',
             directed: true,
-            spacingFactor: 1.5,
-            padding: 30,
-            avoidOverlap: true
+            spacingFactor: 1.75,
+            padding: 50,
+            avoidOverlap: true,
+            fit: true,
+            circle: false
         }
     });
 
@@ -178,8 +180,11 @@ function displayDependencyGraph(graphData) {
         console.log('Tapped node:', node.data('label'));
     });
 
-    // Zoom to fit on load
-    cy.fit(50);
+    // Center and fit the graph with proper padding
+    cy.ready(function() {
+        cy.fit(50);
+        cy.center();
+    });
 }
 
 function displayCrossPackageDeps(deps) {
