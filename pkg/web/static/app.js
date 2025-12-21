@@ -282,47 +282,11 @@ async function loadAndCheckComplete() {
             lastDataHash = currentHash;
 
             // Update stats when we have coverage data
-            if (data.totalFiles > 0) {
-                updateLoadingProgress(1);
-
-                document.getElementById('workspace').textContent = data.workspace;
-                document.getElementById('totalFiles').textContent = data.totalFiles;
-                document.getElementById('coveredFiles').textContent = data.coveredFiles;
-                document.getElementById('uncoveredCount').textContent = data.uncoveredFiles.length;
-
-                const percentage = data.coveragePercent;
-                document.getElementById('coveragePercent').textContent = percentage.toFixed(0) + '%';
-
-                const progressFill = document.getElementById('progressFill');
-                progressFill.style.width = percentage + '%';
-
-                // Color code the progress bar
-                progressFill.className = 'progress-fill'; // Reset classes
-                if (percentage === 100) {
-                    progressFill.classList.add('success');
-                } else if (percentage < 80) {
-                    progressFill.classList.add('warning');
-                }
-
-                // Show uncovered files or success message ONLY when we have data
-                if (!hasShownCoverageResult) {
-                    if (data.uncoveredFiles && data.uncoveredFiles.length > 0) {
-                        displayUncoveredFiles(data.uncoveredFiles);
-                        document.getElementById('uncoveredSection').style.display = 'block';
-                        document.getElementById('successMessage').style.display = 'none';
-                    } else if (data.totalFiles > 0) {
-                        document.getElementById('uncoveredSection').style.display = 'none';
-                        document.getElementById('successMessage').style.display = 'block';
-                    }
-                    hasShownCoverageResult = true;
-                }
-
-                // Show graph section with loading spinner once coverage is complete
-                if (!graphSectionShown) {
-                    updateLoadingProgress(2);
-                    document.getElementById('graphSection').style.display = 'block';
-                    graphSectionShown = true;
-                }
+            if (data.totalFiles > 0 && !graphSectionShown) {
+                // Coverage complete - show graph section and move to step 2
+                updateLoadingProgress(2);
+                document.getElementById('graphSection').style.display = 'block';
+                graphSectionShown = true;
             }
 
             // Display graph when it becomes available (hide loading spinner)
