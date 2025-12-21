@@ -105,6 +105,34 @@
         </div>
     </div>
 
+    <!-- Target Details Modal -->
+    <div id="targetModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTargetLabel">Target Details</h2>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <h3>📄 Files in Target</h3>
+                    <div id="modalFiles" class="modal-file-list"></div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>⬅️ Incoming Dependencies</h3>
+                    <p class="modal-help">Other targets depending on this target's files</p>
+                    <div id="modalIncoming" class="modal-file-list"></div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>➡️ Outgoing Dependencies</h3>
+                    <p class="modal-help">This target's files depending on other targets</p>
+                    <div id="modalOutgoing" class="modal-file-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/app.js"></script>
 </body>
 </html>

@@ -129,10 +129,12 @@ function displayDependencyGraph(graphData) {
         }
     });
 
-    // Add interactivity
+    // Add interactivity - show target details on click
     cy.on('tap', 'node', function(evt) {
         const node = evt.target;
-        console.log('Tapped node:', node.data('label'));
+        const targetLabel = node.data('label');
+        console.log('Tapped node:', targetLabel);
+        showTargetDetails(targetLabel);
     });
 
     // Center and fit the graph after layout completes and canvas is ready
@@ -368,4 +370,114 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Poll every 1 second for updates during analysis
     refreshInterval = setInterval(loadAndCheckComplete, 1000);
+});
+
+// Modal functions for showing target details
+async function showTargetDetails(targetLabel) {
+    try {
+        // Encode the target label for URL
+        const encodedLabel = encodeURIComponent(targetLabel);
+        const response = await fetch(`/api/target/${encodedLabel}`);
+        
+        if (!response.ok) {
+            console.error('Failed to fetch target details');
+            return;
+        }
+        
+        const details = await response.json();
+        displayTargetModal(details);
+    } catch (error) {
+        console.error('Error fetching target details:', error);
+    }
+}
+
+function displayTargetModal(details) {
+    const modal = document.getElementById('targetModal');
+    const labelEl = document.getElementById('modalTargetLabel');
+    const filesEl = document.getElementById('modalFiles');
+    const incomingEl = document.getElementById('modalIncoming');
+    const outgoingEl = document.getElementById('modalOutgoing');
+    
+    // Set title
+    labelEl.textContent = details.targetLabel;
+    
+    // Display files in target
+    filesEl.innerHTML = '';
+    if (details.files && details.files.length > 0) {
+        details.files.forEach(file => {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = `modal-file-item ${file.type}`;
+            fileDiv.textContent = file.path;
+            filesEl.appendChild(fileDiv);
+        });
+    } else {
+        filesEl.innerHTML = '<div class="modal-empty">No files found (may need .d files)</div>';
+    }
+    
+    // Display incoming dependencies
+    incomingEl.innerHTML = '';
+    if (details.incomingFileDeps && details.incomingFileDeps.length > 0) {
+        details.incomingFileDeps.forEach(dep => {
+            const depDiv = document.createElement('div');
+            depDiv.className = 'modal-dep-item';
+            
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'modal-dep-file';
+            fileDiv.textContent = `${dep.sourceFile} → ${dep.targetFile}`;
+            
+            const targetDiv = document.createElement('div');
+            targetDiv.className = 'modal-dep-target';
+            targetDiv.textContent = `From: ${dep.sourceTarget}`;
+            
+            depDiv.appendChild(fileDiv);
+            depDiv.appendChild(targetDiv);
+            incomingEl.appendChild(depDiv);
+        });
+    } else {
+        incomingEl.innerHTML = '<div class="modal-empty">No incoming dependencies</div>';
+    }
+    
+    // Display outgoing dependencies
+    outgoingEl.innerHTML = '';
+    if (details.outgoingFileDeps && details.outgoingFileDeps.length > 0) {
+        details.outgoingFileDeps.forEach(dep => {
+            const depDiv = document.createElement('div');
+            depDiv.className = 'modal-dep-item';
+            
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'modal-dep-file';
+            fileDiv.textContent = `${dep.sourceFile} → ${dep.targetFile}`;
+            
+            const targetDiv = document.createElement('div');
+            targetDiv.className = 'modal-dep-target';
+            targetDiv.textContent = `To: ${dep.targetTarget}`;
+            
+            depDiv.appendChild(fileDiv);
+            depDiv.appendChild(targetDiv);
+            outgoingEl.appendChild(depDiv);
+        });
+    } else {
+        outgoingEl.innerHTML = '<div class="modal-empty">No outgoing dependencies</div>';
+    }
+    
+    // Show modal
+    modal.style.display = 'block';
+}
+
+// Close modal handlers
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('targetModal');
+    const closeBtn = document.querySelector('.modal-close');
+    
+    // Close when clicking X
+    closeBtn.onclick = function() {
+        modal.style.display = 'none';
+    };
+    
+    // Close when clicking outside modal
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    };
 });

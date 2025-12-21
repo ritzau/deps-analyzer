@@ -1,0 +1,5 @@
+cc_library(
+    name = "cycle_demo",
+    srcs = ["a.cc", "b.cc"],
+    hdrs = ["a.h", "b.h"],
+)
