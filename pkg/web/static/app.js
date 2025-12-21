@@ -101,11 +101,43 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'node[type*="binary"]',
+                selector: 'node[type = "cc_binary"]',
                 style: {
                     'background-color': '#ff8c00',
                     'color': 'white',
                     'border-color': '#cc7000'
+                }
+            },
+            {
+                selector: 'node[type = "cc_shared_library"]',
+                style: {
+                    'background-color': '#c586c0',
+                    'color': 'white',
+                    'border-color': '#9d6b99'
+                }
+            },
+            {
+                selector: 'node[type = "source"]',
+                style: {
+                    'background-color': '#89d185',
+                    'color': '#1e1e1e',
+                    'border-color': '#6fb06b'
+                }
+            },
+            {
+                selector: 'node[type = "header"]',
+                style: {
+                    'background-color': '#4fc1ff',
+                    'color': '#1e1e1e',
+                    'border-color': '#3fa0d9'
+                }
+            },
+            {
+                selector: 'node[type = "external"]',
+                style: {
+                    'background-color': '#6a6a6a',
+                    'color': '#cccccc',
+                    'border-color': '#505050'
                 }
             },
             {
@@ -145,13 +177,8 @@ function displayDependencyGraph(graphData) {
         }
     });
 
-    // Add interactivity - show target details on click
-    cy.on('tap', 'node', function(evt) {
-        const node = evt.target;
-        const targetLabel = node.data('label');
-        console.log('Tapped node:', targetLabel);
-        showTargetDetails(targetLabel);
-    });
+    // Node clicks are now handled by the tree browser
+    // (removed old modal popup behavior)
 
     // Center and fit the graph after layout completes and canvas is ready
     cy.one('layoutstop', function() {
@@ -302,6 +329,11 @@ async function loadAndCheckComplete() {
             // Step 2: Graph complete
             if (step >= 2 && data.graph && !hasShownGraph) {
                 console.log('Step 2 -> 3');
+
+                // Store the analysis data and package graph
+                analysisData = data;
+                packageGraph = data.graph;
+
                 displayDependencyGraph(data.graph);
                 const graphLoading = document.getElementById('graphLoading');
                 if (graphLoading) {
@@ -481,6 +513,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 let treeData = null;
 let selectedNode = null;
+let analysisData = null; // Store full analysis data
+let packageGraph = null; // Store the original package-level graph
 
 // Build tree structure from analysis data
 function buildTreeData(data) {
@@ -554,6 +588,7 @@ function createTreeNode(item, type) {
 
         // Click to toggle expansion
         content.addEventListener('click', (e) => {
+            console.log('Target node clicked:', item.label);
             e.stopPropagation();
             toggleTreeNode(node, item);
         });
@@ -614,7 +649,7 @@ async function toggleTreeNode(node, item) {
 }
 
 // Select a tree node and update the view
-function selectTreeNode(node, item, type) {
+async function selectTreeNode(node, item, type) {
     // Remove previous selection
     document.querySelectorAll('.tree-node.selected').forEach(n => {
         n.classList.remove('selected');
@@ -625,27 +660,79 @@ function selectTreeNode(node, item, type) {
     selectedNode = { node, item, type };
 
     // Update the main view based on selection
-    if (type === 'target') {
-        // Show target-level graph (existing behavior)
+    if (type === 'project') {
+        // Show package-level graph (the default view)
+        console.log('Selected project - showing package graph');
+        if (packageGraph) {
+            displayDependencyGraph(packageGraph);
+        }
+    } else if (type === 'target') {
+        // Show file-level graph for this target
         console.log('Selected target:', item.label);
-        // The graph already shows all targets, so no change needed
-        // Could highlight this target in the graph
+        await showFileGraphForTarget(item.label);
     } else if (type === 'file') {
-        // Show file-level dependencies
+        // Keep showing the current target's file graph
         console.log('Selected file:', item.path);
-        // TODO: Implement file-level graph view
+        // File is already shown in the current graph
     } else if (type === 'uncovered') {
         // Show uncovered file (maybe highlight in uncovered section?)
         console.log('Selected uncovered file:', item);
     }
 }
 
+// Show file-level graph for a target
+async function showFileGraphForTarget(targetLabel) {
+    try {
+        // Encode the target label for URL (strip leading // for the path)
+        const encodedLabel = targetLabel.startsWith('//') ? targetLabel.substring(2) : targetLabel;
+        const response = await fetch(`/api/target/${encodedLabel}/graph`);
+
+        if (!response.ok) {
+            console.error('Failed to fetch target graph:', response.statusText);
+            return;
+        }
+
+        const graphData = await response.json();
+        console.log('File graph for target:', targetLabel, graphData);
+
+        // Display the file-level graph
+        displayDependencyGraph(graphData);
+    } catch (error) {
+        console.error('Error fetching target graph:', error);
+    }
+}
+
 // Populate the tree browser
 function populateTreeBrowser(data) {
+    console.log('Populating tree browser with data:', data);
     const treeContent = document.getElementById('treeContent');
     treeContent.innerHTML = '';
 
     treeData = buildTreeData(data);
+
+    // Project Root Node
+    const projectNode = document.createElement('div');
+    projectNode.className = 'tree-node project-node';
+    projectNode.dataset.type = 'project';
+    projectNode.dataset.id = data.workspace;
+
+    const projectContent = document.createElement('div');
+    projectContent.className = 'tree-node-content';
+
+    const projectLabel = document.createElement('span');
+    projectLabel.className = 'tree-label';
+    projectLabel.textContent = `🏠 ${data.workspace.split('/').pop() || 'Project'}`;
+    projectContent.appendChild(projectLabel);
+    projectNode.appendChild(projectContent);
+
+    // Click handler for project - show package graph
+    projectContent.addEventListener('click', (e) => {
+        console.log('Project node clicked');
+        e.stopPropagation();
+        selectTreeNode(projectNode, { workspace: data.workspace }, 'project');
+    });
+
+    treeContent.appendChild(projectNode);
 
     // Targets Section
     const targetsSection = document.createElement('div');

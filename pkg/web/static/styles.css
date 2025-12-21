@@ -20,6 +20,7 @@
     --success-green: #89d185;
     --error-red: #f48771;
     --info-blue: #4fc1ff;
+    --purple-primary: #c586c0;
 }
 
 body {
@@ -266,6 +267,10 @@ header h1 {
 
 .legend-color.binary {
     background: var(--orange-primary);
+}
+
+.legend-color.shared {
+    background: var(--purple-primary);
 }
 
 /* File lists */

@@ -15,7 +15,8 @@ type Target struct {
 
 // QueryAllCCTargets returns all C++ targets in the workspace
 func QueryAllCCTargets(workspaceRoot string) ([]Target, error) {
-	cmd := exec.Command("bazel", "query", `kind("cc_.* rule", //...)`)
+	// Use --output=label_kind to get both label and kind
+	cmd := exec.Command("bazel", "query", `kind("cc_.* rule", //...)`, "--output=label_kind")
 	cmd.Dir = workspaceRoot
 
 	output, err := cmd.CombinedOutput()
@@ -28,13 +29,18 @@ func QueryAllCCTargets(workspaceRoot string) ([]Target, error) {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		// Skip empty lines and Bazel informational output
-		if line == "" || !strings.HasPrefix(line, "//") {
+		if line == "" {
 			continue
 		}
-		targets = append(targets, Target{
-			Label: line,
-			Kind:  "cc_rule", // Generic for now
-		})
+		// Format is: "kind_name rule //label"
+		// e.g., "cc_library rule //util:util"
+		parts := strings.Fields(line)
+		if len(parts) >= 3 && strings.HasPrefix(parts[2], "//") {
+			targets = append(targets, Target{
+				Label: parts[2],
+				Kind:  parts[0], // e.g., "cc_binary", "cc_library"
+			})
+		}
 	}
 
 	return targets, nil
