@@ -251,6 +251,13 @@ function displayDependencyGraph(graphData) {
                 // Clicked a target group - switch to that target's file view
                 // Extract target label from parent node ID (format: "parent-//target:name")
                 const targetLabel = nodeId.replace('parent-', '');
+
+                // Check if we're already viewing this target - if so, do nothing
+                if (targetLabel === currentTarget) {
+                    console.log('Already viewing target:', targetLabel);
+                    return;
+                }
+
                 console.log('Target group clicked, switching to:', targetLabel);
 
                 // Find and click the corresponding target in the tree
