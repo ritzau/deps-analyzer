@@ -63,26 +63,35 @@ func GetTargetFileDetails(targetLabel string, fileGraph *graph.FileGraph, crossP
 
 	// Analyze cross-package dependencies to find incoming/outgoing file deps
 	for _, dep := range crossPackageDeps {
-		// Use package names instead of trying to guess target labels
-		// since a package may contain multiple targets
-
 		// Incoming: other targets depending on this target's files
 		if filesInTarget[dep.TargetFile] {
+			// Use full target label if available, otherwise fall back to package
+			sourceTarget := dep.SourceTarget
+			if sourceTarget == "" {
+				sourceTarget = dep.SourcePackage
+			}
+
 			details.IncomingFileDeps = append(details.IncomingFileDeps, FileDependencyDetail{
 				SourceFile:   dep.SourceFile,
 				TargetFile:   dep.TargetFile,
-				SourceTarget: dep.SourcePackage, // Use package, not guessed target
-				TargetTarget: targetLabel,       // Use actual target label for current target
+				SourceTarget: sourceTarget,
+				TargetTarget: targetLabel, // Use actual target label for current target
 			})
 		}
 
 		// Outgoing: this target's files depending on other targets
 		if filesInTarget[dep.SourceFile] {
+			// Use full target label if available, otherwise fall back to package
+			targetTarget := dep.TargetTarget
+			if targetTarget == "" {
+				targetTarget = dep.TargetPackage
+			}
+
 			details.OutgoingFileDeps = append(details.OutgoingFileDeps, FileDependencyDetail{
 				SourceFile:   dep.SourceFile,
 				TargetFile:   dep.TargetFile,
-				SourceTarget: targetLabel,       // Use actual target label for current target
-				TargetTarget: dep.TargetPackage, // Use package, not guessed target
+				SourceTarget: targetLabel, // Use actual target label for current target
+				TargetTarget: targetTarget,
 			})
 		}
 	}

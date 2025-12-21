@@ -13,10 +13,19 @@ type CrossPackageDep struct {
 	TargetFile    string `json:"targetFile"`    // e.g., "util/strings.h"
 	SourcePackage string `json:"sourcePackage"` // e.g., "//core"
 	TargetPackage string `json:"targetPackage"` // e.g., "//util"
+	SourceTarget  string `json:"sourceTarget"`  // e.g., "//core:core" (full target label if known)
+	TargetTarget  string `json:"targetTarget"`  // e.g., "//util:util" (full target label if known)
 }
 
 // FindCrossPackageDeps identifies file dependencies that cross package boundaries
+// Deprecated: Use FindCrossPackageDepsWithTargets for more accurate target labels
 func FindCrossPackageDeps(fg *graph.FileGraph) []CrossPackageDep {
+	return FindCrossPackageDepsWithTargets(fg, nil)
+}
+
+// FindCrossPackageDepsWithTargets identifies file dependencies that cross package boundaries
+// and includes full target labels when fileToTarget mapping is provided
+func FindCrossPackageDepsWithTargets(fg *graph.FileGraph, fileToTarget map[string]string) []CrossPackageDep {
 	var crossDeps []CrossPackageDep
 
 	edges := fg.Edges()
@@ -30,12 +39,24 @@ func FindCrossPackageDeps(fg *graph.FileGraph) []CrossPackageDep {
 
 		// If packages differ, this is a cross-package dependency
 		if sourcePackage != targetPackage {
-			crossDeps = append(crossDeps, CrossPackageDep{
+			dep := CrossPackageDep{
 				SourceFile:    sourceFile,
 				TargetFile:    targetFile,
 				SourcePackage: sourcePackage,
 				TargetPackage: targetPackage,
-			})
+			}
+
+			// Add full target labels if mapping is provided
+			if fileToTarget != nil {
+				if sourceTarget, ok := fileToTarget[sourceFile]; ok {
+					dep.SourceTarget = sourceTarget
+				}
+				if targetTarget, ok := fileToTarget[targetFile]; ok {
+					dep.TargetTarget = targetTarget
+				}
+			}
+
+			crossDeps = append(crossDeps, dep)
 		}
 	}
 

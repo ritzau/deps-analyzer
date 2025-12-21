@@ -149,3 +149,30 @@ func labelToPath(label string) string {
 	// No colon, just return as-is (shouldn't happen for source files)
 	return label
 }
+
+// BuildFileToTargetMap creates a mapping from file paths to their owning target labels
+// Returns a map where keys are file paths (e.g., "util/strings.cc") and values are target labels (e.g., "//util:util")
+func BuildFileToTargetMap(workspaceRoot string) (map[string]string, error) {
+	// Get all CC targets
+	targets, err := QueryAllCCTargets(workspaceRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	fileToTarget := make(map[string]string)
+
+	// For each target, get its source files and map them to the target
+	for _, target := range targets {
+		files, err := QuerySourceFilesForTarget(workspaceRoot, target.Label)
+		if err != nil {
+			// Log but don't fail - some targets might not have source files
+			continue
+		}
+
+		for _, filePath := range files {
+			fileToTarget[filePath] = target.Label
+		}
+	}
+
+	return fileToTarget, nil
+}

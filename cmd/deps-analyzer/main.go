@@ -169,7 +169,18 @@ func startWebServerAsync(workspace string, port int) {
 		} else {
 			log.Printf("[3/4] Found %d .d files", len(fileDeps))
 			fileGraph = graph.BuildFileGraph(fileDeps)
-			crossPackageDeps = analysis.FindCrossPackageDeps(fileGraph)
+
+			// Build file-to-target mapping for accurate target labels
+			log.Println("[3/4] Building file-to-target mapping...")
+			fileToTarget, err := bazel.BuildFileToTargetMap(workspace)
+			if err != nil {
+				log.Printf("[3/4] Warning: Could not build file-to-target map: %v", err)
+				crossPackageDeps = analysis.FindCrossPackageDeps(fileGraph)
+			} else {
+				log.Printf("[3/4] Mapped %d files to targets", len(fileToTarget))
+				crossPackageDeps = analysis.FindCrossPackageDepsWithTargets(fileGraph, fileToTarget)
+			}
+
 			fileCycles = cycles.FindFileCycles(fileGraph)
 			log.Printf("[3/4] Complete: Found %d cross-package file dependencies, %d circular dependencies", len(crossPackageDeps), len(fileCycles))
 
