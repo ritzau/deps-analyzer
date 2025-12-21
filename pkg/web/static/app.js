@@ -180,10 +180,9 @@ function displayDependencyGraph(graphData) {
         console.log('Tapped node:', node.data('label'));
     });
 
-    // Center and fit the graph with proper padding
-    cy.ready(function() {
+    // Fit the graph to viewport with padding after layout completes
+    cy.one('layoutstop', function() {
         cy.fit(50);
-        cy.center();
     });
 }
 
