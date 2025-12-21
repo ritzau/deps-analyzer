@@ -24,3 +24,11 @@ possible to trigger restarting the analysis.
 
 Make a good looking color scheme and support dark/light (auto detected by
 default). Maybe dive deeper and also choose a font that we can enjoy some :)
+
+## Investigate compiler options to also track header:header deps
+
+Better track compile time deps to detect cycles.
+
+## Use nm/readelf to track undefined/public symbols
+
+Track link time dependencies.
