@@ -1,8 +1,18 @@
-// Update loading message
-function updateLoadingMessage(message) {
-    const loadingMsg = document.getElementById('loadingMessage');
-    if (loadingMsg) {
-        loadingMsg.textContent = message;
+// Update loading checklist progress
+function updateLoadingProgress(step) {
+    // Mark previous steps as completed
+    for (let i = 1; i < step; i++) {
+        const item = document.querySelector(`.loading-checklist-item[data-step="${i}"]`);
+        if (item) {
+            item.classList.remove('active');
+            item.classList.add('completed');
+        }
+    }
+
+    // Mark current step as active
+    const currentItem = document.querySelector(`.loading-checklist-item[data-step="${step}"]`);
+    if (currentItem) {
+        currentItem.classList.add('active');
     }
 }
 
@@ -273,7 +283,7 @@ async function loadAndCheckComplete() {
 
             // Update stats when we have coverage data
             if (data.totalFiles > 0) {
-                updateLoadingMessage('[1/4] Coverage analysis complete...');
+                updateLoadingProgress(1);
 
                 document.getElementById('workspace').textContent = data.workspace;
                 document.getElementById('totalFiles').textContent = data.totalFiles;
@@ -309,7 +319,7 @@ async function loadAndCheckComplete() {
 
                 // Show graph section with loading spinner once coverage is complete
                 if (!graphSectionShown) {
-                    updateLoadingMessage('[2/4] Building dependency graph...');
+                    updateLoadingProgress(2);
                     document.getElementById('graphSection').style.display = 'block';
                     graphSectionShown = true;
                 }
@@ -333,7 +343,7 @@ async function loadAndCheckComplete() {
 
             // Show cross-package deps when they become available
             if (data.crossPackageDeps && data.crossPackageDeps.length > 0 && !hasShownCrossDeps) {
-                updateLoadingMessage('[3/4] Analyzing file dependencies...');
+                updateLoadingProgress(3);
                 displayCrossPackageDeps(data.crossPackageDeps);
                 document.getElementById('crossPackageSection').style.display = 'block';
                 hasShownCrossDeps = true;
@@ -355,7 +365,16 @@ async function loadAndCheckComplete() {
             const hasCrossData = hasShownCrossDeps || (data.crossPackageDeps && data.crossPackageDeps.length === 0);
             const hasCycleData = hasShownCycles || (data.fileCycles && data.fileCycles.length === 0);
             if (data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData) {
-                updateLoadingMessage('[4/4] Analysis complete!');
+                updateLoadingProgress(4);
+
+                // Mark all steps as completed
+                setTimeout(() => {
+                    document.querySelectorAll('.loading-checklist-item').forEach(item => {
+                        item.classList.remove('active');
+                        item.classList.add('completed');
+                    });
+                }, 500);
+
                 console.log('Analysis complete, stopping auto-refresh');
                 if (refreshInterval) {
                     clearInterval(refreshInterval);

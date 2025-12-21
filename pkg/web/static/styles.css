@@ -303,6 +303,50 @@ header h1 {
     z-index: 1000;
 }
 
+.loading-checklist {
+    background: white;
+    border-radius: 12px;
+    padding: 30px 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    min-width: 400px;
+}
+
+.loading-checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 0;
+    color: #666;
+    font-size: 1.1em;
+}
+
+.loading-checklist-item.active {
+    color: #667eea;
+    font-weight: 500;
+}
+
+.loading-checklist-item.completed {
+    color: #10b981;
+}
+
+.checklist-icon {
+    font-size: 1.5em;
+    width: 30px;
+    text-align: center;
+}
+
+.loading-checklist-item.active .checklist-icon {
+    animation: spin 2s linear infinite;
+}
+
+.loading-checklist-item.completed .checklist-icon::before {
+    content: '✓';
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 .loading-spinner {
     width: 60px;
     height: 60px;
@@ -311,10 +355,6 @@ header h1 {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 20px;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 
 .loading-message {
