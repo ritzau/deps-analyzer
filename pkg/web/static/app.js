@@ -311,45 +311,38 @@ async function loadAndCheckComplete() {
                 populateTreeBrowser(data);
             }
 
-            // Step 3: Analyzing file dependencies complete
+            // Step 3 & 4: Analyzing file dependencies and detecting cycles
+            // Both crossPackageDeps and fileCycles are set together on server
             // crossPackageDeps will be undefined until analysis is done, then becomes array (possibly empty)
             if (data.crossPackageDeps !== undefined && !hasShownCrossDeps) {
+                // Display cross-package deps if any
                 if (data.crossPackageDeps.length > 0) {
                     displayCrossPackageDeps(data.crossPackageDeps);
                     document.getElementById('crossPackageSection').style.display = 'block';
                 }
-                // Mark step 3 complete, activate step 4
+
+                // Display cycles if any
+                if (data.fileCycles && data.fileCycles.length > 0) {
+                    displayFileCycles(data.fileCycles);
+                    document.getElementById('cyclesSection').style.display = 'block';
+                }
+
+                // Steps 3 and 4 both complete together
                 updateLoadingProgress(3, 4);
                 hasShownCrossDeps = true;
-            }
-
-            // Show cycles when they become available
-            if (data.fileCycles && data.fileCycles.length > 0 && !hasShownCycles) {
-                displayFileCycles(data.fileCycles);
-                document.getElementById('cyclesSection').style.display = 'block';
                 hasShownCycles = true;
-            }
 
-            // Step 4: Check if all analysis is complete
-            const hasCrossData = hasShownCrossDeps;
-            // fileCycles can be null (no cycles), undefined (not done), or array with cycles
-            const hasCycleData = hasShownCycles || (data.fileCycles !== undefined && (data.fileCycles === null || data.fileCycles.length === 0));
-            const analysisComplete = data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData;
-
-            if (analysisComplete) {
-                // Mark step 4 complete (no next step)
-                updateLoadingProgress(4, null);
-
-                // Hide overlay after showing completion
+                // Immediately complete step 4 and hide overlay
                 setTimeout(() => {
-                    hideLoadingOverlay();
-                }, 800);
-
-                console.log('Analysis complete, stopping auto-refresh');
-                if (refreshInterval) {
-                    clearInterval(refreshInterval);
-                    refreshInterval = null;
-                }
+                    updateLoadingProgress(4, null);
+                    setTimeout(() => {
+                        hideLoadingOverlay();
+                        if (refreshInterval) {
+                            clearInterval(refreshInterval);
+                            refreshInterval = null;
+                        }
+                    }, 800);
+                }, 100);
             }
         }
     } catch (e) {
