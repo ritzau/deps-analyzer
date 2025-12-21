@@ -211,15 +211,21 @@ function displayDependencyGraph(graphData) {
             // At package level, clicking a target should zoom into it
             // Find and click the corresponding target in the tree
             const targetNodes = document.querySelectorAll('.tree-node[data-type="target"]');
+            console.log('Looking for tree node with id:', nodeId);
+            console.log('Found', targetNodes.length, 'target nodes in tree');
+
             for (const treeNode of targetNodes) {
+                console.log('Checking tree node id:', treeNode.dataset.id);
                 if (treeNode.dataset.id === nodeId) {
-                    const content = treeNode.querySelector('.tree-node-content');
-                    if (content) {
-                        content.click();
+                    console.log('Match found! Clicking tree node');
+                    const label = treeNode.querySelector('.tree-label');
+                    if (label) {
+                        label.click();
                         return;
                     }
                 }
             }
+            console.log('No matching tree node found for:', nodeId);
         } else if (currentView === 'file') {
             // At file level, could highlight the file in the tree
             // For now, just log it
