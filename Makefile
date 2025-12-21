@@ -2,7 +2,7 @@
 
 # Build the analyzer binary
 build:
-	go build -o deps-analyzer ./cmd/analyzer
+	go build -o deps-analyzer ./cmd/deps-analyzer
 
 # Run the analyzer in web mode
 run: build
@@ -19,6 +19,6 @@ clean:
 
 # Install to GOPATH/bin
 install:
-	go install ./cmd/analyzer
+	go install ./cmd/deps-analyzer
 
 .DEFAULT_GOAL := build
