@@ -8,6 +8,7 @@ import (
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
+	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/finder"
 	"github.com/ritzau/deps-analyzer/pkg/graph"
 	"github.com/ritzau/deps-analyzer/pkg/output"
@@ -95,14 +96,29 @@ func startWebServer(workspace string, totalFiles, coveredFiles int, uncovered []
 		fmt.Printf("Graph: %d nodes, %d edges\n", len(graphData.Nodes), len(graphData.Edges))
 	}
 
+	// Build file dependency graph and find cross-package dependencies
+	fmt.Println("Analyzing file-level dependencies...")
+	var crossPackageDeps []analysis.CrossPackageDep
+	fileDeps, err := deps.ParseAllDFiles(workspace)
+	if err != nil {
+		fmt.Printf("Warning: Could not parse .d files: %v\n", err)
+	} else if len(fileDeps) == 0 {
+		fmt.Println("Note: No .d files found. Run 'bazel build //... --save_temps' to generate them.")
+	} else {
+		fileGraph := graph.BuildFileGraph(fileDeps)
+		crossPackageDeps = analysis.FindCrossPackageDeps(fileGraph)
+		fmt.Printf("Found %d cross-package file dependencies\n", len(crossPackageDeps))
+	}
+
 	// Create analysis data
 	data := &web.AnalysisData{
-		Workspace:       workspace,
-		TotalFiles:      totalFiles,
-		CoveredFiles:    coveredFiles,
-		UncoveredFiles:  uncovered,
-		CoveragePercent: percentage,
-		Graph:           graphData,
+		Workspace:        workspace,
+		TotalFiles:       totalFiles,
+		CoveredFiles:     coveredFiles,
+		UncoveredFiles:   uncovered,
+		CoveragePercent:  percentage,
+		Graph:            graphData,
+		CrossPackageDeps: crossPackageDeps,
 	}
 
 	// Create and start server

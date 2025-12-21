@@ -51,6 +51,12 @@ async function loadAnalysisData() {
             document.getElementById('graphSection').style.display = 'block';
         }
 
+        // Show cross-package dependencies if available
+        if (data.crossPackageDeps && data.crossPackageDeps.length > 0) {
+            displayCrossPackageDeps(data.crossPackageDeps);
+            document.getElementById('crossPackageSection').style.display = 'block';
+        }
+
     } catch (error) {
         console.error('Error loading analysis data:', error);
         loadingEl.style.display = 'none';
@@ -169,6 +175,55 @@ function displayDependencyGraph(graphData) {
 
     // Zoom to fit on load
     cy.fit(50);
+}
+
+function displayCrossPackageDeps(deps) {
+    const listEl = document.getElementById('crossPackageList');
+    listEl.innerHTML = '';
+
+    // Group by source package
+    const grouped = {};
+    deps.forEach(dep => {
+        if (!grouped[dep.sourcePackage]) {
+            grouped[dep.sourcePackage] = [];
+        }
+        grouped[dep.sourcePackage].push(dep);
+    });
+
+    // Display grouped dependencies
+    Object.keys(grouped).sort().forEach(sourcePackage => {
+        const packageDeps = grouped[sourcePackage];
+
+        const packageDiv = document.createElement('div');
+        packageDiv.style.marginBottom = '15px';
+
+        const headerDiv = document.createElement('div');
+        headerDiv.style.fontWeight = 'bold';
+        headerDiv.style.marginBottom = '5px';
+        headerDiv.style.color = '#0d6efd';
+        headerDiv.textContent = `${sourcePackage} dependencies:`;
+        packageDiv.appendChild(headerDiv);
+
+        packageDeps.forEach(dep => {
+            const depDiv = document.createElement('div');
+            depDiv.className = 'file-item';
+            depDiv.style.marginLeft = '20px';
+
+            const pathDiv = document.createElement('div');
+            pathDiv.className = 'file-path';
+            pathDiv.textContent = `${dep.sourceFile} → ${dep.targetFile}`;
+
+            const targetDiv = document.createElement('div');
+            targetDiv.className = 'file-package';
+            targetDiv.textContent = `Depends on: ${dep.targetPackage}`;
+
+            depDiv.appendChild(pathDiv);
+            depDiv.appendChild(targetDiv);
+            packageDiv.appendChild(depDiv);
+        });
+
+        listEl.appendChild(packageDiv);
+    });
 }
 
 // Load data when page loads

@@ -36,12 +36,13 @@ type GraphData struct {
 
 // AnalysisData holds all the analysis results to send to the frontend
 type AnalysisData struct {
-	Workspace       string                   `json:"workspace"`
-	TotalFiles      int                      `json:"totalFiles"`
-	CoveredFiles    int                      `json:"coveredFiles"`
-	UncoveredFiles  []analysis.UncoveredFile `json:"uncoveredFiles"`
-	CoveragePercent float64                  `json:"coveragePercent"`
-	Graph           *GraphData               `json:"graph,omitempty"`
+	Workspace         string                      `json:"workspace"`
+	TotalFiles        int                         `json:"totalFiles"`
+	CoveredFiles      int                         `json:"coveredFiles"`
+	UncoveredFiles    []analysis.UncoveredFile    `json:"uncoveredFiles"`
+	CoveragePercent   float64                     `json:"coveragePercent"`
+	Graph             *GraphData                  `json:"graph,omitempty"`
+	CrossPackageDeps  []analysis.CrossPackageDep  `json:"crossPackageDeps,omitempty"`
 }
 
 // Server represents the web server
