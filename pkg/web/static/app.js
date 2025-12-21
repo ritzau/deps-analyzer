@@ -89,7 +89,7 @@ function displayDependencyGraph(graphData) {
                     'text-valign': 'center',
                     'text-halign': 'center',
                     'font-size': '12px',
-                    'font-family': 'Consolas, Monaco, monospace',
+                    'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                     'font-weight': '600',
                     'text-wrap': 'wrap',
                     'text-max-width': '140px',
