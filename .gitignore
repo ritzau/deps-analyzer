@@ -6,6 +6,8 @@ bazel-*
 *.test
 *.out
 /bin/
+deps-analyzer
+analyzer
 
 # IDE
 .idea/
