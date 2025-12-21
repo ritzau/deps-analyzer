@@ -95,6 +95,13 @@
                 <p class="help-text">File-level dependencies that cross package boundaries. These may indicate tight coupling.</p>
                 <div id="crossPackageList" class="file-list"></div>
             </div>
+
+            <!-- Circular Dependencies -->
+            <div id="cyclesSection" class="card" style="display: none;">
+                <h2>🔄 Circular Dependencies</h2>
+                <p class="help-text">Files that have circular include dependencies. These can cause compilation issues and should be refactored.</p>
+                <div id="cyclesList" class="file-list"></div>
+            </div>
         </div>
     </div>
 

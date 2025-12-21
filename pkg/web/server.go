@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
+	"github.com/ritzau/deps-analyzer/pkg/cycles"
 )
 
 //go:embed static/*
@@ -43,6 +44,7 @@ type AnalysisData struct {
 	CoveragePercent   float64                     `json:"coveragePercent"`
 	Graph             *GraphData                  `json:"graph,omitempty"`
 	CrossPackageDeps  []analysis.CrossPackageDep  `json:"crossPackageDeps,omitempty"`
+	FileCycles        []cycles.FileCycle          `json:"fileCycles,omitempty"`
 }
 
 // Server represents the web server

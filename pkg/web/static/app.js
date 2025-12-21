@@ -198,6 +198,43 @@ function displayCrossPackageDeps(deps) {
     });
 }
 
+function displayFileCycles(cycles) {
+    const listEl = document.getElementById('cyclesList');
+    listEl.innerHTML = '';
+
+    cycles.forEach((cycle, index) => {
+        const cycleDiv = document.createElement('div');
+        cycleDiv.style.marginBottom = '20px';
+
+        const headerDiv = document.createElement('div');
+        headerDiv.style.fontWeight = 'bold';
+        headerDiv.style.marginBottom = '10px';
+        headerDiv.style.color = '#dc3545';
+        headerDiv.textContent = `Cycle ${index + 1} (${cycle.files.length} files):`;
+        cycleDiv.appendChild(headerDiv);
+
+        const cycleItemDiv = document.createElement('div');
+        cycleItemDiv.className = 'file-item';
+        cycleItemDiv.style.background = '#ffe6e6';
+        cycleItemDiv.style.borderLeftColor = '#dc3545';
+
+        // Display the cycle as a chain
+        const pathDiv = document.createElement('div');
+        pathDiv.className = 'file-path';
+        pathDiv.style.fontFamily = 'Courier New, monospace';
+        pathDiv.style.fontSize = '0.9em';
+        pathDiv.style.lineHeight = '1.6';
+
+        // Show cycle as: file1 → file2 → file3 → file1
+        const cycleChain = cycle.files.join(' → ') + ' → ' + cycle.files[0];
+        pathDiv.textContent = cycleChain;
+
+        cycleItemDiv.appendChild(pathDiv);
+        cycleDiv.appendChild(cycleItemDiv);
+        listEl.appendChild(cycleDiv);
+    });
+}
+
 let refreshInterval;
 let lastDataHash = '';
 
@@ -208,12 +245,14 @@ function hashData(data) {
         covered: data.coveredFiles,
         uncoveredCount: data.uncoveredFiles ? data.uncoveredFiles.length : 0,
         hasGraph: !!data.graph,
-        hasCrossDeps: !!data.crossPackageDeps && data.crossPackageDeps.length > 0
+        hasCrossDeps: !!data.crossPackageDeps && data.crossPackageDeps.length > 0,
+        hasCycles: !!data.fileCycles && data.fileCycles.length > 0
     });
 }
 
 let hasShownGraph = false;
 let hasShownCrossDeps = false;
+let hasShownCycles = false;
 let hasShownCoverageResult = false;
 let graphSectionShown = false;
 
@@ -293,13 +332,22 @@ async function loadAndCheckComplete() {
                 hasShownCrossDeps = true;
             }
 
+            // Show cycles when they become available
+            if (data.fileCycles && data.fileCycles.length > 0 && !hasShownCycles) {
+                displayFileCycles(data.fileCycles);
+                document.getElementById('cyclesSection').style.display = 'block';
+                hasShownCycles = true;
+            }
+
             // Hide loading overlay when we have coverage data
             if (data.totalFiles > 0) {
                 hideLoadingOverlay();
             }
 
-            // Stop polling if we have all the data
-            if (data.totalFiles > 0 && hasShownGraph && (hasShownCrossDeps || (data.crossPackageDeps && data.crossPackageDeps.length === 0))) {
+            // Stop polling if we have all the data (cross-package deps and cycles are optional)
+            const hasCrossData = hasShownCrossDeps || (data.crossPackageDeps && data.crossPackageDeps.length === 0);
+            const hasCycleData = hasShownCycles || (data.fileCycles && data.fileCycles.length === 0);
+            if (data.totalFiles > 0 && hasShownGraph && hasCrossData && hasCycleData) {
                 updateLoadingMessage('[4/4] Analysis complete!');
                 console.log('Analysis complete, stopping auto-refresh');
                 if (refreshInterval) {

@@ -69,6 +69,21 @@ func (fg *FileGraph) GetNode(path string) (*FileNode, bool) {
 	return node, exists
 }
 
+// GetNodeByID returns a file node by its graph ID
+func (fg *FileGraph) GetNodeByID(id int64) *FileNode {
+	for path, nodeID := range fg.ids {
+		if nodeID == id {
+			return fg.nodes[path]
+		}
+	}
+	return nil
+}
+
+// Graph returns the underlying directed graph
+func (fg *FileGraph) Graph() *simple.DirectedGraph {
+	return fg.graph
+}
+
 // Nodes returns all file nodes in the graph
 func (fg *FileGraph) Nodes() []*FileNode {
 	nodes := make([]*FileNode, 0, len(fg.nodes))
