@@ -176,6 +176,12 @@ func startWebServerAsync(workspace string, port int) {
 				if len(bin.SystemLibraries) > 0 {
 					log.Printf("[2.5/4]     System libs: %v", bin.SystemLibraries)
 				}
+				if len(bin.OverlappingDeps) > 0 {
+					log.Printf("[2.5/4]     ⚠️  Overlapping deps (potential duplicate symbols):")
+					for sharedLib, targets := range bin.OverlappingDeps {
+						log.Printf("[2.5/4]       %s shares: %v", sharedLib, targets)
+					}
+				}
 			}
 			server.SetBinaries(binaryInfos)
 		}

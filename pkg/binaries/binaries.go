@@ -8,13 +8,14 @@ import (
 
 // BinaryInfo represents a cc_binary or cc_shared_library
 type BinaryInfo struct {
-	Label             string   `json:"label"`
-	Kind              string   `json:"kind"` // "cc_binary" or "cc_shared_library"
-	DynamicDeps       []string `json:"dynamicDeps"`
-	DataDeps          []string `json:"dataDeps"`
-	SystemLibraries   []string `json:"systemLibraries"`
-	RegularDeps       []string `json:"regularDeps"`      // Direct cc_library dependencies
-	InternalTargets   []string `json:"internalTargets"` // All cc_library targets this binary depends on
+	Label             string              `json:"label"`
+	Kind              string              `json:"kind"` // "cc_binary" or "cc_shared_library"
+	DynamicDeps       []string            `json:"dynamicDeps"`
+	DataDeps          []string            `json:"dataDeps"`
+	SystemLibraries   []string            `json:"systemLibraries"`
+	RegularDeps       []string            `json:"regularDeps"`      // Direct cc_library dependencies
+	InternalTargets   []string            `json:"internalTargets"` // All cc_library targets this binary depends on
+	OverlappingDeps   map[string][]string `json:"overlappingDeps"` // Map of binary -> overlapping cc_library targets (potential duplicate symbols)
 }
 
 // QueryAllBinaries finds all cc_binary and cc_shared_library targets
@@ -225,5 +226,61 @@ func GetAllBinariesInfo(workspace string) ([]*BinaryInfo, error) {
 		binaries = append(binaries, info)
 	}
 
+	// Compute overlapping dependencies (potential duplicate symbols)
+	computeOverlappingDeps(binaries)
+
 	return binaries, nil
+}
+
+// computeOverlappingDeps finds cc_library targets that are linked into multiple binaries
+// This can cause duplicate symbols if a binary loads a shared library that both depend on the same cc_library
+func computeOverlappingDeps(binaries []*BinaryInfo) {
+	for i, binary := range binaries {
+		if binary.Kind != "cc_binary" {
+			continue // Only check for cc_binary loading shared libraries
+		}
+
+		binary.OverlappingDeps = make(map[string][]string)
+
+		// Check each dynamic dependency
+		for _, depLabel := range binary.DynamicDeps {
+			// Find the shared library
+			var sharedLib *BinaryInfo
+			for _, b := range binaries {
+				if b.Label == depLabel {
+					sharedLib = b
+					break
+				}
+			}
+
+			if sharedLib == nil {
+				continue
+			}
+
+			// Find overlapping cc_library targets
+			binaryTargets := toSet(binary.InternalTargets)
+			var overlapping []string
+
+			for _, target := range sharedLib.InternalTargets {
+				if binaryTargets[target] {
+					overlapping = append(overlapping, target)
+				}
+			}
+
+			if len(overlapping) > 0 {
+				binary.OverlappingDeps[depLabel] = overlapping
+			}
+		}
+
+		binaries[i] = binary
+	}
+}
+
+// toSet converts a slice to a set (map[string]bool)
+func toSet(slice []string) map[string]bool {
+	set := make(map[string]bool)
+	for _, item := range slice {
+		set[item] = true
+	}
+	return set
 }
