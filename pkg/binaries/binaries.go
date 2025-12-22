@@ -96,7 +96,24 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 	// Get all cc_library targets this binary depends on (excluding shared libraries)
 	info.InternalTargets = queryInternalTargets(workspace, label)
 
+	// Get direct cc_library dependencies (depth 1)
+	info.RegularDeps = queryDirectDeps(workspace, label)
+
 	return info, nil
+}
+
+// queryDirectDeps finds direct cc_library dependencies (depth 1)
+func queryDirectDeps(workspace string, label string) []string {
+	// Query for direct cc_library dependencies only
+	cmd := exec.Command("bazel", "query",
+		fmt.Sprintf("kind('cc_library', deps(%s, 1))", label))
+	cmd.Dir = workspace
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	return parseLabels(string(output), label)
 }
 
 // queryInternalTargets finds all cc_library targets this binary depends on

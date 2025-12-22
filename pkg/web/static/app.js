@@ -1317,6 +1317,14 @@ function buildBinaryFocusedGraphData(focusedBinary) {
         type: 'target-group'
     });
 
+    // Add the binary itself as a node inside the internal group
+    graphData.nodes.push({
+        id: focusedBinary.label,
+        label: focusedBinary.label,
+        type: focusedBinary.kind,
+        parent: 'internal-group'
+    });
+
     // Filter to only include cc_library targets this binary depends on (static deps)
     const internalTargetSet = new Set(focusedBinary.internalTargets || []);
     console.log('Internal targets for', focusedBinary.label, ':', Array.from(internalTargetSet));
@@ -1349,6 +1357,21 @@ function buildBinaryFocusedGraphData(focusedBinary) {
                 graphData.edges.push(edge);
             }
         });
+
+        // Add edges from the binary to packages containing its direct dependencies
+        if (focusedBinary.regularDeps) {
+            focusedBinary.regularDeps.forEach(depLabel => {
+                const packageName = depLabel.split(':')[0];
+                if (relevantPackages.has(packageName)) {
+                    graphData.edges.push({
+                        source: focusedBinary.label,
+                        target: packageName,
+                        type: 'static',
+                        symbols: []
+                    });
+                }
+            });
+        }
     } else {
         // Show individual targets - but only our internal (static) targets
         const allTargets = packageGraph ? packageGraph.nodes : [];
@@ -1368,6 +1391,20 @@ function buildBinaryFocusedGraphData(focusedBinary) {
             packageGraph.edges.forEach(edge => {
                 if (internalTargetSet.has(edge.source) && internalTargetSet.has(edge.target)) {
                     graphData.edges.push(edge);
+                }
+            });
+        }
+
+        // Add edges from the binary to its direct dependencies
+        if (focusedBinary.regularDeps) {
+            focusedBinary.regularDeps.forEach(depLabel => {
+                if (internalTargetSet.has(depLabel)) {
+                    graphData.edges.push({
+                        source: focusedBinary.label,
+                        target: depLabel,
+                        type: 'static',
+                        symbols: []
+                    });
                 }
             });
         }
