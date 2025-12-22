@@ -1317,35 +1317,59 @@ function buildBinaryFocusedGraphData(focusedBinary) {
         type: 'target-group'
     });
 
-    // Add ALL targets from package graph inside the internal group
-    // This shows the complete static dependency graph
+    // Filter to only include cc_library targets this binary depends on (static deps)
+    const internalTargetSet = new Set(focusedBinary.internalTargets || []);
+    console.log('Internal targets for', focusedBinary.label, ':', Array.from(internalTargetSet));
+
     if (packagesCollapsed && packageGraph) {
-        // Show as packages
+        // Show as packages - but only packages that contain our internal targets
         const collapsedPkg = buildCollapsedPackageGraph(packageGraph);
 
-        collapsedPkg.nodes.forEach(node => {
-            graphData.nodes.push({
-                ...node,
-                parent: 'internal-group'
-            });
+        // Find which packages contain our internal targets
+        const relevantPackages = new Set();
+        internalTargetSet.forEach(targetLabel => {
+            const packageName = targetLabel.split(':')[0];
+            relevantPackages.add(packageName);
         });
 
-        // Add all edges between packages
-        graphData.edges.push(...collapsedPkg.edges);
+        console.log('Relevant packages:', Array.from(relevantPackages));
+
+        collapsedPkg.nodes.forEach(node => {
+            if (relevantPackages.has(node.id)) {
+                graphData.nodes.push({
+                    ...node,
+                    parent: 'internal-group'
+                });
+            }
+        });
+
+        // Add edges only between our relevant packages
+        collapsedPkg.edges.forEach(edge => {
+            if (relevantPackages.has(edge.source) && relevantPackages.has(edge.target)) {
+                graphData.edges.push(edge);
+            }
+        });
     } else {
-        // Show individual targets
+        // Show individual targets - but only our internal (static) targets
         const allTargets = packageGraph ? packageGraph.nodes : [];
 
         allTargets.forEach(target => {
-            graphData.nodes.push({
-                ...target,
-                parent: 'internal-group'
-            });
+            const targetLabel = target.label || target.id;
+            if (internalTargetSet.has(targetLabel)) {
+                graphData.nodes.push({
+                    ...target,
+                    parent: 'internal-group'
+                });
+            }
         });
 
-        // Add all edges between targets
+        // Add edges only between our internal targets
         if (packageGraph && packageGraph.edges) {
-            graphData.edges.push(...packageGraph.edges);
+            packageGraph.edges.forEach(edge => {
+                if (internalTargetSet.has(edge.source) && internalTargetSet.has(edge.target)) {
+                    graphData.edges.push(edge);
+                }
+            });
         }
     }
 
