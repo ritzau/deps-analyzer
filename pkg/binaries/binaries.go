@@ -13,7 +13,8 @@ type BinaryInfo struct {
 	DynamicDeps       []string `json:"dynamicDeps"`
 	DataDeps          []string `json:"dataDeps"`
 	SystemLibraries   []string `json:"systemLibraries"`
-	RegularDeps       []string `json:"regularDeps"`
+	RegularDeps       []string `json:"regularDeps"`      // Direct cc_library dependencies
+	InternalTargets   []string `json:"internalTargets"` // All cc_library targets this binary depends on
 }
 
 // QueryAllBinaries finds all cc_binary and cc_shared_library targets
@@ -91,7 +92,24 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 	// Get system libraries from linkopts
 	info.SystemLibraries = querySystemLibraries(workspace, label)
 
+	// Get all cc_library targets this binary depends on (excluding shared libraries)
+	info.InternalTargets = queryInternalTargets(workspace, label)
+
 	return info, nil
+}
+
+// queryInternalTargets finds all cc_library targets this binary depends on
+func queryInternalTargets(workspace string, label string) []string {
+	// Query for all cc_library targets in the dependency tree
+	cmd := exec.Command("bazel", "query",
+		fmt.Sprintf("kind('cc_library', deps(%s))", label))
+	cmd.Dir = workspace
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	return parseLabels(string(output), label)
 }
 
 // querySharedLibraryDeps finds all cc_shared_library dependencies

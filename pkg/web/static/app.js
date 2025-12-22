@@ -594,10 +594,12 @@ async function loadAndCheckComplete() {
                 updateLoadingProgress(2, 3);
                 hasShownGraph = true;
 
-                // Populate tree browser
+                // Populate tree browser (after binary data is loaded)
                 if (data.graph.nodes) {
                     populateTreeBrowser(data);
                 }
+
+                console.log('Binary list populated, binaryData count:', binaryData ? binaryData.length : 0);
             }
 
             // Step 4: All complete
@@ -1267,21 +1269,68 @@ function buildBinaryFocusedGraphData(focusedBinary) {
         edges: []
     };
 
-    // Get all targets from the full package graph
+    console.log('Building focused graph for binary:', focusedBinary.label);
+    console.log('Internal targets:', focusedBinary.internalTargets);
+
+    // Get the internal targets that belong to this binary
+    const internalTargetLabels = new Set(focusedBinary.internalTargets || []);
     const allTargets = packageGraph ? packageGraph.nodes : [];
 
-    // Determine which targets belong to this binary
-    // For now, we'll show all internal targets with the option to collapse to packages
+    // Add compound parent node for internal targets
+    graphData.nodes.push({
+        id: 'internal-group',
+        label: focusedBinary.label,
+        type: 'target-group'
+    });
+
+    // Filter and add only targets that belong to this binary
     if (packagesCollapsed && packageGraph) {
         // Show as packages
         const collapsedPkg = buildCollapsedPackageGraph(packageGraph);
-        graphData.nodes.push(...collapsedPkg.nodes);
-        graphData.edges.push(...collapsedPkg.edges);
+
+        // Filter to only include packages that have targets in this binary
+        const relevantPackageNames = new Set();
+        internalTargetLabels.forEach(targetLabel => {
+            const packageName = targetLabel.split(':')[0];
+            relevantPackageNames.add(packageName);
+        });
+
+        collapsedPkg.nodes.forEach(node => {
+            if (relevantPackageNames.has(node.id)) {
+                graphData.nodes.push({
+                    ...node,
+                    parent: 'internal-group'
+                });
+            }
+        });
+
+        // Add edges between internal packages
+        collapsedPkg.edges.forEach(edge => {
+            if (relevantPackageNames.has(edge.source) && relevantPackageNames.has(edge.target)) {
+                graphData.edges.push(edge);
+            }
+        });
     } else {
-        // Show individual targets
-        graphData.nodes.push(...allTargets);
+        // Show individual targets that belong to this binary
+        allTargets.forEach(target => {
+            if (internalTargetLabels.has(target.label) || internalTargetLabels.has(target.id)) {
+                graphData.nodes.push({
+                    ...target,
+                    parent: 'internal-group'
+                });
+            }
+        });
+
+        // Add edges between internal targets
         if (packageGraph) {
-            graphData.edges.push(...packageGraph.edges);
+            packageGraph.edges.forEach(edge => {
+                const sourceInternal = internalTargetLabels.has(edge.source);
+                const targetInternal = internalTargetLabels.has(edge.target);
+
+                if (sourceInternal && targetInternal) {
+                    graphData.edges.push(edge);
+                }
+            });
         }
     }
 
