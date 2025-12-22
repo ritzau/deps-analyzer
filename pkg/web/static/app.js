@@ -1326,9 +1326,55 @@ function buildBinaryFocusedGraphData(focusedBinary) {
         });
     }
 
-    // Add edges from focused binary to external dependencies
-    // Note: We need to find which internal targets connect to external binaries
-    // For now, we'll add edges from the binary itself (simplified)
+    // Add edges connecting to external dependencies
+    // We need to find which internal target actually uses these external binaries
+    // For now, create edges from main:test_app (the focused binary's main target)
+
+    const mainTarget = focusedBinary.label; // e.g., "//main:test_app"
+
+    // Check if this target exists in the graph
+    const hasMainTarget = graphData.nodes.some(n => n.id === mainTarget || n.label === mainTarget);
+
+    if (hasMainTarget) {
+        // Add edges for dynamic dependencies
+        if (focusedBinary.dynamicDeps) {
+            focusedBinary.dynamicDeps.forEach(depLabel => {
+                graphData.edges.push({
+                    source: mainTarget,
+                    target: depLabel,
+                    type: 'dynamic_link',
+                    linkage: 'dynamic',
+                    symbols: []
+                });
+            });
+        }
+
+        // Add edges for data dependencies
+        if (focusedBinary.dataDeps) {
+            focusedBinary.dataDeps.forEach(depLabel => {
+                graphData.edges.push({
+                    source: mainTarget,
+                    target: depLabel,
+                    type: 'data_dependency',
+                    linkage: 'data',
+                    symbols: []
+                });
+            });
+        }
+
+        // Add edges for system libraries
+        if (focusedBinary.systemLibraries) {
+            focusedBinary.systemLibraries.forEach(sysLib => {
+                graphData.edges.push({
+                    source: mainTarget,
+                    target: 'system:' + sysLib,
+                    type: 'system_link',
+                    linkage: 'system',
+                    symbols: []
+                });
+            });
+        }
+    }
 
     return graphData;
 }
