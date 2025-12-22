@@ -82,7 +82,8 @@ func ParseNMOutput(objectFile string, nmOutput string) []Symbol {
 
 // RunNM runs nm on an object file and returns the parsed symbols
 func RunNM(objectFile string) ([]Symbol, error) {
-	cmd := exec.Command("nm", objectFile)
+	// Use -C to demangle C++ symbol names for better readability
+	cmd := exec.Command("nm", "-C", objectFile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("nm failed for %s: %w", objectFile, err)
@@ -104,14 +105,20 @@ func FindObjectFiles(workspaceRoot string) ([]string, error) {
 
 	for _, dir := range bazelOutDirs {
 		// Use find command to locate .o files
-		cmd := exec.Command("find", dir, "-name", "*.o", "-type", "f")
+		// Use -L to follow symlinks (Bazel uses symlinks for bazel-out)
+		cmd := exec.Command("find", "-L", dir, "-name", "*.o")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			// Directory might not exist, continue
 			continue
 		}
 
-		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		outputStr := strings.TrimSpace(string(output))
+		if outputStr == "" {
+			continue
+		}
+
+		lines := strings.Split(outputStr, "\n")
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
 			if line != "" {
@@ -227,12 +234,15 @@ func objectFileToSourceFile(objPath string, workspaceRoot string) string {
 	name := strings.TrimSuffix(base, ".o")
 
 	// Try to extract package path from the object file path
-	// Bazel typically puts objects in paths like: bazel-out/.../bin/package/_objs/target/file.o
+	// Bazel typically puts objects in paths like:
+	//   bazel-out/.../bin/package/_objs/target/file.o
+	//   bazel-bin/package/_objs/target/file.o
 	parts := strings.Split(objPath, string(filepath.Separator))
 
 	var packagePath string
 	for i, part := range parts {
-		if part == "bin" && i+1 < len(parts) {
+		// Look for "bin" directory or "bazel-bin" symlink
+		if (part == "bin" || part == "bazel-bin") && i+1 < len(parts) {
 			// Everything after "bin" until "_objs" is the package path
 			for j := i + 1; j < len(parts); j++ {
 				if parts[j] == "_objs" {
@@ -247,16 +257,16 @@ func objectFileToSourceFile(objPath string, workspaceRoot string) string {
 		}
 	}
 
+	var result string
 	if packagePath != "" {
-		// Try common C++ extensions
-		for _, ext := range []string{".cc", ".cpp", ".c"} {
-			candidate := filepath.Join(packagePath, name+ext)
-			return candidate
-		}
+		// Just use .cc extension (most common for Bazel C++)
+		result = filepath.Join(packagePath, name+".cc")
+	} else {
+		// Fallback: just use the base name with .cc
+		result = name + ".cc"
 	}
 
-	// Fallback: just use the base name with .cc
-	return name + ".cc"
+	return result
 }
 
 // isDefinedSymbol returns true if the symbol type indicates a definition

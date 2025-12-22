@@ -40,3 +40,13 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ## CI
 
 ## Test using a (headless?) browser
+
+## Real decent logging
+
+## External packages
+
+- May require support of .a files
+
+## Real so file test cases
+
+## BUG: Only include edges to the focused target

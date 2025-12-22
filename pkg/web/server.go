@@ -28,11 +28,11 @@ type GraphNode struct {
 
 // GraphEdge represents an edge in the dependency graph
 type GraphEdge struct {
-	Source  string `json:"source"`
-	Target  string `json:"target"`
-	Type    string `json:"type"`    // "file" (from .d files) or "symbol" (from nm)
-	Linkage string `json:"linkage"` // For symbol edges: "static", "dynamic", or "cross"
-	Symbol  string `json:"symbol"`  // For symbol edges: the symbol name
+	Source  string   `json:"source"`
+	Target  string   `json:"target"`
+	Type    string   `json:"type"`    // "file" (from .d files) or "symbol" (from nm)
+	Linkage string   `json:"linkage"` // For symbol edges: "static", "dynamic", or "cross"
+	Symbols []string `json:"symbols"` // For symbol edges: list of symbol names
 }
 
 // GraphData holds the dependency graph for visualization
@@ -220,7 +220,7 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 			graphData.Nodes = append(graphData.Nodes, GraphNode{
 				ID:     dep.TargetFile,
 				Label:  getFileName(dep.TargetFile),
-				Type:   "external",
+				Type:   getFileType(dep.TargetFile),
 				Parent: parentID,
 			})
 		}
@@ -234,7 +234,7 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 			graphData.Nodes = append(graphData.Nodes, GraphNode{
 				ID:     dep.SourceFile,
 				Label:  getFileName(dep.SourceFile),
-				Type:   "external",
+				Type:   getFileType(dep.SourceFile),
 				Parent: parentID,
 			})
 		}
@@ -278,28 +278,83 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 		})
 	}
 
-	// Add symbol-level edges
+	// Add symbol-level edges and nodes for symbol-referenced files
 	if symbolDeps != nil {
-		// Create a map of files in this target or connected targets
-		allFiles := make(map[string]bool)
-		for file := range filesInTarget {
-			allFiles[file] = true
-		}
-		for file := range externalFiles {
-			allFiles[file] = true
-		}
-
+		// First pass: add any missing nodes for source files referenced by symbols
 		for _, symDep := range symbolDeps {
-			// Only include symbol edges that involve files in this view
-			if allFiles[symDep.SourceFile] && allFiles[symDep.TargetFile] {
-				graphData.Edges = append(graphData.Edges, GraphEdge{
-					Source:  symDep.SourceFile,
-					Target:  symDep.TargetFile,
-					Type:    "symbol",
-					Linkage: string(symDep.Linkage),
-					Symbol:  symDep.Symbol,
+			// Check if this symbol dependency involves files in the current target
+			sourceInTarget := filesInTarget[symDep.SourceFile]
+			targetInTarget := filesInTarget[symDep.TargetFile]
+
+			// If source is in target and target is not, add target as external node
+			if sourceInTarget && !targetInTarget && !externalFiles[symDep.TargetFile] {
+				externalFiles[symDep.TargetFile] = true
+				parentID := ensureParentNode(symDep.TargetTarget)
+				graphData.Nodes = append(graphData.Nodes, GraphNode{
+					ID:     symDep.TargetFile,
+					Label:  getFileName(symDep.TargetFile),
+					Type:   getFileType(symDep.TargetFile),
+					Parent: parentID,
 				})
 			}
+
+			// If target is in target and source is not, add source as external node
+			if targetInTarget && !sourceInTarget && !externalFiles[symDep.SourceFile] {
+				externalFiles[symDep.SourceFile] = true
+				parentID := ensureParentNode(symDep.SourceTarget)
+				graphData.Nodes = append(graphData.Nodes, GraphNode{
+					ID:     symDep.SourceFile,
+					Label:  getFileName(symDep.SourceFile),
+					Type:   getFileType(symDep.SourceFile),
+					Parent: parentID,
+				})
+			}
+		}
+
+		// Second pass: deduplicate and add symbol edges
+		// Map of (source, target, linkage) -> set of unique symbols
+		type edgeKey struct {
+			source  string
+			target  string
+			linkage string
+		}
+		symbolEdgeMap := make(map[edgeKey]map[string]bool)
+
+		for _, symDep := range symbolDeps {
+			// Include symbol edges that involve files in this target
+			sourceInTarget := filesInTarget[symDep.SourceFile] || externalFiles[symDep.SourceFile]
+			targetInTarget := filesInTarget[symDep.TargetFile] || externalFiles[symDep.TargetFile]
+
+			if sourceInTarget && targetInTarget {
+				key := edgeKey{
+					source:  symDep.SourceFile,
+					target:  symDep.TargetFile,
+					linkage: string(symDep.Linkage),
+				}
+				// Initialize the symbol set if needed
+				if symbolEdgeMap[key] == nil {
+					symbolEdgeMap[key] = make(map[string]bool)
+				}
+				// Add symbol to the set (automatically deduplicates)
+				symbolEdgeMap[key][symDep.Symbol] = true
+			}
+		}
+
+		// Create deduplicated edges with combined symbol lists
+		for key, symbolSet := range symbolEdgeMap {
+			// Convert set to sorted list for consistent display
+			symbols := make([]string, 0, len(symbolSet))
+			for symbol := range symbolSet {
+				symbols = append(symbols, symbol)
+			}
+
+			graphData.Edges = append(graphData.Edges, GraphEdge{
+				Source:  key.source,
+				Target:  key.target,
+				Type:    "symbol",
+				Linkage: key.linkage,
+				Symbols: symbols,
+			})
 		}
 	}
 
@@ -314,6 +369,31 @@ func getFileName(path string) string {
 		}
 	}
 	return path
+}
+
+// getFileType determines if a file is a source or header file
+func getFileType(path string) string {
+	// Check file extension
+	if len(path) > 2 {
+		ext := path[len(path)-2:]
+		if ext == ".h" {
+			return "header"
+		}
+	}
+	if len(path) > 3 {
+		ext := path[len(path)-3:]
+		if ext == ".cc" || ext == ".cpp" {
+			return "source"
+		}
+	}
+	if len(path) > 4 {
+		ext := path[len(path)-4:]
+		if ext == ".hpp" {
+			return "header"
+		}
+	}
+	// Default to source for external files
+	return "source"
 }
 
 // Start starts the web server on the specified port

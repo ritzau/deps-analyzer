@@ -94,7 +94,7 @@ function displayDependencyGraph(graphData) {
                 target: edge.target,
                 type: edge.type,
                 linkage: edge.linkage,
-                symbol: edge.symbol
+                symbols: edge.symbols || []
             }
         }))
     ];
@@ -263,6 +263,43 @@ function displayDependencyGraph(graphData) {
             coolingFactor: 0.95,
             minTemp: 1.0
         }
+    });
+
+    // Add tooltip for symbol edges
+    const tooltip = document.createElement('div');
+    tooltip.id = 'edge-tooltip';
+    tooltip.style.position = 'absolute';
+    tooltip.style.display = 'none';
+    tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+    tooltip.style.color = 'white';
+    tooltip.style.padding = '8px 12px';
+    tooltip.style.borderRadius = '4px';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.maxWidth = '400px';
+    tooltip.style.zIndex = '10000';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.whiteSpace = 'pre-wrap';
+    tooltip.style.fontFamily = 'monospace';
+    document.body.appendChild(tooltip);
+
+    // Show tooltip on edge hover
+    cy.on('mouseover', 'edge[type = "symbol"]', function(evt) {
+        const edge = evt.target;
+        const symbols = edge.data('symbols');
+        if (symbols && symbols.length > 0) {
+            const symbolList = symbols.join('\n');
+            tooltip.textContent = `Symbols (${symbols.length}):\n${symbolList}`;
+            tooltip.style.display = 'block';
+        }
+    });
+
+    cy.on('mousemove', 'edge[type = "symbol"]', function(evt) {
+        tooltip.style.left = (evt.originalEvent.pageX + 10) + 'px';
+        tooltip.style.top = (evt.originalEvent.pageY + 10) + 'px';
+    });
+
+    cy.on('mouseout', 'edge[type = "symbol"]', function(evt) {
+        tooltip.style.display = 'none';
     });
 
     // Click on graph background to zoom out one level
