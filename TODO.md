@@ -29,10 +29,6 @@ default). Maybe dive deeper and also choose a font that we can enjoy some :)
 
 Better track compile time deps to detect cycles.
 
-## Use nm/readelf to track undefined/public symbols
-
-Track link time dependencies.
-
 ## Caching the result
 
 Store a cache so that we don't have to reanalyze unless there is a change.

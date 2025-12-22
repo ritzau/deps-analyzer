@@ -1,0 +1,15 @@
+# Graphics shared library BUILD file
+
+cc_shared_library(
+    name = "graphics",
+    deps = [":graphics_impl"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "graphics_impl",
+    srcs = ["renderer.cc"],
+    hdrs = ["renderer.h"],
+    linkopts = ["-ldl"],  # System library dependency
+    visibility = ["//visibility:public"],
+)

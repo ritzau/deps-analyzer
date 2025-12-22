@@ -5,6 +5,7 @@
 #include "util/strings.h"
 #include "util/time.h"
 #include "util/file_io.h"
+#include "graphics/renderer.h"
 
 int main(int argc, char** argv) {
   std::cout << "=== Test Application ===" << std::endl;
@@ -25,8 +26,14 @@ int main(int argc, char** argv) {
   core::StateManager state;
   state.SetValue("version", "1.0");
   state.SetValue("name", "test_app");
-  
+
   std::cout << "State version: " << state.GetValue("version") << std::endl;
+
+  // Use graphics library (dynamically linked)
+  graphics::Renderer renderer;
+  renderer.Initialize();
+  renderer.SetResolution(1920, 1080);
+  renderer.DrawFrame();
   
   // Try to load plugin (demonstration of plugin loading)
   std::cout << "\nAttempting to load plugin..." << std::endl;
