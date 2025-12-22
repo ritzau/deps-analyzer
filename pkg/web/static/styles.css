@@ -290,6 +290,17 @@ header h1 {
     ) !important;
 }
 
+.legend-line.dotted {
+    height: 2px;
+    background: repeating-linear-gradient(
+        to right,
+        currentColor 0,
+        currentColor 2px,
+        transparent 2px,
+        transparent 4px
+    ) !important;
+}
+
 /* File lists */
 .file-list {
     display: flex;

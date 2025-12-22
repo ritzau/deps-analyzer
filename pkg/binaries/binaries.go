@@ -49,13 +49,24 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 		return nil, fmt.Errorf("bazel query failed for %s: %w", label, err)
 	}
 
-	// Parse kind from output (format: "rule_kind rule label")
+	// Parse kind from output (format: "cc_binary rule //label")
 	outputStr := string(output)
-	parts := strings.Fields(strings.TrimSpace(outputStr))
-	if len(parts) < 3 {
-		return nil, fmt.Errorf("unexpected query output format: %s", outputStr)
+	// Filter out Loading/INFO lines, get only the result line
+	lines := strings.Split(outputStr, "\n")
+	var resultLine string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "Loading:") && !strings.HasPrefix(line, "INFO:") {
+			resultLine = line
+			break
+		}
 	}
-	kind := parts[1]
+
+	parts := strings.Fields(resultLine)
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("unexpected query output format: %s", resultLine)
+	}
+	kind := parts[0] // First field is the rule kind (e.g., "cc_binary", "cc_shared_library")
 
 	info := &BinaryInfo{
 		Label: label,

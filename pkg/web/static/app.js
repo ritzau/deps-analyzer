@@ -144,6 +144,15 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
+                selector: 'node[type = "system_library"]',
+                style: {
+                    'background-color': '#d7ba7d',
+                    'color': '#1e1e1e',
+                    'border-color': '#b89b5d',
+                    'shape': 'hexagon'
+                }
+            },
+            {
                 selector: 'node[type = "source"]',
                 style: {
                     'background-color': '#89d185',
@@ -237,6 +246,33 @@ function displayDependencyGraph(graphData) {
                 style: {
                     'line-color': '#d7ba7d',
                     'target-arrow-color': '#d7ba7d'
+                }
+            },
+            {
+                selector: 'edge[type = "dynamic_link"]',
+                style: {
+                    'line-color': '#c586c0',
+                    'target-arrow-color': '#c586c0',
+                    'width': 3,
+                    'line-style': 'solid'
+                }
+            },
+            {
+                selector: 'edge[type = "data_dependency"]',
+                style: {
+                    'line-color': '#89d185',
+                    'target-arrow-color': '#89d185',
+                    'width': 2,
+                    'line-style': 'dashed'
+                }
+            },
+            {
+                selector: 'edge[type = "system_link"]',
+                style: {
+                    'line-color': '#d7ba7d',
+                    'target-arrow-color': '#d7ba7d',
+                    'width': 2,
+                    'line-style': 'dotted'
                 }
             },
             {
@@ -527,6 +563,17 @@ async function loadAndCheckComplete() {
                 analysisData = data;
                 packageGraph = data.graph;
 
+                // Fetch binary data
+                try {
+                    const binariesResponse = await fetch('/api/binaries');
+                    if (binariesResponse.ok) {
+                        binaryData = await binariesResponse.json();
+                        console.log('Loaded binary data:', binaryData);
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch binary data:', e);
+                }
+
                 displayDependencyGraph(data.graph);
                 const graphLoading = document.getElementById('graphLoading');
                 if (graphLoading) {
@@ -708,16 +755,32 @@ let treeData = null;
 let selectedNode = null;
 let analysisData = null; // Store full analysis data
 let packageGraph = null; // Store the original package-level graph
+let binaryGraph = null; // Store the binary-level graph
+let binaryData = null; // Store binary information
 let cy = null; // Store the Cytoscape instance
-let currentView = 'package'; // Track current view: 'package' or 'file'
+let currentView = 'package'; // Track current view: 'package', 'file', or 'binary'
 let currentTarget = null; // Track which target we're viewing at file level
+let currentBinary = null; // Track which binary we're viewing at binary level
 
 // Build tree structure from analysis data
 function buildTreeData(data) {
     const tree = {
+        binaries: [],
         targets: [],
         uncoveredFiles: data.uncoveredFiles || []
     };
+
+    // Build binaries section if available
+    if (binaryData && binaryData.length > 0) {
+        for (const binary of binaryData) {
+            tree.binaries.push({
+                label: binary.label,
+                type: 'binary',
+                kind: binary.kind,
+                id: binary.label
+            });
+        }
+    }
 
     // Build targets section with their files
     if (data.graph && data.graph.nodes) {
@@ -747,7 +810,7 @@ function createTreeNode(item, type) {
     // Toggle arrow for expandable nodes
     const toggle = document.createElement('span');
     toggle.className = 'tree-toggle';
-    if (type === 'target') {
+    if (type === 'binary' || type === 'target') {
         toggle.textContent = '▶';
         node.classList.add('collapsed');
     } else {
@@ -759,7 +822,10 @@ function createTreeNode(item, type) {
     const label = document.createElement('span');
     label.className = 'tree-label';
 
-    if (type === 'target') {
+    if (type === 'binary') {
+        const icon = item.kind === 'cc_binary' ? '🔧' : '📚';
+        label.textContent = `${icon} ${item.label}`;
+    } else if (type === 'target') {
         label.textContent = `📦 ${item.label}`;
     } else if (type === 'file') {
         const fileName = item.path ? item.path.split('/').pop() : item.split('/').pop();
@@ -776,8 +842,8 @@ function createTreeNode(item, type) {
     content.appendChild(label);
     node.appendChild(content);
 
-    // Add children container for targets
-    if (type === 'target') {
+    // Add children container for binaries and targets
+    if (type === 'binary' || type === 'target') {
         const children = document.createElement('div');
         children.className = 'tree-children';
         node.appendChild(children);
@@ -787,7 +853,7 @@ function createTreeNode(item, type) {
             console.log('Toggle arrow clicked');
             e.stopPropagation();
             try {
-                await toggleExpansion(node, item);
+                await toggleExpansion(node, item, type);
             } catch (error) {
                 console.error('Error in toggleExpansion:', error);
             }
@@ -795,10 +861,10 @@ function createTreeNode(item, type) {
 
         // Click on label to always select/zoom (regardless of expansion)
         label.addEventListener('click', async (e) => {
-            console.log('Target label clicked:', item.label);
+            console.log(`${type} label clicked:`, item.label);
             e.stopPropagation();
             try {
-                await selectTreeNode(node, item, 'target');
+                await selectTreeNode(node, item, type);
             } catch (error) {
                 console.error('Error in selectTreeNode:', error);
             }
@@ -815,38 +881,50 @@ function createTreeNode(item, type) {
 }
 
 // Toggle tree node expansion (without selecting)
-async function toggleExpansion(node, item) {
+async function toggleExpansion(node, item, type) {
     const toggle = node.querySelector('.tree-toggle');
     const children = node.querySelector('.tree-children');
 
     if (node.classList.contains('collapsed')) {
-        // Expand: load files if not already loaded
+        // Expand: load children if not already loaded
         node.classList.remove('collapsed');
         toggle.textContent = '▼';
 
         if (children.children.length === 0 && item.label) {
-            // Fetch target details
-            try {
-                const encodedLabel = encodeURIComponent(item.label);
-                const response = await fetch(`/api/target/${encodedLabel}`);
-                if (response.ok) {
-                    const details = await response.json();
-                    if (details.files && details.files.length > 0) {
-                        details.files.forEach(file => {
-                            const fileNode = createTreeNode(file, 'file');
-                            children.appendChild(fileNode);
-                        });
-                    } else {
-                        const emptyMsg = document.createElement('div');
-                        emptyMsg.className = 'tree-label';
-                        emptyMsg.style.color = '#999';
-                        emptyMsg.style.fontStyle = 'italic';
-                        emptyMsg.textContent = 'No files found';
-                        children.appendChild(emptyMsg);
+            if (type === 'binary') {
+                // For binaries, show dependency info (not expandable to children for now)
+                // We'll just show a message - the graph will show the dependencies
+                const infoMsg = document.createElement('div');
+                infoMsg.className = 'tree-label';
+                infoMsg.style.color = '#999';
+                infoMsg.style.fontStyle = 'italic';
+                infoMsg.style.marginLeft = '20px';
+                infoMsg.textContent = 'Click to view dependencies in graph';
+                children.appendChild(infoMsg);
+            } else if (type === 'target') {
+                // Fetch target details
+                try {
+                    const encodedLabel = encodeURIComponent(item.label);
+                    const response = await fetch(`/api/target/${encodedLabel}`);
+                    if (response.ok) {
+                        const details = await response.json();
+                        if (details.files && details.files.length > 0) {
+                            details.files.forEach(file => {
+                                const fileNode = createTreeNode(file, 'file');
+                                children.appendChild(fileNode);
+                            });
+                        } else {
+                            const emptyMsg = document.createElement('div');
+                            emptyMsg.className = 'tree-label';
+                            emptyMsg.style.color = '#999';
+                            emptyMsg.style.fontStyle = 'italic';
+                            emptyMsg.textContent = 'No files found';
+                            children.appendChild(emptyMsg);
+                        }
                     }
+                } catch (error) {
+                    console.error('Failed to load target files:', error);
                 }
-            } catch (error) {
-                console.error('Failed to load target files:', error);
             }
         }
     } else {
@@ -873,14 +951,23 @@ async function selectTreeNode(node, item, type) {
         console.log('Selected project - showing package graph');
         currentView = 'package';
         currentTarget = null;
+        currentBinary = null;
         if (packageGraph) {
             displayDependencyGraph(packageGraph);
         }
+    } else if (type === 'binary') {
+        // Show binary-level graph focused on this binary
+        console.log('Selected binary:', item.label);
+        currentView = 'binary';
+        currentBinary = item.label;
+        currentTarget = null;
+        await showBinaryGraphFocused(item.label);
     } else if (type === 'target') {
         // Show file-level graph for this target
         console.log('Selected target:', item.label);
         currentView = 'file';
         currentTarget = item.label;
+        currentBinary = null;
         await showFileGraphForTarget(item.label);
     } else if (type === 'file') {
         // Keep showing the current target's file graph
@@ -889,6 +976,35 @@ async function selectTreeNode(node, item, type) {
     } else if (type === 'uncovered') {
         // Show uncovered file (maybe highlight in uncovered section?)
         console.log('Selected uncovered file:', item);
+    }
+}
+
+// Show binary-level graph focused on a specific binary
+async function showBinaryGraphFocused(binaryLabel) {
+    try {
+        console.log('Fetching binary graph focused on:', binaryLabel);
+
+        // For now, show the full binary graph (in the future we could filter by focused binary)
+        if (!binaryGraph) {
+            const response = await fetch('/api/binaries/graph');
+            if (!response.ok) {
+                console.error('Failed to fetch binary graph:', response.status);
+                return;
+            }
+            binaryGraph = await response.json();
+        }
+
+        console.log('Received binary graph data:', binaryGraph);
+
+        // Display the binary-level graph
+        if (binaryGraph && binaryGraph.nodes) {
+            // TODO: In the future, we could filter/highlight the focused binary
+            displayDependencyGraph(binaryGraph);
+        } else {
+            console.error('Invalid binary graph data received:', binaryGraph);
+        }
+    } catch (error) {
+        console.error('Error fetching binary graph:', error);
     }
 }
 
@@ -906,6 +1022,23 @@ function zoomOutOneLevel() {
             // Fallback: directly show package graph
             currentView = 'package';
             currentTarget = null;
+            currentBinary = null;
+            if (packageGraph) {
+                displayDependencyGraph(packageGraph);
+            }
+        }
+    } else if (currentView === 'binary') {
+        // We're at binary level, zoom out to package level
+        console.log('Zooming out from binary view to package view');
+
+        const projectNode = document.querySelector('.tree-node.project-node .tree-node-content');
+        if (projectNode) {
+            projectNode.click();
+        } else {
+            // Fallback: directly show package graph
+            currentView = 'package';
+            currentTarget = null;
+            currentBinary = null;
             if (packageGraph) {
                 displayDependencyGraph(packageGraph);
             }
@@ -981,6 +1114,24 @@ function populateTreeBrowser(data) {
     });
 
     treeContent.appendChild(projectNode);
+
+    // Binaries Section
+    if (treeData.binaries.length > 0) {
+        const binariesSection = document.createElement('div');
+        binariesSection.className = 'tree-section';
+
+        const binariesTitle = document.createElement('div');
+        binariesTitle.className = 'tree-section-title';
+        binariesTitle.innerHTML = `🔧 Binaries <span class="tree-count">${treeData.binaries.length}</span>`;
+        binariesSection.appendChild(binariesTitle);
+
+        treeData.binaries.forEach(binary => {
+            const binaryNode = createTreeNode(binary, 'binary');
+            binariesSection.appendChild(binaryNode);
+        });
+
+        treeContent.appendChild(binariesSection);
+    }
 
     // Targets Section
     const targetsSection = document.createElement('div');
