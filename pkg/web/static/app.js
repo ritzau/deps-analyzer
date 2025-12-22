@@ -767,12 +767,20 @@ document.addEventListener('DOMContentLoaded', function() {
             packagesCollapsed = this.checked;
             console.log('Package collapse toggled:', packagesCollapsed);
 
-            // If we're at package level view, rebuild the graph with collapsed packages
+            // Rebuild the current view based on mode
             if (currentView === 'package' && packageGraph) {
+                // Package level view
                 if (packagesCollapsed) {
                     displayDependencyGraph(buildCollapsedPackageGraph(packageGraph));
                 } else {
                     displayDependencyGraph(packageGraph);
+                }
+            } else if (currentView === 'binary' && currentBinary && binaryData) {
+                // Binary-focused view - rebuild with new collapse state
+                const focusedBinary = binaryData.find(b => b.label === currentBinary);
+                if (focusedBinary) {
+                    const graphData = buildBinaryFocusedGraphData(focusedBinary);
+                    displayDependencyGraph(graphData);
                 }
             }
         });
@@ -1270,67 +1278,46 @@ function buildBinaryFocusedGraphData(focusedBinary) {
     };
 
     console.log('Building focused graph for binary:', focusedBinary.label);
-    console.log('Internal targets:', focusedBinary.internalTargets);
+    console.log('Dynamic deps:', focusedBinary.dynamicDeps);
+    console.log('Data deps:', focusedBinary.dataDeps);
+    console.log('System libs:', focusedBinary.systemLibraries);
 
-    // Get the internal targets that belong to this binary
-    const internalTargetLabels = new Set(focusedBinary.internalTargets || []);
-    const allTargets = packageGraph ? packageGraph.nodes : [];
-
-    // Add compound parent node for internal targets
+    // Add compound parent node for internal (static) dependencies
     graphData.nodes.push({
         id: 'internal-group',
         label: focusedBinary.label,
         type: 'target-group'
     });
 
-    // Filter and add only targets that belong to this binary
+    // Add ALL targets from package graph inside the internal group
+    // This shows the complete static dependency graph
     if (packagesCollapsed && packageGraph) {
         // Show as packages
         const collapsedPkg = buildCollapsedPackageGraph(packageGraph);
 
-        // Filter to only include packages that have targets in this binary
-        const relevantPackageNames = new Set();
-        internalTargetLabels.forEach(targetLabel => {
-            const packageName = targetLabel.split(':')[0];
-            relevantPackageNames.add(packageName);
-        });
-
         collapsedPkg.nodes.forEach(node => {
-            if (relevantPackageNames.has(node.id)) {
-                graphData.nodes.push({
-                    ...node,
-                    parent: 'internal-group'
-                });
-            }
-        });
-
-        // Add edges between internal packages
-        collapsedPkg.edges.forEach(edge => {
-            if (relevantPackageNames.has(edge.source) && relevantPackageNames.has(edge.target)) {
-                graphData.edges.push(edge);
-            }
-        });
-    } else {
-        // Show individual targets that belong to this binary
-        allTargets.forEach(target => {
-            if (internalTargetLabels.has(target.label) || internalTargetLabels.has(target.id)) {
-                graphData.nodes.push({
-                    ...target,
-                    parent: 'internal-group'
-                });
-            }
-        });
-
-        // Add edges between internal targets
-        if (packageGraph) {
-            packageGraph.edges.forEach(edge => {
-                const sourceInternal = internalTargetLabels.has(edge.source);
-                const targetInternal = internalTargetLabels.has(edge.target);
-
-                if (sourceInternal && targetInternal) {
-                    graphData.edges.push(edge);
-                }
+            graphData.nodes.push({
+                ...node,
+                parent: 'internal-group'
             });
+        });
+
+        // Add all edges between packages
+        graphData.edges.push(...collapsedPkg.edges);
+    } else {
+        // Show individual targets
+        const allTargets = packageGraph ? packageGraph.nodes : [];
+
+        allTargets.forEach(target => {
+            graphData.nodes.push({
+                ...target,
+                parent: 'internal-group'
+            });
+        });
+
+        // Add all edges between targets
+        if (packageGraph && packageGraph.edges) {
+            graphData.edges.push(...packageGraph.edges);
         }
     }
 
