@@ -41,9 +41,8 @@ func QueryAllBinaries(workspace string) ([]string, error) {
 
 // GetBinaryInfo retrieves detailed information about a binary or shared library
 func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
-	// Query for rule kind and attributes
-	query := fmt.Sprintf("kind('cc_binary|cc_shared_library', %s)", label)
-	cmd := exec.Command("bazel", "query", "--output=label_kind", query)
+	// Query for rule kind
+	cmd := exec.Command("bazel", "query", "--output=label_kind", label)
 	cmd.Dir = workspace
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -51,9 +50,10 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 	}
 
 	// Parse kind from output (format: "rule_kind rule label")
-	parts := strings.Fields(strings.TrimSpace(string(output)))
+	outputStr := string(output)
+	parts := strings.Fields(strings.TrimSpace(outputStr))
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("unexpected query output format: %s", string(output))
+		return nil, fmt.Errorf("unexpected query output format: %s", outputStr)
 	}
 	kind := parts[1]
 
@@ -62,121 +62,91 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 		Kind:  kind,
 	}
 
-	// Get dynamic_deps if any
-	dynamicDeps, _ := queryAttribute(workspace, label, "dynamic_deps")
-	info.DynamicDeps = dynamicDeps
+	// Get shared library dependencies (both dynamic_deps and from data)
+	sharedLibDeps := querySharedLibraryDeps(workspace, label)
 
-	// Get data dependencies (filter for shared libraries)
-	dataDeps, _ := queryAttribute(workspace, label, "data")
-	for _, dep := range dataDeps {
-		// Check if this data dep is a shared library
-		if isSharedLibrary(workspace, dep) {
+	// Separate into dynamic_deps and data_deps based on how they're referenced
+	// For now, we'll use a heuristic: query deps to see what's linked
+	linkedDeps := queryLinkedDeps(workspace, label)
+
+	for _, dep := range sharedLibDeps {
+		if contains(linkedDeps, dep) {
+			info.DynamicDeps = append(info.DynamicDeps, dep)
+		} else {
 			info.DataDeps = append(info.DataDeps, dep)
 		}
 	}
 
-	// Get linkopts to extract system libraries
-	linkopts, _ := queryLinkopts(workspace, label)
-	info.SystemLibraries = extractSystemLibraries(linkopts)
-
-	// Get regular cc_library deps
-	regularDeps, _ := queryAttribute(workspace, label, "deps")
-	info.RegularDeps = regularDeps
+	// Get system libraries from linkopts
+	info.SystemLibraries = querySystemLibraries(workspace, label)
 
 	return info, nil
 }
 
-// queryAttribute queries a specific attribute of a target
-func queryAttribute(workspace string, label string, attr string) ([]string, error) {
-	query := fmt.Sprintf("attr(%s, '', %s)", attr, label)
-	cmd := exec.Command("bazel", "query", "--output=label", query)
+// querySharedLibraryDeps finds all cc_shared_library dependencies
+func querySharedLibraryDeps(workspace string, label string) []string {
+	// Query for all shared libraries this target depends on
+	cmd := exec.Command("bazel", "query",
+		fmt.Sprintf("kind('cc_shared_library', deps(%s))", label))
 	cmd.Dir = workspace
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Attribute might not exist, return empty
-		return nil, nil
+		return nil
 	}
 
-	// Try to get the actual deps by querying deps() with appropriate filters
-	var depsQuery string
-	switch attr {
-	case "dynamic_deps":
-		depsQuery = fmt.Sprintf("kind('cc_shared_library', deps(%s, 1))", label)
-	case "data":
-		depsQuery = fmt.Sprintf("attr(data, '', %s)", label)
-	case "deps":
-		depsQuery = fmt.Sprintf("kind('cc_library', deps(%s, 1))", label)
-	default:
-		return nil, nil
-	}
-
-	cmd = exec.Command("bazel", "query", "--output=label", depsQuery)
-	cmd.Dir = workspace
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return nil, nil
-	}
-
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	var results []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && line != label {
-			results = append(results, line)
-		}
-	}
-
-	return results, nil
+	return parseLabels(string(output), label)
 }
 
-// queryLinkopts gets linkopts for a target
-func queryLinkopts(workspace string, label string) ([]string, error) {
-	// Use cquery to get build information including linkopts
-	cmd := exec.Command("bazel", "cquery",
-		"--output=jsonproto",
-		label)
+// queryLinkedDeps finds dependencies that are linked (not just data)
+func queryLinkedDeps(workspace string, label string) []string {
+	// Query direct deps only (depth 1) to find what's actually linked
+	cmd := exec.Command("bazel", "query",
+		fmt.Sprintf("deps(%s, 1)", label))
 	cmd.Dir = workspace
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
-	// Parse the JSON to extract linkopts
-	// This is a simplified version - in reality we'd parse the proto JSON
-	outputStr := string(output)
+	return parseLabels(string(output), label)
+}
 
-	// Look for linkopts patterns in the output
-	var linkopts []string
-	lines := strings.Split(outputStr, "\n")
+// querySystemLibraries extracts system libraries from linkopts
+func querySystemLibraries(workspace string, label string) []string {
+	// Use buildozer to read linkopts if available, otherwise return empty
+	// For now, we'll use a simple heuristic based on common system libs
+
+	// Try to get build file content and parse linkopts
+	cmd := exec.Command("bazel", "query", "--output=build", label)
+	cmd.Dir = workspace
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	return extractSystemLibraries(string(output))
+}
+
+// extractSystemLibraries parses system libraries from build output
+func extractSystemLibraries(buildOutput string) []string {
+	var sysLibs []string
+	seen := make(map[string]bool)
+
+	lines := strings.Split(buildOutput, "\n")
 	for _, line := range lines {
+		// Look for linkopts lines containing -l flags
 		if strings.Contains(line, "-l") {
 			// Extract -l flags
 			fields := strings.Fields(line)
 			for _, field := range fields {
+				field = strings.Trim(field, `"',[]`)
 				if strings.HasPrefix(field, "-l") {
-					linkopts = append(linkopts, field)
+					lib := strings.TrimPrefix(field, "-l")
+					if lib != "" && !seen[lib] {
+						seen[lib] = true
+						sysLibs = append(sysLibs, lib)
+					}
 				}
-			}
-		}
-	}
-
-	return linkopts, nil
-}
-
-// extractSystemLibraries extracts system library names from linkopts
-func extractSystemLibraries(linkopts []string) []string {
-	var sysLibs []string
-	seen := make(map[string]bool)
-
-	for _, opt := range linkopts {
-		opt = strings.TrimSpace(opt)
-		// Match -lfoo or -l foo patterns
-		if strings.HasPrefix(opt, "-l") {
-			lib := strings.TrimPrefix(opt, "-l")
-			lib = strings.Trim(lib, `"'`)
-			if lib != "" && !seen[lib] {
-				seen[lib] = true
-				sysLibs = append(sysLibs, lib)
 			}
 		}
 	}
@@ -184,16 +154,28 @@ func extractSystemLibraries(linkopts []string) []string {
 	return sysLibs
 }
 
-// isSharedLibrary checks if a label is a cc_shared_library
-func isSharedLibrary(workspace string, label string) bool {
-	cmd := exec.Command("bazel", "query", "--output=label_kind", label)
-	cmd.Dir = workspace
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return false
+// parseLabels extracts target labels from bazel query output
+func parseLabels(output string, exclude string) []string {
+	var labels []string
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines, status messages, and the queried label itself
+		if line != "" && strings.HasPrefix(line, "//") && line != exclude {
+			labels = append(labels, line)
+		}
 	}
+	return labels
+}
 
-	return strings.Contains(string(output), "cc_shared_library")
+// contains checks if a string slice contains a value
+func contains(slice []string, value string) bool {
+	for _, item := range slice {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 // GetAllBinariesInfo retrieves information for all binaries

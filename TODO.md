@@ -44,3 +44,8 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 - May require support of .a files
 
 ## Real so file test cases
+
+## Detect elliminated symbols
+
+- Analyze the built artifacts to see which symbols made it
+- Use ldd to see which libraries are dynamically linked
