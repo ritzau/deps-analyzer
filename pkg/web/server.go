@@ -102,6 +102,8 @@ func (s *Server) SetBinaries(bins []*binaries.BinaryInfo) {
 func (s *Server) setupRoutes() {
 	// API routes - more specific routes must come first
 	s.router.HandleFunc("/api/analysis", s.handleAnalysis).Methods("GET")
+	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
+	s.router.HandleFunc("/api/binaries/graph", s.handleBinaryGraph).Methods("GET")
 	s.router.HandleFunc("/api/target/{label:.*}/graph", s.handleTargetGraph).Methods("GET")
 	s.router.HandleFunc("/api/target/{label:.*}", s.handleTargetDetails).Methods("GET")
 
@@ -122,6 +124,33 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(s.analysisData)
+}
+
+func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.binaries == nil {
+		json.NewEncoder(w).Encode([]*binaries.BinaryInfo{})
+		return
+	}
+
+	json.NewEncoder(w).Encode(s.binaries)
+}
+
+func (s *Server) handleBinaryGraph(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.binaries == nil {
+		json.NewEncoder(w).Encode(&GraphData{
+			Nodes: []GraphNode{},
+			Edges: []GraphEdge{},
+		})
+		return
+	}
+
+	// Build binary-level graph
+	graphData := buildBinaryGraphData(s.binaries)
+	json.NewEncoder(w).Encode(graphData)
 }
 
 func (s *Server) handleTargetDetails(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +198,81 @@ func (s *Server) handleTargetGraph(w http.ResponseWriter, r *http.Request) {
 	graphData := buildFileGraphData(targetLabel, details, s.fileGraph, s.symbolDeps)
 
 	json.NewEncoder(w).Encode(graphData)
+}
+
+// buildBinaryGraphData creates a graph visualization for binaries and their shared library dependencies
+func buildBinaryGraphData(binaryInfos []*binaries.BinaryInfo) *GraphData {
+	graphData := &GraphData{
+		Nodes: make([]GraphNode, 0),
+		Edges: make([]GraphEdge, 0),
+	}
+
+	// Create nodes for all binaries
+	for _, bin := range binaryInfos {
+		nodeType := bin.Kind
+		// Use specific type for binaries vs shared libraries
+		if bin.Kind == "cc_binary" {
+			nodeType = "cc_binary"
+		} else if bin.Kind == "cc_shared_library" {
+			nodeType = "cc_shared_library"
+		}
+
+		graphData.Nodes = append(graphData.Nodes, GraphNode{
+			ID:    bin.Label,
+			Label: bin.Label,
+			Type:  nodeType,
+		})
+	}
+
+	// Create nodes for system libraries
+	systemLibs := make(map[string]bool)
+	for _, bin := range binaryInfos {
+		for _, sysLib := range bin.SystemLibraries {
+			if !systemLibs[sysLib] {
+				systemLibs[sysLib] = true
+				graphData.Nodes = append(graphData.Nodes, GraphNode{
+					ID:    "system:" + sysLib,
+					Label: sysLib,
+					Type:  "system_library",
+				})
+			}
+		}
+	}
+
+	// Create edges for dependencies
+	for _, bin := range binaryInfos {
+		// Dynamic deps (linked shared libraries)
+		for _, dep := range bin.DynamicDeps {
+			graphData.Edges = append(graphData.Edges, GraphEdge{
+				Source:  bin.Label,
+				Target:  dep,
+				Type:    "dynamic_link",
+				Symbols: []string{},
+			})
+		}
+
+		// Data deps (runtime-loaded shared libraries)
+		for _, dep := range bin.DataDeps {
+			graphData.Edges = append(graphData.Edges, GraphEdge{
+				Source:  bin.Label,
+				Target:  dep,
+				Type:    "data_dependency",
+				Symbols: []string{},
+			})
+		}
+
+		// System library dependencies
+		for _, sysLib := range bin.SystemLibraries {
+			graphData.Edges = append(graphData.Edges, GraphEdge{
+				Source:  bin.Label,
+				Target:  "system:" + sysLib,
+				Type:    "system_link",
+				Symbols: []string{},
+			})
+		}
+	}
+
+	return graphData
 }
 
 // buildFileGraphData creates a graph visualization for files within and connected to a target
