@@ -11,6 +11,7 @@ import (
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
+	"github.com/ritzau/deps-analyzer/pkg/binaries"
 	"github.com/ritzau/deps-analyzer/pkg/cycles"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/finder"
@@ -156,6 +157,16 @@ func startWebServerAsync(workspace string, port int) {
 		data.Graph = graphData
 		data.AnalysisStep = 2
 		server.SetAnalysisData(data)
+
+		// Extract binary-level information
+		log.Println("[2.5/4] Analyzing binary dependencies...")
+		binaryInfos, err := binaries.GetAllBinariesInfo(workspace)
+		if err != nil {
+			log.Printf("[2.5/4] Warning: Could not extract binary info: %v", err)
+		} else {
+			log.Printf("[2.5/4] Found %d binaries with dependency information", len(binaryInfos))
+			server.SetBinaries(binaryInfos)
+		}
 
 		// Build file dependency graph and detect cycles
 		log.Println("[3/4] Parsing .d files for file-level dependencies...")

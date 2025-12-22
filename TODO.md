@@ -49,3 +49,15 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 - Analyze the built artifacts to see which symbols made it
 - Use ldd to see which libraries are dynamically linked
+
+## Message bus
+
+- Communicate from the server to the UI using a pub/sub
+- UI subscribes to get ui state messages
+- Great for start up
+- Awesome also to do live updates
+- Can also be fun to develop a terminal client
+
+## Optimize analysis
+
+- Fewer queries should be possible for many phases

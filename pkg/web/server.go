@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
+	"github.com/ritzau/deps-analyzer/pkg/binaries"
 	"github.com/ritzau/deps-analyzer/pkg/cycles"
 	"github.com/ritzau/deps-analyzer/pkg/graph"
 	"github.com/ritzau/deps-analyzer/pkg/symbols"
@@ -61,6 +62,7 @@ type Server struct {
 	fileGraph        *graph.FileGraph
 	crossPackageDeps []analysis.CrossPackageDep
 	symbolDeps       []symbols.SymbolDependency
+	binaries         []*binaries.BinaryInfo
 }
 
 // NewServer creates a new web server
@@ -90,6 +92,11 @@ func (s *Server) SetCrossPackageDeps(deps []analysis.CrossPackageDep) {
 // SetSymbolDeps stores symbol-level dependencies for target detail queries
 func (s *Server) SetSymbolDeps(deps []symbols.SymbolDependency) {
 	s.symbolDeps = deps
+}
+
+// SetBinaries stores binary-level information
+func (s *Server) SetBinaries(bins []*binaries.BinaryInfo) {
+	s.binaries = bins
 }
 
 func (s *Server) setupRoutes() {
