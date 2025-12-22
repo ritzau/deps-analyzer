@@ -1191,87 +1191,176 @@ async function showFileGraphForTarget(targetLabel) {
     }
 }
 
-// Populate the tree browser
-function populateTreeBrowser(data) {
-    console.log('Populating tree browser with data:', data);
-    const treeContent = document.getElementById('treeContent');
-    treeContent.innerHTML = '';
+// Select a binary and show its focused graph
+function selectBinary(binaryLabel, itemElement) {
+    console.log('Selected binary:', binaryLabel);
 
-    treeData = buildTreeData(data);
+    // Update UI selection
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('selected'));
+    if (itemElement) itemElement.classList.add('selected');
 
-    // Project Root Node
-    const projectNode = document.createElement('div');
-    projectNode.className = 'tree-node project-node';
-    projectNode.dataset.type = 'project';
-    projectNode.dataset.id = data.workspace;
+    // Update state
+    currentView = 'binary';
+    currentBinary = binaryLabel;
+    currentTarget = null;
 
-    const projectContent = document.createElement('div');
-    projectContent.className = 'tree-node-content';
+    // Show binary-focused graph
+    showBinaryFocusedGraph(binaryLabel);
+}
 
-    const projectLabel = document.createElement('span');
-    projectLabel.className = 'tree-label';
-    projectLabel.textContent = `🏠 ${data.workspace.split('/').pop() || 'Project'}`;
-    projectContent.appendChild(projectLabel);
-    projectNode.appendChild(projectContent);
+// Select a target and show its file graph
+function selectTarget(targetLabel, itemElement) {
+    console.log('Selected target:', targetLabel);
 
-    // Click handler for project - show package graph
-    projectContent.addEventListener('click', (e) => {
-        console.log('Project node clicked');
-        e.stopPropagation();
-        selectTreeNode(projectNode, { workspace: data.workspace }, 'project');
-    });
+    // Update UI selection
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('selected'));
+    if (itemElement) itemElement.classList.add('selected');
 
-    treeContent.appendChild(projectNode);
+    // Update state
+    currentView = 'file';
+    currentTarget = targetLabel;
+    currentBinary = null;
 
-    // Binaries Section
-    if (treeData.binaries.length > 0) {
-        const binariesSection = document.createElement('div');
-        binariesSection.className = 'tree-section';
+    // Show file-level graph for this target
+    showFileGraphForTarget(targetLabel);
+}
 
-        const binariesTitle = document.createElement('div');
-        binariesTitle.className = 'tree-section-title';
-        binariesTitle.innerHTML = `🔧 Binaries <span class="tree-count">${treeData.binaries.length}</span>`;
-        binariesSection.appendChild(binariesTitle);
+// Show binary-focused graph: internal targets/packages + external binaries
+async function showBinaryFocusedGraph(binaryLabel) {
+    try {
+        console.log('Building binary-focused graph for:', binaryLabel);
 
-        treeData.binaries.forEach(binary => {
-            const binaryNode = createTreeNode(binary, 'binary');
-            binariesSection.appendChild(binaryNode);
-        });
+        // Fetch full binary graph if not already loaded
+        if (!binaryGraph) {
+            const response = await fetch('/api/binaries/graph');
+            if (!response.ok) {
+                console.error('Failed to fetch binary graph');
+                return;
+            }
+            binaryGraph = await response.json();
+        }
 
-        treeContent.appendChild(binariesSection);
+        // Find the focused binary's info
+        const focusedBinary = binaryData.find(b => b.label === binaryLabel);
+        if (!focusedBinary) {
+            console.error('Binary not found:', binaryLabel);
+            return;
+        }
+
+        // Build graph showing:
+        // 1. Internal targets/packages (from packageGraph)
+        // 2. External binaries (as binary-level nodes)
+        // 3. System libraries
+
+        const graphData = buildBinaryFocusedGraphData(focusedBinary);
+        displayDependencyGraph(graphData);
+
+    } catch (error) {
+        console.error('Error showing binary-focused graph:', error);
+    }
+}
+
+// Build graph data for a focused binary
+function buildBinaryFocusedGraphData(focusedBinary) {
+    const graphData = {
+        nodes: [],
+        edges: []
+    };
+
+    // Get all targets from the full package graph
+    const allTargets = packageGraph ? packageGraph.nodes : [];
+
+    // Determine which targets belong to this binary
+    // For now, we'll show all internal targets with the option to collapse to packages
+    if (packagesCollapsed && packageGraph) {
+        // Show as packages
+        const collapsedPkg = buildCollapsedPackageGraph(packageGraph);
+        graphData.nodes.push(...collapsedPkg.nodes);
+        graphData.edges.push(...collapsedPkg.edges);
+    } else {
+        // Show individual targets
+        graphData.nodes.push(...allTargets);
+        if (packageGraph) {
+            graphData.edges.push(...packageGraph.edges);
+        }
     }
 
-    // Targets Section
-    const targetsSection = document.createElement('div');
-    targetsSection.className = 'tree-section';
-
-    const targetsTitle = document.createElement('div');
-    targetsTitle.className = 'tree-section-title';
-    targetsTitle.innerHTML = `📦 Targets <span class="tree-count">${treeData.targets.length}</span>`;
-    targetsSection.appendChild(targetsTitle);
-
-    treeData.targets.forEach(target => {
-        const targetNode = createTreeNode(target, 'target');
-        targetsSection.appendChild(targetNode);
-    });
-
-    treeContent.appendChild(targetsSection);
-
-    // Uncovered Files Section
-    if (treeData.uncoveredFiles.length > 0) {
-        const uncoveredSection = document.createElement('div');
-        uncoveredSection.className = 'tree-section';
-
-        const uncoveredTitle = document.createElement('div');
-        uncoveredTitle.className = 'tree-section-title';
-        uncoveredTitle.innerHTML = `⚠️ Uncovered <span class="tree-count">${treeData.uncoveredFiles.length}</span>`;
-        uncoveredSection.appendChild(uncoveredTitle);
-
-        treeData.uncoveredFiles.forEach(file => {
-            const fileNode = createTreeNode(file, 'uncovered');
-            uncoveredSection.appendChild(fileNode);
+    // Add external binaries this binary depends on
+    if (focusedBinary.dynamicDeps) {
+        focusedBinary.dynamicDeps.forEach(depLabel => {
+            const depBinary = binaryData.find(b => b.label === depLabel);
+            if (depBinary) {
+                graphData.nodes.push({
+                    id: depLabel,
+                    label: depLabel,
+                    type: depBinary.kind, // cc_binary or cc_shared_library
+                    external: true
+                });
+            }
         });
+    }
 
-        treeContent.appendChild(uncoveredSection);
+    if (focusedBinary.dataDeps) {
+        focusedBinary.dataDeps.forEach(depLabel => {
+            const depBinary = binaryData.find(b => b.label === depLabel);
+            if (depBinary) {
+                graphData.nodes.push({
+                    id: depLabel,
+                    label: depLabel,
+                    type: depBinary.kind,
+                    external: true
+                });
+            }
+        });
+    }
+
+    // Add system libraries
+    if (focusedBinary.systemLibraries) {
+        focusedBinary.systemLibraries.forEach(sysLib => {
+            graphData.nodes.push({
+                id: 'system:' + sysLib,
+                label: sysLib,
+                type: 'system_library',
+                external: true
+            });
+        });
+    }
+
+    // Add edges from focused binary to external dependencies
+    // Note: We need to find which internal targets connect to external binaries
+    // For now, we'll add edges from the binary itself (simplified)
+
+    return graphData;
+}
+
+// Populate the tree browser
+function populateTreeBrowser(data) {
+    console.log('Populating navigation with data:', data);
+
+    // Populate binaries list
+    const binariesItems = document.getElementById('binariesItems');
+    if (binariesItems && binaryData && binaryData.length > 0) {
+        binariesItems.innerHTML = '';
+        binaryData.forEach(binary => {
+            const item = document.createElement('div');
+            item.className = 'nav-item';
+            const icon = binary.kind === 'cc_binary' ? '🔧' : '📚';
+            item.textContent = `${icon} ${binary.label}`;
+            item.onclick = () => selectBinary(binary.label, item);
+            binariesItems.appendChild(item);
+        });
+    }
+
+    // Populate targets list
+    const targetsItems = document.getElementById('targetsItems');
+    if (targetsItems && data.graph && data.graph.nodes) {
+        targetsItems.innerHTML = '';
+        data.graph.nodes.forEach(node => {
+            const item = document.createElement('div');
+            item.className = 'nav-item';
+            item.textContent = `📦 ${node.label}`;
+            item.onclick = () => selectTarget(node.label, item);
+            targetsItems.appendChild(item);
+        });
     }
 }

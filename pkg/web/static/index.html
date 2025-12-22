@@ -40,15 +40,22 @@
             <!-- Tree Browser (Left Panel) -->
             <div id="treeBrowser" class="tree-browser">
                 <div class="tree-header">
-                    <h3>📁 Project Structure</h3>
+                    <h3>📁 Navigation</h3>
                     <label class="toggle-switch" title="Show/hide individual targets within packages">
                         <input type="checkbox" id="packageCollapseToggle">
                         <span class="toggle-slider"></span>
                         <span class="toggle-label">Collapse Packages</span>
                     </label>
                 </div>
-                <div class="tree-content" id="treeContent">
-                    <!-- Tree will be populated by JavaScript -->
+                <div class="list-content">
+                    <div id="binariesList" class="nav-section">
+                        <div class="nav-section-title">🔧 Binaries</div>
+                        <div id="binariesItems" class="nav-items"></div>
+                    </div>
+                    <div id="targetsList" class="nav-section">
+                        <div class="nav-section-title">📦 Targets</div>
+                        <div id="targetsItems" class="nav-items"></div>
+                    </div>
                 </div>
             </div>
 

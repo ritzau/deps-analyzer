@@ -61,3 +61,9 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ## Optimize analysis
 
 - Fewer queries should be possible for many phases
+- Can we use bazel to generate and cache this info?
+- Concurrent operations?
+
+# BUG: . as project name
+
+- If we use the crurent dir, at least check to see what its name is
