@@ -164,7 +164,19 @@ func startWebServerAsync(workspace string, port int) {
 		if err != nil {
 			log.Printf("[2.5/4] Warning: Could not extract binary info: %v", err)
 		} else {
-			log.Printf("[2.5/4] Found %d binaries with dependency information", len(binaryInfos))
+			log.Printf("[2.5/4] Found %d binaries", len(binaryInfos))
+			for _, bin := range binaryInfos {
+				log.Printf("[2.5/4]   %s (%s)", bin.Label, bin.Kind)
+				if len(bin.DynamicDeps) > 0 {
+					log.Printf("[2.5/4]     Dynamic deps: %v", bin.DynamicDeps)
+				}
+				if len(bin.DataDeps) > 0 {
+					log.Printf("[2.5/4]     Data deps: %v", bin.DataDeps)
+				}
+				if len(bin.SystemLibraries) > 0 {
+					log.Printf("[2.5/4]     System libs: %v", bin.SystemLibraries)
+				}
+			}
 			server.SetBinaries(binaryInfos)
 		}
 
