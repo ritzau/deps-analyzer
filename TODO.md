@@ -48,5 +48,3 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 - May require support of .a files
 
 ## Real so file test cases
-
-## BUG: Only include edges to the focused target

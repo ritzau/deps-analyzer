@@ -321,11 +321,20 @@ func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails,
 		symbolEdgeMap := make(map[edgeKey]map[string]bool)
 
 		for _, symDep := range symbolDeps {
-			// Include symbol edges that involve files in this target
-			sourceInTarget := filesInTarget[symDep.SourceFile] || externalFiles[symDep.SourceFile]
-			targetInTarget := filesInTarget[symDep.TargetFile] || externalFiles[symDep.TargetFile]
+			// Only include symbol edges where at least one endpoint is in the focused target
+			sourceInFocusedTarget := filesInTarget[symDep.SourceFile]
+			targetInFocusedTarget := filesInTarget[symDep.TargetFile]
 
-			if sourceInTarget && targetInTarget {
+			// At least one endpoint must be in the focused target
+			if !sourceInFocusedTarget && !targetInFocusedTarget {
+				continue
+			}
+
+			// Both endpoints must be visible (either in focused target or in external files)
+			sourceVisible := sourceInFocusedTarget || externalFiles[symDep.SourceFile]
+			targetVisible := targetInFocusedTarget || externalFiles[symDep.TargetFile]
+
+			if sourceVisible && targetVisible {
 				key := edgeKey{
 					source:  symDep.SourceFile,
 					target:  symDep.TargetFile,
