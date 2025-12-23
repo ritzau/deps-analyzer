@@ -59,6 +59,12 @@ function displayUncoveredFiles(files) {
 function displayDependencyGraph(graphData) {
     console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
 
+    // Hide the graph loading spinner
+    const graphLoading = document.getElementById('graphLoading');
+    if (graphLoading) {
+        graphLoading.style.display = 'none';
+    }
+
     // If we already have a cytoscape instance, destroy it first
     if (cy) {
         console.log('Destroying existing cytoscape instance');
@@ -649,10 +655,6 @@ async function loadGraphData() {
             // Display the graph
             if (packageGraph && packageGraph.nodes && packageGraph.nodes.length > 0) {
                 displayDependencyGraph(packageGraph);
-                const graphLoading = document.getElementById('graphLoading');
-                if (graphLoading) {
-                    graphLoading.style.display = 'none';
-                }
             }
         }
 
