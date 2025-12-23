@@ -78,9 +78,9 @@ function displayDependencyGraph(graphData) {
             };
 
             // Mark the currently focused target-group with a special attribute
-            if (node.type === 'target-group' && currentView === 'file') {
+            if (node.type === 'target-group') {
                 const targetLabel = node.id.replace('parent-', '');
-                if (targetLabel === currentTarget) {
+                if ((currentView === 'file' || currentView === 'focused') && targetLabel === currentTarget) {
                     nodeData.focused = true;
                 }
             }
@@ -153,19 +153,25 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'node[type = "source"]',
+                selector: 'node[type = "source"], node[type ^= "source"]',
                 style: {
                     'background-color': '#89d185',
                     'color': '#1e1e1e',
-                    'border-color': '#6fb06b'
+                    'border-color': '#6fb06b',
+                    'shape': 'ellipse',
+                    'width': '60px',
+                    'height': '60px'
                 }
             },
             {
-                selector: 'node[type = "header"]',
+                selector: 'node[type = "header"], node[type ^= "header"]',
                 style: {
                     'background-color': '#4fc1ff',
                     'color': '#1e1e1e',
-                    'border-color': '#3fa0d9'
+                    'border-color': '#3fa0d9',
+                    'shape': 'ellipse',
+                    'width': '60px',
+                    'height': '60px'
                 }
             },
             {
@@ -227,25 +233,26 @@ function displayDependencyGraph(graphData) {
                 style: {
                     'shape': 'roundrectangle',
                     'background-color': '#2d2d30',
-                    'background-opacity': 0.5,
+                    'background-opacity': 0.3,
                     'border-width': '2px',
                     'border-color': '#4a4a4e',
-                    'border-style': 'dashed',
+                    'border-style': 'solid',
                     'label': 'data(label)',
                     'color': '#969696',
                     'text-valign': 'top',
                     'text-halign': 'center',
                     'font-size': '14px',
                     'font-weight': 'bold',
-                    'padding': '20px'
+                    'padding': '30px'
                 }
             },
             {
                 selector: 'node[type = "target-group"][focused]',
                 style: {
-                    'border-width': '3px',
+                    'border-width': '4px',
                     'border-color': '#ff8c00',
-                    'border-style': 'dashed'
+                    'background-opacity': 0.4,
+                    'color': '#ff8c00'
                 }
             },
             {

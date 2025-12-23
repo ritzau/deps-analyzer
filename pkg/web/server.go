@@ -429,10 +429,10 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 }
 
 // buildTargetFocusedGraph creates a focused view of a target showing:
-// - All internal dependencies (compile-time and link-time)
-// - Incoming dependencies (other targets depending on this one)
-// - Outgoing dependencies (targets this one depends on)
-// Only shows dependencies that connect to/from the focused target
+// - The focused target with all its files (sources and headers)
+// - Incoming dependencies (targets that depend on this one) with their files
+// - Outgoing dependencies (targets this one depends on) with their files
+// - All compile-time and link-time dependencies between files and targets
 func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
@@ -461,42 +461,66 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target) 
 		}
 	}
 
-	// Add the focused target node (highlighted)
-	graphData.Nodes = append(graphData.Nodes, GraphNode{
-		ID:    focusedTarget.Label,
-		Label: focusedTarget.Label,
-		Type:  string(focusedTarget.Kind) + "_focused",
-	})
+	// Helper function to add target with its files as a compound node
+	addTargetWithFiles := func(target *model.Target, typeSuffix string) {
+		// Add parent/container node for the target
+		parentID := "parent-" + target.Label
+		graphData.Nodes = append(graphData.Nodes, GraphNode{
+			ID:    parentID,
+			Label: target.Label,
+			Type:  "target-group",
+		})
 
-	// Add incoming dependency nodes
-	for targetLabel := range incomingDeps {
-		if target, exists := module.Targets[targetLabel]; exists {
+		// Add file nodes (sources and headers) as children
+		for _, source := range target.Sources {
+			fileID := target.Label + ":file:" + source
 			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:    target.Label,
-				Label: target.Label,
-				Type:  string(target.Kind) + "_incoming",
+				ID:     fileID,
+				Label:  getFileName(source),
+				Type:   "source" + typeSuffix,
+				Parent: parentID,
+			})
+		}
+		for _, header := range target.Headers {
+			fileID := target.Label + ":file:" + header
+			graphData.Nodes = append(graphData.Nodes, GraphNode{
+				ID:     fileID,
+				Label:  getFileName(header),
+				Type:   "header" + typeSuffix,
+				Parent: parentID,
 			})
 		}
 	}
 
-	// Add outgoing dependency nodes
+	// Add the focused target with its files
+	addTargetWithFiles(focusedTarget, "_focused")
+
+	// Add incoming dependency targets with their files
+	for targetLabel := range incomingDeps {
+		if target, exists := module.Targets[targetLabel]; exists {
+			addTargetWithFiles(target, "_incoming")
+		}
+	}
+
+	// Add outgoing dependency targets with their files
 	for targetLabel := range outgoingDeps {
 		if target, exists := module.Targets[targetLabel]; exists {
-			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:    target.Label,
-				Label: target.Label,
-				Type:  string(target.Kind) + "_outgoing",
-			})
+			addTargetWithFiles(target, "_outgoing")
 		}
 	}
 
 	// Add edges - only those that connect to/from the focused target
+	// Edges now connect to the parent node IDs (with "parent-" prefix)
 	for _, dep := range module.Dependencies {
 		// Include edge if it connects to or from the focused target
 		if dep.From == focusedTarget.Label || dep.To == focusedTarget.Label {
+			// Use parent- prefix for compound node IDs
+			sourceID := "parent-" + dep.From
+			targetID := "parent-" + dep.To
+
 			graphData.Edges = append(graphData.Edges, GraphEdge{
-				Source:  dep.From,
-				Target:  dep.To,
+				Source:  sourceID,
+				Target:  targetID,
 				Type:    string(dep.Type),
 				Linkage: string(dep.Type),
 				Symbols: []string{},
@@ -505,6 +529,15 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target) 
 	}
 
 	return graphData
+}
+
+// getFileName extracts the file name from a full path
+func getFileName(path string) string {
+	parts := strings.Split(path, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return path
 }
 
 // Start starts the web server on the specified port
