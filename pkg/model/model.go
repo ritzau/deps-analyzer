@@ -43,8 +43,129 @@ type Dependency struct {
 	Type DependencyType `json:"type"` // Type of dependency
 }
 
+// Package represents a Bazel package with its targets
+type Package struct {
+	Path    string             `json:"path"`    // Package path (e.g., "//main")
+	Targets map[string]*Target `json:"targets"` // Map of target name -> Target
+}
+
+// PackageDependency represents dependencies between two packages
+type PackageDependency struct {
+	From         string                     `json:"from"`         // Source package path
+	To           string                     `json:"to"`           // Target package path
+	Dependencies map[DependencyType][]Edge  `json:"dependencies"` // Grouped by type
+}
+
+// Edge represents a single dependency edge between targets
+type Edge struct {
+	FromTarget string `json:"fromTarget"` // Source target label
+	ToTarget   string `json:"toTarget"`   // Target dependency label
+}
+
 // Workspace represents the complete build graph
 type Workspace struct {
 	Targets      map[string]*Target `json:"targets"`      // Map of label -> Target
-	Dependencies []Dependency       `json:"dependencies"` // All dependencies with types
+	Dependencies []Dependency       `json:"dependencies"` // All target-level dependencies
+	Packages     map[string]*Package `json:"packages"`    // Map of package path -> Package
+}
+
+// GetPackageDependencies returns all dependencies for a given package
+func (w *Workspace) GetPackageDependencies(packagePath string) []PackageDependency {
+	// Map to aggregate dependencies by target package
+	depsByPackage := make(map[string]*PackageDependency)
+
+	// Iterate through all dependencies
+	for _, dep := range w.Dependencies {
+		fromTarget := w.Targets[dep.From]
+		toTarget := w.Targets[dep.To]
+
+		if fromTarget == nil || toTarget == nil {
+			continue
+		}
+
+		// Only include if source is from our package
+		if fromTarget.Package != packagePath {
+			continue
+		}
+
+		// Skip dependencies within the same package
+		if fromTarget.Package == toTarget.Package {
+			continue
+		}
+
+		// Get or create package dependency
+		pkgDep, exists := depsByPackage[toTarget.Package]
+		if !exists {
+			pkgDep = &PackageDependency{
+				From:         packagePath,
+				To:           toTarget.Package,
+				Dependencies: make(map[DependencyType][]Edge),
+			}
+			depsByPackage[toTarget.Package] = pkgDep
+		}
+
+		// Add edge
+		edge := Edge{
+			FromTarget: dep.From,
+			ToTarget:   dep.To,
+		}
+		pkgDep.Dependencies[dep.Type] = append(pkgDep.Dependencies[dep.Type], edge)
+	}
+
+	// Convert map to slice
+	result := make([]PackageDependency, 0, len(depsByPackage))
+	for _, pkgDep := range depsByPackage {
+		result = append(result, *pkgDep)
+	}
+
+	return result
+}
+
+// GetAllPackageDependencies returns all package-to-package dependencies in the workspace
+func (w *Workspace) GetAllPackageDependencies() []PackageDependency {
+	// Map to aggregate dependencies by package pair
+	depsByPair := make(map[string]*PackageDependency)
+
+	for _, dep := range w.Dependencies {
+		fromTarget := w.Targets[dep.From]
+		toTarget := w.Targets[dep.To]
+
+		if fromTarget == nil || toTarget == nil {
+			continue
+		}
+
+		// Skip dependencies within the same package
+		if fromTarget.Package == toTarget.Package {
+			continue
+		}
+
+		// Create key for package pair
+		key := fromTarget.Package + " -> " + toTarget.Package
+
+		// Get or create package dependency
+		pkgDep, exists := depsByPair[key]
+		if !exists {
+			pkgDep = &PackageDependency{
+				From:         fromTarget.Package,
+				To:           toTarget.Package,
+				Dependencies: make(map[DependencyType][]Edge),
+			}
+			depsByPair[key] = pkgDep
+		}
+
+		// Add edge
+		edge := Edge{
+			FromTarget: dep.From,
+			ToTarget:   dep.To,
+		}
+		pkgDep.Dependencies[dep.Type] = append(pkgDep.Dependencies[dep.Type], edge)
+	}
+
+	// Convert map to slice
+	result := make([]PackageDependency, 0, len(depsByPair))
+	for _, pkgDep := range depsByPair {
+		result = append(result, *pkgDep)
+	}
+
+	return result
 }

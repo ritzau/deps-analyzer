@@ -69,6 +69,7 @@ func QueryWorkspace(workspacePath string) (*model.Workspace, error) {
 	workspace := &model.Workspace{
 		Targets:      make(map[string]*model.Target),
 		Dependencies: make([]model.Dependency, 0),
+		Packages:     make(map[string]*model.Package),
 	}
 
 	// First pass: create all targets
@@ -76,6 +77,17 @@ func QueryWorkspace(workspacePath string) (*model.Workspace, error) {
 		target := parseTarget(rule)
 		if target != nil {
 			workspace.Targets[target.Label] = target
+
+			// Add to package
+			pkg, exists := workspace.Packages[target.Package]
+			if !exists {
+				pkg = &model.Package{
+					Path:    target.Package,
+					Targets: make(map[string]*model.Target),
+				}
+				workspace.Packages[target.Package] = pkg
+			}
+			pkg.Targets[target.Name] = target
 		}
 	}
 

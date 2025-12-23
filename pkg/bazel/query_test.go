@@ -122,6 +122,53 @@ func TestQueryWorkspace(t *testing.T) {
 			t.Errorf("Dependency not found: %s -> %s", tc.from, tc.to)
 		}
 	}
+
+	// Test package-level dependencies
+	t.Run("PackageDependencies", func(t *testing.T) {
+		// Check packages were created
+		if len(workspace.Packages) == 0 {
+			t.Fatal("No packages found")
+		}
+
+		t.Logf("Found %d packages", len(workspace.Packages))
+
+		// Get dependencies for //main package
+		mainDeps := workspace.GetPackageDependencies("//main")
+		t.Logf("//main has %d package dependencies", len(mainDeps))
+
+		// Should depend on //core, //util, //graphics, //audio
+		expectedDeps := map[string]bool{
+			"//core":     false,
+			"//util":     false,
+			"//graphics": false,
+			"//audio":    false,
+		}
+
+		for _, pkgDep := range mainDeps {
+			if _, expected := expectedDeps[pkgDep.To]; expected {
+				expectedDeps[pkgDep.To] = true
+				t.Logf("  -> %s with %d edges", pkgDep.To, countEdges(pkgDep))
+			}
+		}
+
+		for pkg, found := range expectedDeps {
+			if !found {
+				t.Errorf("//main missing expected dependency to %s", pkg)
+			}
+		}
+
+		// Get all package dependencies
+		allPkgDeps := workspace.GetAllPackageDependencies()
+		t.Logf("Total package-to-package dependencies: %d", len(allPkgDeps))
+	})
+}
+
+func countEdges(pkgDep model.PackageDependency) int {
+	count := 0
+	for _, edges := range pkgDep.Dependencies {
+		count += len(edges)
+	}
+	return count
 }
 
 func findExampleWorkspace(t *testing.T) string {

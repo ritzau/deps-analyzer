@@ -57,6 +57,28 @@ func main() {
 		}
 	}
 
+	// Show package-level dependencies
+	fmt.Printf("\nFound %d packages:\n", len(workspace.Packages))
+	for _, pkg := range workspace.Packages {
+		fmt.Printf("  %s (%d targets)\n", pkg.Path, len(pkg.Targets))
+	}
+
+	// Get all package dependencies
+	fmt.Println("\nPackage-to-package dependencies:")
+	pkgDeps := workspace.GetAllPackageDependencies()
+	for _, pkgDep := range pkgDeps {
+		edgeCount := 0
+		for _, edges := range pkgDep.Dependencies {
+			edgeCount += len(edges)
+		}
+		fmt.Printf("  %s -> %s (%d edges)\n", pkgDep.From, pkgDep.To, edgeCount)
+
+		// Show breakdown by type
+		for depType, edges := range pkgDep.Dependencies {
+			fmt.Printf("    %s: %d\n", depType, len(edges))
+		}
+	}
+
 	// Write to JSON for inspection
 	jsonData, err := json.MarshalIndent(workspace, "", "  ")
 	if err != nil {
