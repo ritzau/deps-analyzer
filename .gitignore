@@ -22,3 +22,5 @@ Thumbs.db
 
 # Local settings
 .claude/settings.local.json
+workspace.json
+test-bazel-xml

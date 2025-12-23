@@ -1,0 +1,195 @@
+{
+  "targets": {
+    "//audio:audio": {
+      "label": "//audio:audio",
+      "kind": "cc_shared_library",
+      "package": "//audio",
+      "name": "audio",
+      "deps": [
+        "//audio:audio_impl"
+      ]
+    },
+    "//audio:audio_impl": {
+      "label": "//audio:audio_impl",
+      "kind": "cc_library",
+      "package": "//audio",
+      "name": "audio_impl",
+      "sources": [
+        "//audio:audio_engine.cc"
+      ],
+      "headers": [
+        "//audio:audio_engine.h"
+      ],
+      "deps": [
+        "//util:util"
+      ]
+    },
+    "//core:core": {
+      "label": "//core:core",
+      "kind": "cc_library",
+      "package": "//core",
+      "name": "core",
+      "sources": [
+        "//core:engine.cc",
+        "//core:state.cc"
+      ],
+      "headers": [
+        "//core:engine.h",
+        "//core:state.h"
+      ],
+      "deps": [
+        "//util:util"
+      ]
+    },
+    "//cycle_demo:cycle_demo": {
+      "label": "//cycle_demo:cycle_demo",
+      "kind": "cc_library",
+      "package": "//cycle_demo",
+      "name": "cycle_demo",
+      "sources": [
+        "//cycle_demo:a.cc",
+        "//cycle_demo:b.cc"
+      ],
+      "headers": [
+        "//cycle_demo:a.h",
+        "//cycle_demo:b.h"
+      ]
+    },
+    "//graphics:graphics": {
+      "label": "//graphics:graphics",
+      "kind": "cc_shared_library",
+      "package": "//graphics",
+      "name": "graphics",
+      "deps": [
+        "//graphics:graphics_impl"
+      ]
+    },
+    "//graphics:graphics_impl": {
+      "label": "//graphics:graphics_impl",
+      "kind": "cc_library",
+      "package": "//graphics",
+      "name": "graphics_impl",
+      "sources": [
+        "//graphics:renderer.cc"
+      ],
+      "headers": [
+        "//graphics:renderer.h"
+      ],
+      "linkopts": [
+        "-ldl"
+      ]
+    },
+    "//main:test_app": {
+      "label": "//main:test_app",
+      "kind": "cc_binary",
+      "package": "//main",
+      "name": "test_app",
+      "sources": [
+        "//main:main.cc"
+      ],
+      "deps": [
+        "//core:core",
+        "//graphics:graphics_impl",
+        "//util:util"
+      ],
+      "dynamicDeps": [
+        "//graphics:graphics"
+      ],
+      "data": [
+        "//audio:audio"
+      ],
+      "linkopts": [
+        "-Wl,-export_dynamic",
+        "-ldl"
+      ]
+    },
+    "//plugins:renderer_plugin": {
+      "label": "//plugins:renderer_plugin",
+      "kind": "cc_binary",
+      "package": "//plugins",
+      "name": "renderer_plugin",
+      "sources": [
+        "//plugins:renderer.cc"
+      ],
+      "deps": [
+        "//core:core",
+        "//util:util"
+      ]
+    },
+    "//util:util": {
+      "label": "//util:util",
+      "kind": "cc_library",
+      "package": "//util",
+      "name": "util",
+      "sources": [
+        "//util:strings.cc",
+        "//util:file_io.cc",
+        "//util:time.cc",
+        "//util:math.cc"
+      ],
+      "headers": [
+        "//util:file_io.h",
+        "//util:math.h",
+        "//util:strings.h",
+        "//util:time.h"
+      ]
+    }
+  },
+  "dependencies": [
+    {
+      "from": "//audio:audio",
+      "to": "//audio:audio_impl",
+      "type": "static"
+    },
+    {
+      "from": "//audio:audio_impl",
+      "to": "//util:util",
+      "type": "static"
+    },
+    {
+      "from": "//core:core",
+      "to": "//util:util",
+      "type": "static"
+    },
+    {
+      "from": "//graphics:graphics",
+      "to": "//graphics:graphics_impl",
+      "type": "static"
+    },
+    {
+      "from": "//main:test_app",
+      "to": "//audio:audio",
+      "type": "data"
+    },
+    {
+      "from": "//main:test_app",
+      "to": "//core:core",
+      "type": "static"
+    },
+    {
+      "from": "//main:test_app",
+      "to": "//graphics:graphics_impl",
+      "type": "static"
+    },
+    {
+      "from": "//main:test_app",
+      "to": "//util:util",
+      "type": "static"
+    },
+    {
+      "from": "//main:test_app",
+      "to": "//graphics:graphics",
+      "type": "dynamic"
+    },
+    {
+      "from": "//plugins:renderer_plugin",
+      "to": "//core:core",
+      "type": "static"
+    },
+    {
+      "from": "//plugins:renderer_plugin",
+      "to": "//util:util",
+      "type": "static"
+    }
+  ]
+}

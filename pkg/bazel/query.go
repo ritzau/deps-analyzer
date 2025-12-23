@@ -1,179 +1,214 @@
 package bazel
 
 import (
+	"encoding/xml"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
+
+	"github.com/ritzau/deps-analyzer/pkg/model"
 )
 
-// Target represents a Bazel build target
-type Target struct {
-	Label string // e.g., "//util:util"
-	Kind  string // e.g., "cc_library"
+// QueryResult represents the XML output from bazel query
+type QueryResult struct {
+	XMLName xml.Name  `xml:"query"`
+	Rules   []RuleXML `xml:"rule"`
 }
 
-// QueryAllCCTargets returns all C++ targets in the workspace
-func QueryAllCCTargets(workspaceRoot string) ([]Target, error) {
-	// Use --output=label_kind to get both label and kind
-	cmd := exec.Command("bazel", "query", `kind("cc_.* rule", //...)`, "--output=label_kind")
-	cmd.Dir = workspaceRoot
+// RuleXML represents a single rule in the XML output
+type RuleXML struct {
+	Class    string      `xml:"class,attr"`
+	Name     string      `xml:"name,attr"`
+	Location string      `xml:"location,attr"`
+	Lists    []ListXML   `xml:"list"`
+	Strings  []StringXML `xml:"string"`
+}
+
+// ListXML represents a list attribute in the XML
+type ListXML struct {
+	Name    string      `xml:"name,attr"`
+	Labels  []LabelXML  `xml:"label"`
+	Strings []StringXML `xml:"string"`
+}
+
+// LabelXML represents a label in the XML
+type LabelXML struct {
+	Value string `xml:"value,attr"`
+}
+
+// StringXML represents a string value in the XML
+type StringXML struct {
+	Value string `xml:"value,attr"`
+}
+
+// QueryWorkspace queries all cc_* targets and their dependencies
+func QueryWorkspace(workspacePath string) (*model.Workspace, error) {
+	// Query all cc_binary, cc_shared_library, and cc_library targets
+	cmd := exec.Command("bazel", "query",
+		"kind('cc_binary|cc_shared_library|cc_library', //...)",
+		"--output=xml")
+	cmd.Dir = workspacePath
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("bazel query failed: %w\nOutput: %s", err, string(output))
 	}
 
-	var targets []Target
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		// Skip empty lines and Bazel informational output
-		if line == "" {
-			continue
-		}
-		// Format is: "kind_name rule //label"
-		// e.g., "cc_library rule //util:util"
-		parts := strings.Fields(line)
-		if len(parts) >= 3 && strings.HasPrefix(parts[2], "//") {
-			targets = append(targets, Target{
-				Label: parts[2],
-				Kind:  parts[0], // e.g., "cc_binary", "cc_library"
-			})
+	// Bazel outputs XML 1.1, but Go's XML parser only supports 1.0
+	// Replace the version declaration
+	xmlStr := string(output)
+	xmlStr = strings.Replace(xmlStr, `<?xml version="1.1"`, `<?xml version="1.0"`, 1)
+
+	// Parse XML
+	var result QueryResult
+	if err := xml.Unmarshal([]byte(xmlStr), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse XML: %w", err)
+	}
+
+	// Build workspace structure
+	workspace := &model.Workspace{
+		Targets:      make(map[string]*model.Target),
+		Dependencies: make([]model.Dependency, 0),
+	}
+
+	// First pass: create all targets
+	for _, rule := range result.Rules {
+		target := parseTarget(rule)
+		if target != nil {
+			workspace.Targets[target.Label] = target
 		}
 	}
 
-	return targets, nil
+	// Second pass: create typed dependencies
+	for _, rule := range result.Rules {
+		deps := parseDependencies(rule, workspace.Targets)
+		workspace.Dependencies = append(workspace.Dependencies, deps...)
+	}
+
+	return workspace, nil
 }
 
-// QueryDeps returns the dependencies of a specific target (only cc_* rules in workspace)
-func QueryDeps(workspaceRoot, targetLabel string) ([]string, error) {
-	// Query for cc_* rule dependencies of this target
-	query := fmt.Sprintf(`kind("cc_.* rule", deps(%s)) - %s`, targetLabel, targetLabel)
-	cmd := exec.Command("bazel", "query", query)
-	cmd.Dir = workspaceRoot
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("bazel query failed: %w\nOutput: %s", err, string(output))
+// parseTarget converts RuleXML to Target
+func parseTarget(rule RuleXML) *model.Target {
+	// Only process cc_binary, cc_shared_library, cc_library
+	kind := model.TargetKind(rule.Class)
+	if kind != model.TargetKindBinary && kind != model.TargetKindSharedLibrary && kind != model.TargetKindLibrary {
+		return nil
 	}
 
-	var deps []string
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		// Skip empty lines and Bazel informational output
-		if line == "" || !strings.HasPrefix(line, "//") {
-			continue
-		}
-		deps = append(deps, line)
-	}
-
-	return deps, nil
-}
-
-// QuerySourceFiles returns all source files (from the workspace, not external)
-// that are part of any cc_* target in the workspace
-func QueryAllSourceFiles(workspaceRoot string) ([]string, error) {
-	// Get all CC targets first
-	targets, err := QueryAllCCTargets(workspaceRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	// Collect all source files from all targets
-	sourceFilesMap := make(map[string]bool)
-	for _, target := range targets {
-		files, err := QuerySourceFilesForTarget(workspaceRoot, target.Label)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query files for %s: %w", target.Label, err)
-		}
-		for _, file := range files {
-			sourceFilesMap[file] = true
-		}
-	}
-
-	// Convert map to slice
-	var sourceFiles []string
-	for file := range sourceFilesMap {
-		sourceFiles = append(sourceFiles, file)
-	}
-
-	return sourceFiles, nil
-}
-
-// QuerySourceFilesForTarget returns source files for a specific target
-func QuerySourceFilesForTarget(workspaceRoot, targetLabel string) ([]string, error) {
-	// Query for source files that are directly listed in this target's srcs/hdrs attributes
-	// Use labels() to get only direct sources, not transitive dependencies
-	// This prevents files from being incorrectly attributed to targets that depend on them
-	query := fmt.Sprintf(`labels("srcs", %s) + labels("hdrs", %s)`, targetLabel, targetLabel)
-	cmd := exec.Command("bazel", "query", query)
-	cmd.Dir = workspaceRoot
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("bazel query failed: %w\nOutput: %s", err, string(output))
-	}
-
-	var sourceFiles []string
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		// Skip empty lines and Bazel informational output
-		if line == "" || !strings.HasPrefix(line, "//") {
-			continue
-		}
-		// Convert Bazel label to file path
-		// e.g., "//util:strings.cc" -> "util/strings.cc"
-		filePath := labelToPath(line)
-		sourceFiles = append(sourceFiles, filePath)
-	}
-
-	return sourceFiles, nil
-}
-
-// labelToPath converts a Bazel label to a file path
-// e.g., "//util:strings.cc" -> "util/strings.cc"
-// e.g., "//core:engine.h" -> "core/engine.h"
-func labelToPath(label string) string {
-	// Remove leading "//"
-	label = strings.TrimPrefix(label, "//")
-
-	// Split on ":"
-	parts := strings.SplitN(label, ":", 2)
+	label := rule.Name
+	parts := strings.Split(label, ":")
+	packagePath := label
+	targetName := ""
 	if len(parts) == 2 {
-		// Package and file: "util:strings.cc" -> "util/strings.cc"
-		return filepath.Join(parts[0], parts[1])
+		packagePath = parts[0]
+		targetName = parts[1]
 	}
 
-	// No colon, just return as-is (shouldn't happen for source files)
-	return label
+	target := &model.Target{
+		Label:   label,
+		Kind:    kind,
+		Package: packagePath,
+		Name:    targetName,
+	}
+
+	// Extract attributes from lists
+	for _, list := range rule.Lists {
+		switch list.Name {
+		case "srcs":
+			for _, label := range list.Labels {
+				if strings.HasSuffix(label.Value, ".cc") {
+					target.Sources = append(target.Sources, label.Value)
+				}
+			}
+		case "hdrs":
+			for _, label := range list.Labels {
+				if strings.HasSuffix(label.Value, ".h") || strings.HasSuffix(label.Value, ".hpp") {
+					target.Headers = append(target.Headers, label.Value)
+				}
+			}
+		case "deps":
+			for _, label := range list.Labels {
+				target.Deps = append(target.Deps, label.Value)
+			}
+		case "dynamic_deps":
+			for _, label := range list.Labels {
+				target.DynamicDeps = append(target.DynamicDeps, label.Value)
+			}
+		case "data":
+			for _, label := range list.Labels {
+				target.Data = append(target.Data, label.Value)
+			}
+		case "linkopts":
+			for _, str := range list.Strings {
+				target.Linkopts = append(target.Linkopts, str.Value)
+			}
+		}
+	}
+
+	return target
 }
 
-// BuildFileToTargetMap creates a mapping from file paths to their owning target labels
-// Returns a map where keys are file paths (e.g., "util/strings.cc") and values are target labels (e.g., "//util:util")
-func BuildFileToTargetMap(workspaceRoot string) (map[string]string, error) {
-	// Get all CC targets
-	targets, err := QueryAllCCTargets(workspaceRoot)
-	if err != nil {
-		return nil, err
+// parseDependencies creates typed dependency edges for a target
+func parseDependencies(rule RuleXML, targets map[string]*model.Target) []model.Dependency {
+	fromLabel := rule.Name
+	var deps []model.Dependency
+
+	for _, list := range rule.Lists {
+		switch list.Name {
+		case "deps":
+			// Regular deps - determine type based on target kind
+			for _, label := range list.Labels {
+				depType := determineDependencyType(label.Value, targets)
+				deps = append(deps, model.Dependency{
+					From: fromLabel,
+					To:   label.Value,
+					Type: depType,
+				})
+			}
+
+		case "dynamic_deps":
+			// Explicit dynamic dependencies
+			for _, label := range list.Labels {
+				deps = append(deps, model.Dependency{
+					From: fromLabel,
+					To:   label.Value,
+					Type: model.DependencyDynamic,
+				})
+			}
+
+		case "data":
+			// Data dependencies (runtime)
+			for _, label := range list.Labels {
+				deps = append(deps, model.Dependency{
+					From: fromLabel,
+					To:   label.Value,
+					Type: model.DependencyData,
+				})
+			}
+		}
 	}
 
-	fileToTarget := make(map[string]string)
+	return deps
+}
 
-	// For each target, get its source files and map them to the target
-	for _, target := range targets {
-		files, err := QuerySourceFilesForTarget(workspaceRoot, target.Label)
-		if err != nil {
-			// Log but don't fail - some targets might not have source files
-			continue
-		}
-
-		for _, filePath := range files {
-			fileToTarget[filePath] = target.Label
-		}
+// determineDependencyType determines if a dep is static or dynamic based on target kind
+func determineDependencyType(depLabel string, targets map[string]*model.Target) model.DependencyType {
+	depTarget, exists := targets[depLabel]
+	if !exists {
+		// If we don't know the target, assume static (cc_library)
+		return model.DependencyStatic
 	}
 
-	return fileToTarget, nil
+	switch depTarget.Kind {
+	case model.TargetKindLibrary:
+		return model.DependencyStatic
+	case model.TargetKindSharedLibrary:
+		return model.DependencyDynamic
+	case model.TargetKindBinary:
+		// Depending on a binary is unusual, treat as data
+		return model.DependencyData
+	default:
+		return model.DependencyStatic
+	}
 }

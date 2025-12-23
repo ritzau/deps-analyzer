@@ -2,20 +2,20 @@
 
 cc_binary(
     name = "test_app",
-    srcs = ["main.cc"],
-    deps = [
-        "//core:core",
-        "//util:util",
-        "//graphics:graphics_impl",  # Link against graphics implementation
+    srcs = glob(["*.cc"]),
+    data = [
+        "//audio",  # Shared library included as data (loaded at runtime)
     ],
     dynamic_deps = [
         "//graphics:graphics",  # Dynamically linked shared library
     ],
-    data = [
-        "//audio:audio",  # Shared library included as data (loaded at runtime)
-    ],
     linkopts = [
         "-Wl,-export_dynamic",  # Export symbols for plugins (macOS compatible)
         "-ldl",  # System library for dynamic loading
+    ],
+    deps = [
+        "//core",
+        "//graphics:graphics_impl",  # Link against graphics implementation
+        "//util",
     ],
 )
