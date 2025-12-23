@@ -400,42 +400,106 @@ function displayDependencyGraph(graphData) {
     document.body.appendChild(tooltip);
 
     // Show tooltip on edge hover
-    cy.on('mouseover', 'edge[type = "symbol"]', function(evt) {
+    cy.on('mouseover', 'edge', function(evt) {
         const edge = evt.target;
+        const edgeType = edge.data('type');
+        const linkage = edge.data('linkage');
         const symbols = edge.data('symbols');
-        if (symbols && symbols.length > 0) {
-            const symbolList = symbols.join('\n');
-            tooltip.textContent = `Symbols (${symbols.length}):\n${symbolList}`;
-            tooltip.style.display = 'block';
+
+        let tooltipText = '';
+
+        // Add description based on edge type
+        if (edgeType === 'static') {
+            tooltipText = '📦 Static Linkage\nTarget depends on this library at link time.\nCode is included in the final binary.';
+        } else if (edgeType === 'dynamic') {
+            tooltipText = '🔗 Dynamic Linkage\nTarget depends on this shared library.\nLibrary is loaded at runtime.';
+        } else if (edgeType === 'data') {
+            tooltipText = '📄 Data Dependency\nTarget needs this file at runtime.\nSpecified in data attribute.';
+        } else if (edgeType === 'compile') {
+            tooltipText = '📝 Compile Dependency\nSource file includes this header.\nDetected from .d files (compiler output).';
+        } else if (edgeType === 'system_link') {
+            tooltipText = '⚙️ System Library Link\nTarget links against system library.\nSpecified in linkopts (e.g., -ldl).';
+        } else if (edgeType === 'symbol') {
+            if (linkage === 'static') {
+                tooltipText = '🔧 Symbol Dependency (Static)\nFile uses symbols from this file.\nStatically linked at build time.';
+            } else if (linkage === 'dynamic') {
+                tooltipText = '🔧 Symbol Dependency (Dynamic)\nFile uses symbols from this file.\nDynamically linked at runtime.';
+            } else if (linkage === 'cross') {
+                tooltipText = '🔧 Symbol Dependency (Cross-Binary)\nFile uses symbols from another binary.\nShared across binary boundaries.';
+            } else {
+                tooltipText = '🔧 Symbol Dependency\nFile uses symbols from this file.';
+            }
+        } else {
+            tooltipText = `Dependency Type: ${edgeType || 'unknown'}`;
         }
+
+        // Add symbol list for symbol edges
+        if (edgeType === 'symbol' && symbols && symbols.length > 0) {
+            const symbolList = symbols.slice(0, 20).join('\n');
+            const more = symbols.length > 20 ? `\n... and ${symbols.length - 20} more` : '';
+            tooltipText += `\n\nSymbols (${symbols.length}):\n${symbolList}${more}`;
+        }
+
+        tooltip.textContent = tooltipText;
+        tooltip.style.display = 'block';
     });
 
-    cy.on('mousemove', 'edge[type = "symbol"]', function(evt) {
+    cy.on('mousemove', 'edge', function(evt) {
         tooltip.style.left = (evt.originalEvent.pageX + 10) + 'px';
         tooltip.style.top = (evt.originalEvent.pageY + 10) + 'px';
     });
 
-    cy.on('mouseout', 'edge[type = "symbol"]', function(evt) {
+    cy.on('mouseout', 'edge', function(evt) {
         tooltip.style.display = 'none';
     });
 
-    // Tooltip for nodes with overlapping dependencies (duplicate symbols warning)
-    cy.on('mouseover', 'node[hasOverlap]', function(evt) {
+    // Tooltip for nodes
+    cy.on('mouseover', 'node', function(evt) {
         const node = evt.target;
+        const nodeType = node.data('type');
+        const nodeLabel = node.data('label');
         const overlappingTargets = node.data('overlappingTargets');
+
+        let tooltipText = '';
+
+        // Special handling for overlapping dependencies warning
         if (overlappingTargets && overlappingTargets.length > 0) {
             const targetList = overlappingTargets.join('\n  ');
-            tooltip.textContent = `⚠️ Duplicate symbols!\n\nBoth this binary and ${node.data('label')} link:\n  ${targetList}`;
-            tooltip.style.display = 'block';
+            tooltipText = `⚠️ Duplicate symbols!\n\nBoth this binary and ${nodeLabel} link:\n  ${targetList}`;
         }
+        // Show type information for regular nodes
+        else {
+            if (nodeType === 'cc_binary') {
+                tooltipText = '📦 Binary (cc_binary)\nExecutable program.\nLinks dependencies into final executable.';
+            } else if (nodeType === 'cc_library') {
+                tooltipText = '📚 Library (cc_library)\nStatic library.\nCompiled code reused by other targets.';
+            } else if (nodeType === 'cc_shared_library') {
+                tooltipText = '🔗 Shared Library (cc_shared_library)\nDynamic library (.so/.dylib).\nLoaded at runtime, shared between processes.';
+            } else if (nodeType === 'system_library') {
+                tooltipText = '⚙️ System Library\nExternal library from the system.\nProvided by OS or installed separately.';
+            } else if (nodeType === 'target-group') {
+                tooltipText = '📁 Target Container\nGroups files within a target.\nClick to focus on this target.';
+            } else if (nodeType && nodeType.startsWith('source')) {
+                tooltipText = '📄 Source File (.cc/.cpp)\nImplementation file.\nCompiled into object code.';
+            } else if (nodeType && nodeType.startsWith('header')) {
+                tooltipText = '📋 Header File (.h/.hpp)\nInterface definitions.\nIncluded by source files.';
+            } else if (nodeType) {
+                tooltipText = `Type: ${nodeType}\n${nodeLabel}`;
+            } else {
+                tooltipText = nodeLabel;
+            }
+        }
+
+        tooltip.textContent = tooltipText;
+        tooltip.style.display = 'block';
     });
 
-    cy.on('mousemove', 'node[hasOverlap]', function(evt) {
+    cy.on('mousemove', 'node', function(evt) {
         tooltip.style.left = (evt.originalEvent.pageX + 10) + 'px';
         tooltip.style.top = (evt.originalEvent.pageY + 10) + 'px';
     });
 
-    cy.on('mouseout', 'node[hasOverlap]', function(evt) {
+    cy.on('mouseout', 'node', function(evt) {
         tooltip.style.display = 'none';
     });
 

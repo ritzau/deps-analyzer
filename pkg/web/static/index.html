@@ -91,30 +91,34 @@
                         <div class="legend-color" style="background: #d7ba7d;"></div>
                         <span>System Library</span>
                     </div>
-                    <div style="font-weight: bold; margin: 12px 0 8px 0;">Edge Types:</div>
+                    <div style="font-weight: bold; margin: 12px 0 8px 0;">Dependency Types:</div>
                     <div class="legend-item">
-                        <div class="legend-line" style="background: #6a6a6a;"></div>
-                        <span>File dependency (#include)</span>
+                        <div class="legend-line" style="background: #4ec9b0; width: 40px; height: 3px;"></div>
+                        <span>Static link (deps)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dashed" style="background: #4ec9b0;"></div>
-                        <span>Symbol (static link)</span>
+                        <div class="legend-line" style="background: #c586c0; width: 40px; height: 3px;"></div>
+                        <span>Dynamic link (shared lib)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dashed" style="background: #c586c0;"></div>
-                        <span>Symbol / Dynamic link</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-line dashed" style="background: #d7ba7d;"></div>
-                        <span>Symbol (cross binary)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-line dashed" style="background: #89d185;"></div>
+                        <div class="legend-line dashed" style="background: #89d185; width: 40px;"></div>
                         <span>Data dependency (runtime)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dotted" style="background: #d7ba7d;"></div>
-                        <span>System library link</span>
+                        <div class="legend-line dotted" style="background: #4fc1ff; width: 40px;"></div>
+                        <span>Compile (#include headers)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dashed" style="background: #4ec9b0; width: 40px;"></div>
+                        <span>Symbol (static)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dashed" style="background: #c586c0; width: 40px;"></div>
+                        <span>Symbol (dynamic)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dotted" style="background: #d7ba7d; width: 40px;"></div>
+                        <span>System library</span>
                     </div>
                 </div>
             </div>
