@@ -588,6 +588,13 @@ function subscribeToWorkspaceStatus() {
                 analysisComplete = true;
 
                 hideLoadingOverlay();
+
+                // Load graph data if we haven't already
+                if (!graphDataLoaded) {
+                    loadGraphData();
+                    graphDataLoaded = true;
+                }
+
                 // Close SSE connections when done
                 if (workspaceStatusSource) {
                     workspaceStatusSource.close();
