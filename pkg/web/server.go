@@ -548,6 +548,33 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 		}
 	}
 
+	// Add system library nodes and edges for the focused target
+	if len(focusedTarget.Linkopts) > 0 {
+		for _, linkopt := range focusedTarget.Linkopts {
+			if strings.HasPrefix(linkopt, "-l") {
+				libName := strings.TrimPrefix(linkopt, "-l")
+				if libName != "" {
+					// Add system library node
+					libNodeID := "system:" + libName
+					graphData.Nodes = append(graphData.Nodes, GraphNode{
+						ID:    libNodeID,
+						Label: libName,
+						Type:  "system_library",
+					})
+
+					// Add edge from focused target to system library
+					graphData.Edges = append(graphData.Edges, GraphEdge{
+						Source:  "parent-" + focusedTarget.Label,
+						Target:  libNodeID,
+						Type:    "system_link",
+						Linkage: "system",
+						Symbols: []string{},
+					})
+				}
+			}
+		}
+	}
+
 	// Add file-to-file edges from compile dependencies (.d files)
 	// Build a reverse map from normalized paths to original source paths
 	normalizedToOriginal := make(map[string]string)
@@ -688,8 +715,17 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 	return graphData
 }
 
-// getFileName extracts the file name from a full path
+// getFileName extracts the file name from a full path or Bazel label
 func getFileName(path string) string {
+	// Handle Bazel label format: //package:file.cc
+	if strings.Contains(path, ":") {
+		parts := strings.Split(path, ":")
+		if len(parts) > 1 {
+			path = parts[len(parts)-1]
+		}
+	}
+
+	// Extract just the filename from path
 	parts := strings.Split(path, "/")
 	if len(parts) > 0 {
 		return parts[len(parts)-1]
