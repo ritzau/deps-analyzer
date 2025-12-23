@@ -435,6 +435,29 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 		})
 	}
 
+	// Track system libraries to avoid duplicates
+	systemLibs := make(map[string]bool)
+
+	// Add system library nodes and edges from linkopts
+	for _, target := range module.Targets {
+		if len(target.Linkopts) > 0 {
+			for _, linkopt := range target.Linkopts {
+				if strings.HasPrefix(linkopt, "-l") {
+					libName := strings.TrimPrefix(linkopt, "-l")
+					if libName != "" && !systemLibs[libName] {
+						systemLibs[libName] = true
+						// Add system library node
+						graphData.Nodes = append(graphData.Nodes, GraphNode{
+							ID:    "system:" + libName,
+							Label: libName,
+							Type:  "system_library",
+						})
+					}
+				}
+			}
+		}
+	}
+
 	// Create edges for all dependencies, colored by type
 	for _, dep := range module.Dependencies {
 		graphData.Edges = append(graphData.Edges, GraphEdge{
@@ -443,6 +466,26 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 			Type:    string(dep.Type),
 			Symbols: []string{},
 		})
+	}
+
+	// Add edges from targets to their system libraries
+	for _, target := range module.Targets {
+		if len(target.Linkopts) > 0 {
+			for _, linkopt := range target.Linkopts {
+				if strings.HasPrefix(linkopt, "-l") {
+					libName := strings.TrimPrefix(linkopt, "-l")
+					if libName != "" {
+						graphData.Edges = append(graphData.Edges, GraphEdge{
+							Source:  target.Label,
+							Target:  "system:" + libName,
+							Type:    "system_link",
+							Linkage: "system",
+							Symbols: []string{},
+						})
+					}
+				}
+			}
+		}
 	}
 
 	return graphData
@@ -481,53 +524,31 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 		}
 	}
 
-	// Helper function to add target with its files as a compound node
-	addTargetWithFiles := func(target *model.Target, typeSuffix string) {
-		// Add parent/container node for the target
+	// First, add parent nodes for all relevant targets (we'll add file nodes later after we know which have edges)
+	addTargetParent := func(target *model.Target) {
 		parentID := "parent-" + target.Label
 		graphData.Nodes = append(graphData.Nodes, GraphNode{
 			ID:    parentID,
 			Label: target.Label,
 			Type:  "target-group",
 		})
-
-		// Add file nodes (sources and headers) as children
-		for _, source := range target.Sources {
-			fileID := target.Label + ":file:" + source
-			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:     fileID,
-				Label:  getFileName(source),
-				Type:   "source" + typeSuffix,
-				Parent: parentID,
-			})
-		}
-		for _, header := range target.Headers {
-			fileID := target.Label + ":file:" + header
-			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:     fileID,
-				Label:  getFileName(header),
-				Type:   "header" + typeSuffix,
-				Parent: parentID,
-			})
-		}
 	}
 
-	// Add the focused target with its files
-	addTargetWithFiles(focusedTarget, "_focused")
-
-	// Add incoming dependency targets with their files
+	// Add parent nodes for all relevant targets
+	addTargetParent(focusedTarget)
 	for targetLabel := range incomingDeps {
 		if target, exists := module.Targets[targetLabel]; exists {
-			addTargetWithFiles(target, "_incoming")
+			addTargetParent(target)
+		}
+	}
+	for targetLabel := range outgoingDeps {
+		if target, exists := module.Targets[targetLabel]; exists {
+			addTargetParent(target)
 		}
 	}
 
-	// Add outgoing dependency targets with their files
-	for targetLabel := range outgoingDeps {
-		if target, exists := module.Targets[targetLabel]; exists {
-			addTargetWithFiles(target, "_outgoing")
-		}
-	}
+	// Track which files have edges (so we only show files that are connected)
+	filesWithEdges := make(map[string]bool)
 
 	// Add target-level edges - only those that connect to/from the focused target
 	// Edges connect to the parent node IDs (with "parent-" prefix)
@@ -629,6 +650,10 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 				sourceFileID := sourceTarget + ":file:" + sourceOriginal
 				targetFileID := targetTarget + ":file:" + depOriginal
 
+				// Track that these files have edges
+				filesWithEdges[sourceFileID] = true
+				filesWithEdges[targetFileID] = true
+
 				// Add compile dependency edge between files
 				graphData.Edges = append(graphData.Edges, GraphEdge{
 					Source:  sourceFileID,
@@ -673,6 +698,10 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 			sourceFileID := symDep.SourceTarget + ":file:" + sourceOriginal
 			targetFileID := symDep.TargetTarget + ":file:" + targetOriginal
 
+			// Track that these files have edges
+			filesWithEdges[sourceFileID] = true
+			filesWithEdges[targetFileID] = true
+
 			// Create edge key for deduplication
 			key := edgeKey{
 				source:  sourceFileID,
@@ -710,6 +739,57 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 	// Add deduplicated symbol edges to graph
 	for _, edge := range symbolEdges {
 		graphData.Edges = append(graphData.Edges, *edge)
+	}
+
+	// Now add file nodes - only for files that have edges OR are in the focused target
+	addFileNodes := func(target *model.Target, typeSuffix string) {
+		parentID := "parent-" + target.Label
+		isFocused := target.Label == focusedTarget.Label
+
+		// Add source file nodes
+		for _, source := range target.Sources {
+			fileID := target.Label + ":file:" + source
+			// Only add if file has edges OR is in focused target
+			if isFocused || filesWithEdges[fileID] {
+				graphData.Nodes = append(graphData.Nodes, GraphNode{
+					ID:     fileID,
+					Label:  getFileName(source),
+					Type:   "source" + typeSuffix,
+					Parent: parentID,
+				})
+			}
+		}
+
+		// Add header file nodes
+		for _, header := range target.Headers {
+			fileID := target.Label + ":file:" + header
+			// Only add if file has edges OR is in focused target
+			if isFocused || filesWithEdges[fileID] {
+				graphData.Nodes = append(graphData.Nodes, GraphNode{
+					ID:     fileID,
+					Label:  getFileName(header),
+					Type:   "header" + typeSuffix,
+					Parent: parentID,
+				})
+			}
+		}
+	}
+
+	// Add file nodes for focused target
+	addFileNodes(focusedTarget, "_focused")
+
+	// Add file nodes for incoming dependency targets
+	for targetLabel := range incomingDeps {
+		if target, exists := module.Targets[targetLabel]; exists {
+			addFileNodes(target, "_incoming")
+		}
+	}
+
+	// Add file nodes for outgoing dependency targets
+	for targetLabel := range outgoingDeps {
+		if target, exists := module.Targets[targetLabel]; exists {
+			addFileNodes(target, "_outgoing")
+		}
 	}
 
 	return graphData
