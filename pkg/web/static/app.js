@@ -406,38 +406,39 @@ function displayDependencyGraph(graphData) {
         const linkage = edge.data('linkage');
         const symbols = edge.data('symbols');
 
+        // Get source and target node labels
+        const sourceNode = cy.getElementById(edge.data('source'));
+        const targetNode = cy.getElementById(edge.data('target'));
+        const sourceLabel = sourceNode.data('label') || edge.data('source');
+        const targetLabel = targetNode.data('label') || edge.data('target');
+
         let tooltipText = '';
 
-        // Add description based on edge type
+        // Add description based on edge type with directional information
         if (edgeType === 'static') {
-            tooltipText = '📦 Static Linkage\nTarget depends on this library at link time.\nCode is included in the final binary.';
+            tooltipText = `📦 Static Linkage\n\n${sourceLabel}\n  depends on (statically links)\n${targetLabel}\n\nCode from ${targetLabel} is included in ${sourceLabel} at link time.`;
         } else if (edgeType === 'dynamic') {
-            tooltipText = '🔗 Dynamic Linkage\nTarget depends on this shared library.\nLibrary is loaded at runtime.';
+            tooltipText = `🔗 Dynamic Linkage\n\n${sourceLabel}\n  depends on (dynamically links)\n${targetLabel}\n\nShared library ${targetLabel} is loaded at runtime.`;
         } else if (edgeType === 'data') {
-            tooltipText = '📄 Data Dependency\nTarget needs this file at runtime.\nSpecified in data attribute.';
+            tooltipText = `📄 Data Dependency\n\n${sourceLabel}\n  needs at runtime\n${targetLabel}\n\nSpecified in 'data' attribute.`;
         } else if (edgeType === 'compile') {
-            tooltipText = '📝 Compile Dependency\nSource file includes this header.\nDetected from .d files (compiler output).';
+            tooltipText = `📝 Compile Dependency\n\n${sourceLabel}\n  #includes header\n${targetLabel}\n\nDetected from .d files (compiler dependency output).`;
         } else if (edgeType === 'system_link') {
-            tooltipText = '⚙️ System Library Link\nTarget links against system library.\nSpecified in linkopts (e.g., -ldl).';
+            tooltipText = `⚙️ System Library Link\n\n${sourceLabel}\n  links against system library\n${targetLabel}\n\nSpecified in linkopts (-l${targetLabel}).`;
         } else if (edgeType === 'symbol') {
-            if (linkage === 'static') {
-                tooltipText = '🔧 Symbol Dependency (Static)\nFile uses symbols from this file.\nStatically linked at build time.';
-            } else if (linkage === 'dynamic') {
-                tooltipText = '🔧 Symbol Dependency (Dynamic)\nFile uses symbols from this file.\nDynamically linked at runtime.';
-            } else if (linkage === 'cross') {
-                tooltipText = '🔧 Symbol Dependency (Cross-Binary)\nFile uses symbols from another binary.\nShared across binary boundaries.';
-            } else {
-                tooltipText = '🔧 Symbol Dependency\nFile uses symbols from this file.';
+            const linkageDesc = linkage === 'static' ? 'statically linked' :
+                              linkage === 'dynamic' ? 'dynamically linked' :
+                              linkage === 'cross' ? 'cross-binary' : linkage;
+            tooltipText = `🔧 Symbol Dependency (${linkageDesc})\n\n${sourceLabel}\n  uses symbols from\n${targetLabel}`;
+
+            // Add symbol list for symbol edges
+            if (symbols && symbols.length > 0) {
+                const symbolList = symbols.slice(0, 15).join('\n  ');
+                const more = symbols.length > 15 ? `\n  ... and ${symbols.length - 15} more` : '';
+                tooltipText += `\n\nSymbols used (${symbols.length}):\n  ${symbolList}${more}`;
             }
         } else {
-            tooltipText = `Dependency Type: ${edgeType || 'unknown'}`;
-        }
-
-        // Add symbol list for symbol edges
-        if (edgeType === 'symbol' && symbols && symbols.length > 0) {
-            const symbolList = symbols.slice(0, 20).join('\n');
-            const more = symbols.length > 20 ? `\n... and ${symbols.length - 20} more` : '';
-            tooltipText += `\n\nSymbols (${symbols.length}):\n${symbolList}${more}`;
+            tooltipText = `Dependency: ${sourceLabel} → ${targetLabel}\nType: ${edgeType || 'unknown'}`;
         }
 
         tooltip.textContent = tooltipText;
@@ -500,6 +501,11 @@ function displayDependencyGraph(graphData) {
     });
 
     cy.on('mouseout', 'node', function(evt) {
+        tooltip.style.display = 'none';
+    });
+
+    // Hide tooltip when clicking anywhere (fixes tooltip staying visible after click)
+    cy.on('tap', function(evt) {
         tooltip.style.display = 'none';
     });
 
@@ -716,17 +722,24 @@ function subscribeToTargetGraph() {
 
 // Load full graph data from API
 async function loadGraphData() {
+    console.log('loadGraphData() called');
     try {
         // Fetch module graph
         const graphResponse = await fetch('/api/module/graph');
+        console.log('Module graph response status:', graphResponse.status);
         if (graphResponse.ok) {
             packageGraph = await graphResponse.json();
             console.log('Loaded graph with', packageGraph.nodes?.length, 'nodes');
 
             // Display the graph
             if (packageGraph && packageGraph.nodes && packageGraph.nodes.length > 0) {
+                console.log('Calling displayDependencyGraph with', packageGraph.nodes.length, 'nodes');
                 displayDependencyGraph(packageGraph);
+            } else {
+                console.warn('Package graph has no nodes or is invalid:', packageGraph);
             }
+        } else {
+            console.error('Failed to fetch module graph:', graphResponse.status, graphResponse.statusText);
         }
 
         // Fetch binary data
