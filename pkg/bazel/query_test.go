@@ -1,145 +1,176 @@
 package bazel
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ritzau/deps-analyzer/pkg/model"
 )
 
-func TestQueryAllCCTargets(t *testing.T) {
-	examplePath := filepath.Join("..", "..", "example")
+func TestQueryWorkspace(t *testing.T) {
+	// Find the example directory
+	workspacePath := findExampleWorkspace(t)
 
-	targets, err := QueryAllCCTargets(examplePath)
+	// Query the workspace
+	workspace, err := QueryWorkspace(workspacePath)
 	if err != nil {
-		t.Fatalf("QueryAllCCTargets() error = %v", err)
+		t.Fatalf("QueryWorkspace failed: %v", err)
 	}
 
-	// Expected: 4 cc_* targets (util, core, plugins, main)
-	expectedCount := 4
-	if len(targets) != expectedCount {
-		t.Errorf("QueryAllCCTargets() found %d targets, expected %d", len(targets), expectedCount)
+	// Verify we found targets
+	if len(workspace.Targets) == 0 {
+		t.Fatal("No targets found")
 	}
 
-	// Check that we found expected targets
-	expectedLabels := []string{"//util:util", "//core:core", "//plugins:renderer_plugin", "//main:test_app"}
-	foundLabels := make(map[string]bool)
-	for _, target := range targets {
-		foundLabels[target.Label] = true
+	t.Logf("Found %d targets", len(workspace.Targets))
+
+	// Verify specific targets exist
+	requiredTargets := []struct {
+		label string
+		kind  model.TargetKind
+	}{
+		{"//main:test_app", model.TargetKindBinary},
+		{"//core:core", model.TargetKindLibrary},
+		{"//util:util", model.TargetKindLibrary},
+		{"//graphics:graphics", model.TargetKindSharedLibrary},
+		{"//audio:audio", model.TargetKindSharedLibrary},
 	}
 
-	for _, expected := range expectedLabels {
-		if !foundLabels[expected] {
-			t.Errorf("QueryAllCCTargets() missing expected target: %s", expected)
+	for _, req := range requiredTargets {
+		target, exists := workspace.Targets[req.label]
+		if !exists {
+			t.Errorf("Target %s not found", req.label)
+			continue
+		}
+		if target.Kind != req.kind {
+			t.Errorf("Target %s has wrong kind: got %s, want %s", req.label, target.Kind, req.kind)
+		}
+	}
+
+	// Verify test_app has the expected dependencies
+	testApp, exists := workspace.Targets["//main:test_app"]
+	if !exists {
+		t.Fatal("//main:test_app not found")
+	}
+
+	// Check deps (should have core, util, graphics_impl)
+	expectedDeps := []string{"//core:core", "//util:util", "//graphics:graphics_impl"}
+	if len(testApp.Deps) != len(expectedDeps) {
+		t.Errorf("test_app deps: got %d, want %d", len(testApp.Deps), len(expectedDeps))
+	}
+	for _, dep := range expectedDeps {
+		if !contains(testApp.Deps, dep) {
+			t.Errorf("test_app missing dep: %s", dep)
+		}
+	}
+
+	// Check dynamic_deps (should have graphics)
+	if len(testApp.DynamicDeps) != 1 || testApp.DynamicDeps[0] != "//graphics:graphics" {
+		t.Errorf("test_app dynamic_deps: got %v, want [//graphics:graphics]", testApp.DynamicDeps)
+	}
+
+	// Check data (should have audio)
+	if len(testApp.Data) != 1 || testApp.Data[0] != "//audio:audio" {
+		t.Errorf("test_app data: got %v, want [//audio:audio]", testApp.Data)
+	}
+
+	// Check linkopts (should include -ldl)
+	if !contains(testApp.Linkopts, "-ldl") {
+		t.Errorf("test_app missing -ldl in linkopts: %v", testApp.Linkopts)
+	}
+
+	// Verify dependencies are typed correctly
+	t.Logf("Found %d dependencies", len(workspace.Dependencies))
+
+	// Count by type
+	byType := make(map[model.DependencyType]int)
+	for _, dep := range workspace.Dependencies {
+		byType[dep.Type]++
+	}
+
+	t.Logf("Dependency types: static=%d, dynamic=%d, data=%d",
+		byType[model.DependencyStatic],
+		byType[model.DependencyDynamic],
+		byType[model.DependencyData])
+
+	// Verify specific dependency types
+	testCases := []struct {
+		from string
+		to   string
+		typ  model.DependencyType
+	}{
+		{"//main:test_app", "//core:core", model.DependencyStatic},
+		{"//main:test_app", "//graphics:graphics", model.DependencyDynamic},
+		{"//main:test_app", "//audio:audio", model.DependencyData},
+		{"//core:core", "//util:util", model.DependencyStatic},
+	}
+
+	for _, tc := range testCases {
+		found := false
+		for _, dep := range workspace.Dependencies {
+			if dep.From == tc.from && dep.To == tc.to {
+				found = true
+				if dep.Type != tc.typ {
+					t.Errorf("Dependency %s -> %s has wrong type: got %s, want %s",
+						tc.from, tc.to, dep.Type, tc.typ)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Dependency not found: %s -> %s", tc.from, tc.to)
 		}
 	}
 }
 
-func TestQuerySourceFilesForTarget(t *testing.T) {
+func findExampleWorkspace(t *testing.T) string {
+	// Try relative path first (when running from pkg/bazel)
 	examplePath := filepath.Join("..", "..", "example")
-
-	tests := []struct {
-		name          string
-		target        string
-		shouldContain []string
-		shouldNotContain []string
-	}{
-		{
-			name:   "util target",
-			target: "//util:util",
-			shouldContain: []string{
-				"util/strings.cc",
-				"util/strings.h",
-				"util/math.cc",
-				"util/math.h",
-			},
-			shouldNotContain: []string{
-				"util/orphaned.cc", // Not in BUILD.bazel
-			},
-		},
-		{
-			name:   "core target",
-			target: "//core:core",
-			shouldContain: []string{
-				"core/engine.cc",
-				"core/engine.h",
-				"core/state.cc",
-				"core/state.h",
-			},
-			shouldNotContain: []string{},
-		},
+	if isWorkspace(examplePath) {
+		return examplePath
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			files, err := QuerySourceFilesForTarget(examplePath, tt.target)
-			if err != nil {
-				t.Fatalf("QuerySourceFilesForTarget() error = %v", err)
-			}
-
-			fileSet := make(map[string]bool)
-			for _, f := range files {
-				fileSet[f] = true
-			}
-
-			for _, expected := range tt.shouldContain {
-				if !fileSet[expected] {
-					t.Errorf("QuerySourceFilesForTarget() missing file: %s", expected)
-				}
-			}
-
-			for _, notExpected := range tt.shouldNotContain {
-				if fileSet[notExpected] {
-					t.Errorf("QuerySourceFilesForTarget() should not contain: %s", notExpected)
-				}
-			}
-		})
-	}
-}
-
-func TestQueryAllSourceFiles(t *testing.T) {
-	examplePath := filepath.Join("..", "..", "example")
-
-	files, err := QueryAllSourceFiles(examplePath)
+	// Start from current directory and walk up to find example/
+	dir, err := os.Getwd()
 	if err != nil {
-		t.Fatalf("QueryAllSourceFiles() error = %v", err)
+		t.Fatalf("Failed to get working directory: %v", err)
 	}
 
-	// Should find at least 15 files (all non-orphaned files)
-	if len(files) < 15 {
-		t.Errorf("QueryAllSourceFiles() found %d files, expected at least 15", len(files))
-	}
+	for {
+		examplePath = filepath.Join(dir, "example")
+		if isWorkspace(examplePath) {
+			return examplePath
+		}
 
-	fileSet := make(map[string]bool)
-	for _, f := range files {
-		fileSet[f] = true
-	}
-
-	// Should contain files from util
-	if !fileSet["util/strings.cc"] {
-		t.Error("QueryAllSourceFiles() missing util/strings.cc")
-	}
-
-	// Should NOT contain orphaned.cc
-	if fileSet["util/orphaned.cc"] {
-		t.Error("QueryAllSourceFiles() should not contain util/orphaned.cc")
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("Could not find example workspace (cwd=%s)", dir)
+		}
+		dir = parent
 	}
 }
 
-func TestLabelToPath(t *testing.T) {
-	tests := []struct {
-		label    string
-		expected string
-	}{
-		{"//util:strings.cc", "util/strings.cc"},
-		{"//core:engine.h", "core/engine.h"},
-		{"//main:main.cc", "main/main.cc"},
+func isWorkspace(path string) bool {
+	if stat, err := os.Stat(path); err != nil || !stat.IsDir() {
+		return false
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.label, func(t *testing.T) {
-			result := labelToPath(tt.label)
-			if result != tt.expected {
-				t.Errorf("labelToPath(%s) = %s, expected %s", tt.label, result, tt.expected)
-			}
-		})
+	// Check for WORKSPACE, WORKSPACE.bazel, or MODULE.bazel
+	markers := []string{"WORKSPACE", "WORKSPACE.bazel", "MODULE.bazel"}
+	for _, marker := range markers {
+		if _, err := os.Stat(filepath.Join(path, marker)); err == nil {
+			return true
+		}
 	}
+	return false
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
