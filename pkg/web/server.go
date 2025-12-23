@@ -586,6 +586,11 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 					continue // Skip if target is not in a relevant target
 				}
 
+				// Only show edges where at least one end is in the focused target
+				if sourceTarget != focusedTarget.Label && targetTarget != focusedTarget.Label {
+					continue
+				}
+
 				// Get the original Bazel format for the dependency file
 				depOriginal, ok := normalizedToOriginal[depFile]
 				if !ok {
@@ -622,6 +627,11 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 		for _, symDep := range symbolDeps {
 			// Only include if both targets are relevant
 			if !relevantTargets[symDep.SourceTarget] || !relevantTargets[symDep.TargetTarget] {
+				continue
+			}
+
+			// Only show edges where at least one end is in the focused target
+			if symDep.SourceTarget != focusedTarget.Label && symDep.TargetTarget != focusedTarget.Label {
 				continue
 			}
 
