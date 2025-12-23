@@ -147,35 +147,31 @@ func startWebServerAsync(workspace string, port int) {
 		server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 4, 5)
 		server.PublishTargetGraph("complete", true)
 
-		// Extract binary-level information
-		log.Println("[2/2] Analyzing binary dependencies...")
-		server.PublishWorkspaceStatus("analyzing_binaries", "Analyzing binaries...", 5, 5)
+		// Derive binary-level information from the Module (fast, no additional queries)
+		log.Println("[2/2] Deriving binary information from module...")
+		server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 5, 5)
 
-		binaryInfos, err := binaries.GetAllBinariesInfo(workspace)
-		if err != nil {
-			log.Printf("[2/2] Warning: Could not extract binary info: %v", err)
-		} else {
-			log.Printf("[2/2] Found %d binaries", len(binaryInfos))
-			for _, bin := range binaryInfos {
-				log.Printf("[2/2]   %s (%s)", bin.Label, bin.Kind)
-				if len(bin.DynamicDeps) > 0 {
-					log.Printf("[2/2]     Dynamic deps: %v", bin.DynamicDeps)
-				}
-				if len(bin.DataDeps) > 0 {
-					log.Printf("[2/2]     Data deps: %v", bin.DataDeps)
-				}
-				if len(bin.SystemLibraries) > 0 {
-					log.Printf("[2/2]     System libs: %v", bin.SystemLibraries)
-				}
-				if len(bin.OverlappingDeps) > 0 {
-					log.Printf("[2/2]     ⚠️  Overlapping deps (potential duplicate symbols):")
-					for sharedLib, targets := range bin.OverlappingDeps {
-						log.Printf("[2/2]       %s shares: %v", sharedLib, targets)
-					}
+		binaryInfos := binaries.DeriveBinaryInfoFromModule(module)
+		log.Printf("[2/2] Found %d binaries", len(binaryInfos))
+		for _, bin := range binaryInfos {
+			log.Printf("[2/2]   %s (%s)", bin.Label, bin.Kind)
+			if len(bin.DynamicDeps) > 0 {
+				log.Printf("[2/2]     Dynamic deps: %v", bin.DynamicDeps)
+			}
+			if len(bin.DataDeps) > 0 {
+				log.Printf("[2/2]     Data deps: %v", bin.DataDeps)
+			}
+			if len(bin.SystemLibraries) > 0 {
+				log.Printf("[2/2]     System libs: %v", bin.SystemLibraries)
+			}
+			if len(bin.OverlappingDeps) > 0 {
+				log.Printf("[2/2]     ⚠️  Overlapping deps (potential duplicate symbols):")
+				for sharedLib, targets := range bin.OverlappingDeps {
+					log.Printf("[2/2]       %s shares: %v", sharedLib, targets)
 				}
 			}
-			server.SetBinaries(binaryInfos)
 		}
+		server.SetBinaries(binaryInfos)
 
 		log.Printf("[2/2] Analysis complete! Module has %d targets, %d dependencies (%d packages)",
 			len(module.Targets), len(module.Dependencies), module.GetPackageCount())

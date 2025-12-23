@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/ritzau/deps-analyzer/pkg/model"
 )
 
 // BinaryInfo represents a cc_binary or cc_shared_library
@@ -311,4 +313,126 @@ func toSet(slice []string) map[string]bool {
 		set[item] = true
 	}
 	return set
+}
+
+// DeriveBinaryInfoFromModule creates BinaryInfo for all binaries and shared libraries from the Module
+// This is much faster than running separate Bazel queries for each binary
+func DeriveBinaryInfoFromModule(module *model.Module) []*BinaryInfo {
+	var result []*BinaryInfo
+
+	// Process each binary and shared library target
+	for _, target := range module.Targets {
+		if target.Kind != model.TargetKindBinary && target.Kind != model.TargetKindSharedLibrary {
+			continue
+		}
+
+		info := &BinaryInfo{
+			Label:           target.Label,
+			Kind:            string(target.Kind),
+			DynamicDeps:     make([]string, 0),
+			DataDeps:        make([]string, 0),
+			SystemLibraries: extractSystemLibrariesFromLinkopts(target.Linkopts),
+			RegularDeps:     make([]string, 0),
+			InternalTargets: make([]string, 0),
+			OverlappingDeps: make(map[string][]string),
+		}
+
+		// Collect dependencies from module.Dependencies
+		allLibraries := make(map[string]bool)          // All transitive cc_library dependencies
+		dynamicLibs := make(map[string][]string)       // Track which libraries are in which dynamic deps
+
+		for _, dep := range module.Dependencies {
+			if dep.From != target.Label {
+				continue
+			}
+
+			depTarget := module.Targets[dep.To]
+			if depTarget == nil {
+				continue
+			}
+
+			// Categorize by dependency type
+			switch dep.Type {
+			case model.DependencyDynamic:
+				info.DynamicDeps = append(info.DynamicDeps, dep.To)
+				// Collect libraries from this dynamic dep for overlap detection
+				dynamicLibs[dep.To] = getTransitiveLibraries(module, dep.To)
+			case model.DependencyData:
+				info.DataDeps = append(info.DataDeps, dep.To)
+			case model.DependencyStatic:
+				if depTarget.Kind == model.TargetKindLibrary {
+					info.RegularDeps = append(info.RegularDeps, dep.To)
+				}
+			}
+		}
+
+		// Get all transitive cc_library dependencies
+		visited := make(map[string]bool)
+		collectAllLibraries(module, target.Label, visited, allLibraries)
+		for lib := range allLibraries {
+			if lib != target.Label {
+				info.InternalTargets = append(info.InternalTargets, lib)
+			}
+		}
+
+		result = append(result, info)
+	}
+
+	// Compute overlapping dependencies
+	computeOverlappingDeps(result)
+
+	return result
+}
+
+// extractSystemLibrariesFromLinkopts extracts system libraries from linkopts
+func extractSystemLibrariesFromLinkopts(linkopts []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, opt := range linkopts {
+		if strings.HasPrefix(opt, "-l") {
+			lib := strings.TrimPrefix(opt, "-l")
+			if lib != "" && !seen[lib] {
+				seen[lib] = true
+				result = append(result, lib)
+			}
+		}
+	}
+
+	return result
+}
+
+// getTransitiveLibraries gets all transitive cc_library dependencies of a target
+func getTransitiveLibraries(module *model.Module, targetLabel string) []string {
+	visited := make(map[string]bool)
+	libraries := make(map[string]bool)
+	collectAllLibraries(module, targetLabel, visited, libraries)
+
+	result := make([]string, 0, len(libraries))
+	for lib := range libraries {
+		if lib != targetLabel {
+			result = append(result, lib)
+		}
+	}
+	return result
+}
+
+// collectAllLibraries recursively collects all cc_library dependencies
+func collectAllLibraries(module *model.Module, targetLabel string, visited map[string]bool, libraries map[string]bool) {
+	if visited[targetLabel] {
+		return
+	}
+	visited[targetLabel] = true
+
+	target := module.Targets[targetLabel]
+	if target != nil && target.Kind == model.TargetKindLibrary {
+		libraries[targetLabel] = true
+	}
+
+	// Recursively collect from dependencies
+	for _, dep := range module.Dependencies {
+		if dep.From == targetLabel && dep.Type == model.DependencyStatic {
+			collectAllLibraries(module, dep.To, visited, libraries)
+		}
+	}
 }

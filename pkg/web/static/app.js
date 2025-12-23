@@ -581,18 +581,16 @@ function subscribeToWorkspaceStatus() {
                 updateLoadingProgress(4, null); // Mark step 4 complete
                 analysisComplete = true;
 
-                setTimeout(() => {
-                    hideLoadingOverlay();
-                    // Close SSE connections when done
-                    if (workspaceStatusSource) {
-                        workspaceStatusSource.close();
-                        workspaceStatusSource = null;
-                    }
-                    if (targetGraphSource) {
-                        targetGraphSource.close();
-                        targetGraphSource = null;
-                    }
-                }, 1000);
+                hideLoadingOverlay();
+                // Close SSE connections when done
+                if (workspaceStatusSource) {
+                    workspaceStatusSource.close();
+                    workspaceStatusSource = null;
+                }
+                if (targetGraphSource) {
+                    targetGraphSource.close();
+                    targetGraphSource = null;
+                }
             }
         } catch (e) {
             console.error('Error processing workspace status:', e, 'Raw data:', event.data);
