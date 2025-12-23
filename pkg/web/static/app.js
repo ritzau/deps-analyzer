@@ -189,6 +189,32 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
+                selector: 'node[type $= "_focused"]',
+                style: {
+                    'background-color': '#ff8c00',
+                    'color': 'white',
+                    'border-color': '#ff8c00',
+                    'border-width': '4px',
+                    'font-weight': 'bold'
+                }
+            },
+            {
+                selector: 'node[type $= "_incoming"]',
+                style: {
+                    'background-color': '#4ec9b0',
+                    'color': '#1e1e1e',
+                    'border-color': '#3da889'
+                }
+            },
+            {
+                selector: 'node[type $= "_outgoing"]',
+                style: {
+                    'background-color': '#c586c0',
+                    'color': 'white',
+                    'border-color': '#9d6b99'
+                }
+            },
+            {
                 selector: 'node[hasOverlap]',
                 style: {
                     'border-width': 3,
@@ -296,6 +322,33 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
+                selector: 'edge[type = "compile"]',
+                style: {
+                    'line-color': '#4fc1ff',
+                    'target-arrow-color': '#4fc1ff',
+                    'width': 1.5,
+                    'line-style': 'dotted'
+                }
+            },
+            {
+                selector: 'edge[type = "static"]',
+                style: {
+                    'line-color': '#4ec9b0',
+                    'target-arrow-color': '#4ec9b0',
+                    'width': 2,
+                    'line-style': 'solid'
+                }
+            },
+            {
+                selector: 'edge[type = "dynamic"]',
+                style: {
+                    'line-color': '#c586c0',
+                    'target-arrow-color': '#c586c0',
+                    'width': 2.5,
+                    'line-style': 'solid'
+                }
+            },
+            {
                 selector: 'node:selected',
                 style: {
                     'border-width': '3px',
@@ -391,24 +444,18 @@ function displayDependencyGraph(graphData) {
         console.log('Node clicked:', nodeId, 'Type:', nodeType);
 
         if (currentView === 'package') {
-            // At package level, clicking a target should zoom into it
-            // Find and click the corresponding target in the tree
-            const targetNodes = document.querySelectorAll('.tree-node[data-type="target"]');
-            console.log('Looking for tree node with id:', nodeId);
-            console.log('Found', targetNodes.length, 'target nodes in tree');
-
-            for (const treeNode of targetNodes) {
-                console.log('Checking tree node id:', treeNode.dataset.id);
-                if (treeNode.dataset.id === nodeId) {
-                    console.log('Match found! Clicking tree node');
-                    const label = treeNode.querySelector('.tree-label');
-                    if (label) {
-                        label.click();
-                        return;
-                    }
-                }
+            // At package level, clicking a target should go into focused mode
+            // Check if this is a target node (not a package)
+            if (!nodeType.includes('package') && !nodeType.includes('system')) {
+                console.log('Target node clicked in package view, entering focused mode');
+                showFocusedTargetView(nodeId);
             }
-            console.log('No matching tree node found for:', nodeId);
+        } else if (currentView === 'focused') {
+            // In focused mode, clicking another target switches focus
+            if (!nodeType.includes('_focused')) {
+                console.log('Switching focus to:', nodeId);
+                showFocusedTargetView(nodeId);
+            }
         } else if (currentView === 'file') {
             // At file level, check what type of node was clicked
             if (nodeType === 'target-group') {
@@ -855,8 +902,8 @@ let packageGraph = null; // Store the original package-level graph
 let binaryGraph = null; // Store the binary-level graph
 let binaryData = null; // Store binary information
 let cy = null; // Store the Cytoscape instance
-let currentView = 'package'; // Track current view: 'package', 'file', or 'binary'
-let currentTarget = null; // Track which target we're viewing at file level
+let currentView = 'package'; // Track current view: 'package', 'file', 'binary', or 'focused'
+let currentTarget = null; // Track which target we're viewing at file or focused level
 let currentBinary = null; // Track which binary we're viewing at binary level
 let packagesCollapsed = false; // Track if packages are collapsed
 
@@ -1108,7 +1155,22 @@ async function showBinaryGraphFocused(binaryLabel) {
 
 // Zoom out one level in the graph hierarchy
 function zoomOutOneLevel() {
-    if (currentView === 'file') {
+    if (currentView === 'focused') {
+        // We're in focused view, zoom out to package level
+        console.log('Zooming out from focused view to package view');
+        currentView = 'package';
+        currentTarget = null;
+        currentBinary = null;
+
+        // Clear list selection
+        document.querySelectorAll('.nav-item.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+
+        if (packageGraph) {
+            displayDependencyGraph(packageGraph);
+        }
+    } else if (currentView === 'file') {
         // We're at file level, zoom out to package level
         console.log('Zooming out from file view to package view');
 
@@ -1144,6 +1206,45 @@ function zoomOutOneLevel() {
     } else {
         // Already at package level, can't zoom out further
         console.log('Already at top level (package view)');
+    }
+}
+
+// Show focused view for a target (all dependencies touching this target)
+async function showFocusedTargetView(targetLabel) {
+    try {
+        console.log('Showing focused view for target:', targetLabel);
+
+        // Update state
+        currentView = 'focused';
+        currentTarget = targetLabel;
+        currentBinary = null;
+
+        // Sync selection in the list
+        syncListSelection(targetLabel);
+
+        // Fetch focused graph data from API
+        const encodedLabel = encodeURIComponent(targetLabel);
+        const url = `/api/target/${encodedLabel}/focused`;
+        console.log('Fetching from URL:', url);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error('Failed to fetch focused graph:', response.status, response.statusText);
+            return;
+        }
+
+        const graphData = await response.json();
+        console.log('Received focused graph data:', graphData);
+        console.log('Nodes:', graphData.nodes?.length, 'Edges:', graphData.edges?.length);
+
+        // Display the focused graph
+        if (graphData && graphData.nodes) {
+            displayDependencyGraph(graphData);
+        } else {
+            console.error('Invalid graph data received:', graphData);
+        }
+    } catch (error) {
+        console.error('Error showing focused target view:', error);
     }
 }
 
@@ -1198,7 +1299,25 @@ function selectBinary(binaryLabel, itemElement) {
     showBinaryFocusedGraph(binaryLabel);
 }
 
-// Select a target and show its file graph
+// Sync list selection to match the given target label
+function syncListSelection(targetLabel) {
+    // Clear all selections
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('selected'));
+
+    // Find and select the matching item in the targets list
+    const targetsItems = document.getElementById('targetsItems');
+    if (targetsItems) {
+        const items = targetsItems.querySelectorAll('.nav-item');
+        for (const item of items) {
+            if (item.textContent.includes(targetLabel)) {
+                item.classList.add('selected');
+                break;
+            }
+        }
+    }
+}
+
+// Select a target and show its focused graph
 function selectTarget(targetLabel, itemElement) {
     console.log('Selected target:', targetLabel);
 
@@ -1207,12 +1326,12 @@ function selectTarget(targetLabel, itemElement) {
     if (itemElement) itemElement.classList.add('selected');
 
     // Update state
-    currentView = 'file';
+    currentView = 'focused';
     currentTarget = targetLabel;
     currentBinary = null;
 
-    // Show file-level graph for this target
-    showFileGraphForTarget(targetLabel);
+    // Show focused view for this target
+    showFocusedTargetView(targetLabel);
 }
 
 // Show binary-focused graph: internal targets/packages + external binaries

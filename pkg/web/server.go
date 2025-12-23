@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
@@ -122,10 +123,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/module/packages", s.handlePackages).Methods("GET")
 	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
 	s.router.HandleFunc("/api/binaries/graph", s.handleBinaryGraph).Methods("GET")
-
-	// TODO: Bring back target detail endpoints using Module data
-	// - /api/target/{label} - show target details from Module
-	// - /api/target/{label}/graph - show file-level dependencies from compile deps
+	s.router.HandleFunc("/api/target/{label}/focused", s.handleTargetFocused).Methods("GET")
 
 	// Serve static files
 	staticFS, err := fs.Sub(staticFiles, "static")
@@ -290,6 +288,39 @@ func (s *Server) handlePackages(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(pkgDeps)
 }
 
+func (s *Server) handleTargetFocused(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.module == nil {
+		http.Error(w, "Module data not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Get target label from URL path
+	vars := mux.Vars(r)
+	targetLabel := vars["label"]
+	if targetLabel == "" {
+		http.Error(w, "Target label required", http.StatusBadRequest)
+		return
+	}
+
+	// Ensure label starts with //
+	if !strings.HasPrefix(targetLabel, "//") {
+		targetLabel = "//" + targetLabel
+	}
+
+	// Find the target
+	target, exists := s.module.Targets[targetLabel]
+	if !exists {
+		http.Error(w, fmt.Sprintf("Target not found: %s", targetLabel), http.StatusNotFound)
+		return
+	}
+
+	// Build focused graph data
+	graphData := buildTargetFocusedGraph(s.module, target)
+	json.NewEncoder(w).Encode(graphData)
+}
+
 // buildBinaryGraphData creates a graph visualization for binaries and their shared library dependencies
 func buildBinaryGraphData(binaryInfos []*binaries.BinaryInfo) *GraphData {
 	graphData := &GraphData{
@@ -392,6 +423,85 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 			Type:    string(dep.Type),
 			Symbols: []string{},
 		})
+	}
+
+	return graphData
+}
+
+// buildTargetFocusedGraph creates a focused view of a target showing:
+// - All internal dependencies (compile-time and link-time)
+// - Incoming dependencies (other targets depending on this one)
+// - Outgoing dependencies (targets this one depends on)
+// Only shows dependencies that connect to/from the focused target
+func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target) *GraphData {
+	graphData := &GraphData{
+		Nodes: make([]GraphNode, 0),
+		Edges: make([]GraphEdge, 0),
+	}
+
+	// Track which targets are relevant (connect to/from focused target)
+	relevantTargets := make(map[string]bool)
+	relevantTargets[focusedTarget.Label] = true
+
+	// Find all incoming dependencies (targets that depend on focused target)
+	incomingDeps := make(map[string]bool)
+	for _, dep := range module.Dependencies {
+		if dep.To == focusedTarget.Label {
+			incomingDeps[dep.From] = true
+			relevantTargets[dep.From] = true
+		}
+	}
+
+	// Find all outgoing dependencies (targets that focused target depends on)
+	outgoingDeps := make(map[string]bool)
+	for _, dep := range module.Dependencies {
+		if dep.From == focusedTarget.Label {
+			outgoingDeps[dep.To] = true
+			relevantTargets[dep.To] = true
+		}
+	}
+
+	// Add the focused target node (highlighted)
+	graphData.Nodes = append(graphData.Nodes, GraphNode{
+		ID:    focusedTarget.Label,
+		Label: focusedTarget.Label,
+		Type:  string(focusedTarget.Kind) + "_focused",
+	})
+
+	// Add incoming dependency nodes
+	for targetLabel := range incomingDeps {
+		if target, exists := module.Targets[targetLabel]; exists {
+			graphData.Nodes = append(graphData.Nodes, GraphNode{
+				ID:    target.Label,
+				Label: target.Label,
+				Type:  string(target.Kind) + "_incoming",
+			})
+		}
+	}
+
+	// Add outgoing dependency nodes
+	for targetLabel := range outgoingDeps {
+		if target, exists := module.Targets[targetLabel]; exists {
+			graphData.Nodes = append(graphData.Nodes, GraphNode{
+				ID:    target.Label,
+				Label: target.Label,
+				Type:  string(target.Kind) + "_outgoing",
+			})
+		}
+	}
+
+	// Add edges - only those that connect to/from the focused target
+	for _, dep := range module.Dependencies {
+		// Include edge if it connects to or from the focused target
+		if dep.From == focusedTarget.Label || dep.To == focusedTarget.Label {
+			graphData.Edges = append(graphData.Edges, GraphEdge{
+				Source:  dep.From,
+				Target:  dep.To,
+				Type:    string(dep.Type),
+				Linkage: string(dep.Type),
+				Symbols: []string{},
+			})
+		}
 	}
 
 	return graphData
