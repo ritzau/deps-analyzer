@@ -30,11 +30,13 @@ type GraphNode struct {
 
 // GraphEdge represents an edge in the dependency graph
 type GraphEdge struct {
-	Source  string   `json:"source"`
-	Target  string   `json:"target"`
-	Type    string   `json:"type"`    // "file" (from .d files) or "symbol" (from nm)
-	Linkage string   `json:"linkage"` // For symbol edges: "static", "dynamic", or "cross"
-	Symbols []string `json:"symbols"` // For symbol edges: list of symbol names
+	Source      string   `json:"source"`
+	Target      string   `json:"target"`
+	Type        string   `json:"type"`        // "file" (from .d files) or "symbol" (from nm)
+	Linkage     string   `json:"linkage"`     // For symbol edges: "static", "dynamic", or "cross"
+	Symbols     []string `json:"symbols"`     // For symbol edges: list of symbol names
+	SourceLabel string   `json:"sourceLabel"` // Human-readable label for source node
+	TargetLabel string   `json:"targetLabel"` // Human-readable label for target node
 }
 
 // GraphData holds the dependency graph for visualization
@@ -461,10 +463,12 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 	// Create edges for all dependencies, colored by type
 	for _, dep := range module.Dependencies {
 		graphData.Edges = append(graphData.Edges, GraphEdge{
-			Source:  dep.From,
-			Target:  dep.To,
-			Type:    string(dep.Type),
-			Symbols: []string{},
+			Source:      dep.From,
+			Target:      dep.To,
+			Type:        string(dep.Type),
+			Symbols:     []string{},
+			SourceLabel: dep.From, // Use full label for module graph
+			TargetLabel: dep.To,
 		})
 	}
 
@@ -476,11 +480,13 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 					libName := strings.TrimPrefix(linkopt, "-l")
 					if libName != "" {
 						graphData.Edges = append(graphData.Edges, GraphEdge{
-							Source:  target.Label,
-							Target:  "system:" + libName,
-							Type:    "system_link",
-							Linkage: "system",
-							Symbols: []string{},
+							Source:      target.Label,
+							Target:      "system:" + libName,
+							Type:        "system_link",
+							Linkage:     "system",
+							Symbols:     []string{},
+							SourceLabel: target.Label,
+							TargetLabel: libName, // Just the library name for display
 						})
 					}
 				}
@@ -560,11 +566,13 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 			targetID := "parent-" + dep.To
 
 			graphData.Edges = append(graphData.Edges, GraphEdge{
-				Source:  sourceID,
-				Target:  targetID,
-				Type:    string(dep.Type),
-				Linkage: string(dep.Type),
-				Symbols: []string{},
+				Source:      sourceID,
+				Target:      targetID,
+				Type:        string(dep.Type),
+				Linkage:     string(dep.Type),
+				Symbols:     []string{},
+				SourceLabel: dep.From,
+				TargetLabel: dep.To,
 			})
 		}
 	}
@@ -585,11 +593,13 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 
 					// Add edge from focused target to system library
 					graphData.Edges = append(graphData.Edges, GraphEdge{
-						Source:  "parent-" + focusedTarget.Label,
-						Target:  libNodeID,
-						Type:    "system_link",
-						Linkage: "system",
-						Symbols: []string{},
+						Source:      "parent-" + focusedTarget.Label,
+						Target:      libNodeID,
+						Type:        "system_link",
+						Linkage:     "system",
+						Symbols:     []string{},
+						SourceLabel: focusedTarget.Label,
+						TargetLabel: libName,
 					})
 				}
 			}
@@ -656,11 +666,13 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 
 				// Add compile dependency edge between files
 				graphData.Edges = append(graphData.Edges, GraphEdge{
-					Source:  sourceFileID,
-					Target:  targetFileID,
-					Type:    "compile",
-					Linkage: "compile",
-					Symbols: []string{},
+					Source:      sourceFileID,
+					Target:      targetFileID,
+					Type:        "compile",
+					Linkage:     "compile",
+					Symbols:     []string{},
+					SourceLabel: getFileName(sourceOriginal),
+					TargetLabel: getFileName(depOriginal),
 				})
 			}
 		}
@@ -713,11 +725,13 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 			edge, exists := symbolEdges[key]
 			if !exists {
 				edge = &GraphEdge{
-					Source:  sourceFileID,
-					Target:  targetFileID,
-					Type:    "symbol",
-					Linkage: string(symDep.Linkage),
-					Symbols: []string{},
+					Source:      sourceFileID,
+					Target:      targetFileID,
+					Type:        "symbol",
+					Linkage:     string(symDep.Linkage),
+					Symbols:     []string{},
+					SourceLabel: getFileName(sourceOriginal),
+					TargetLabel: getFileName(targetOriginal),
 				}
 				symbolEdges[key] = edge
 			}

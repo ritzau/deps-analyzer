@@ -100,7 +100,9 @@ function displayDependencyGraph(graphData) {
                 target: edge.target,
                 type: edge.type,
                 linkage: edge.linkage,
-                symbols: edge.symbols || []
+                symbols: edge.symbols || [],
+                sourceLabel: edge.sourceLabel,
+                targetLabel: edge.targetLabel
             }
         }))
     ];
@@ -382,7 +384,7 @@ function displayDependencyGraph(graphData) {
         }
     });
 
-    // Add tooltip for symbol edges
+    // Add tooltip for edges and nodes
     const tooltip = document.createElement('div');
     tooltip.id = 'edge-tooltip';
     tooltip.style.position = 'absolute';
@@ -399,18 +401,32 @@ function displayDependencyGraph(graphData) {
     tooltip.style.fontFamily = 'monospace';
     document.body.appendChild(tooltip);
 
-    // Show tooltip on edge hover
+    // Tooltip hover delay
+    let tooltipTimeout = null;
+
+    // Show tooltip on edge hover with delay
     cy.on('mouseover', 'edge', function(evt) {
+        // Clear any existing timeout
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+        }
+
+        // Set timeout for 500ms delay
+        tooltipTimeout = setTimeout(() => {
         const edge = evt.target;
         const edgeType = edge.data('type');
         const linkage = edge.data('linkage');
         const symbols = edge.data('symbols');
 
-        // Get source and target node labels
-        const sourceNode = cy.getElementById(edge.data('source'));
-        const targetNode = cy.getElementById(edge.data('target'));
-        const sourceLabel = sourceNode.data('label') || edge.data('source');
-        const targetLabel = targetNode.data('label') || edge.data('target');
+        // Get source and target node labels (prefer edge labels if available)
+        const sourceLabel = edge.data('sourceLabel') || (() => {
+            const sourceNode = cy.getElementById(edge.data('source'));
+            return sourceNode.data('label') || edge.data('source');
+        })();
+        const targetLabel = edge.data('targetLabel') || (() => {
+            const targetNode = cy.getElementById(edge.data('target'));
+            return targetNode.data('label') || edge.data('target');
+        })();
 
         let tooltipText = '';
 
@@ -443,6 +459,7 @@ function displayDependencyGraph(graphData) {
 
         tooltip.textContent = tooltipText;
         tooltip.style.display = 'block';
+        }, 500); // 500ms delay
     });
 
     cy.on('mousemove', 'edge', function(evt) {
@@ -451,11 +468,23 @@ function displayDependencyGraph(graphData) {
     });
 
     cy.on('mouseout', 'edge', function(evt) {
+        // Clear timeout and hide tooltip
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
         tooltip.style.display = 'none';
     });
 
-    // Tooltip for nodes
+    // Tooltip for nodes with delay
     cy.on('mouseover', 'node', function(evt) {
+        // Clear any existing timeout
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+        }
+
+        // Set timeout for 500ms delay
+        tooltipTimeout = setTimeout(() => {
         const node = evt.target;
         const nodeType = node.data('type');
         const nodeLabel = node.data('label');
@@ -493,6 +522,7 @@ function displayDependencyGraph(graphData) {
 
         tooltip.textContent = tooltipText;
         tooltip.style.display = 'block';
+        }, 500); // 500ms delay
     });
 
     cy.on('mousemove', 'node', function(evt) {
@@ -501,11 +531,21 @@ function displayDependencyGraph(graphData) {
     });
 
     cy.on('mouseout', 'node', function(evt) {
+        // Clear timeout and hide tooltip
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
         tooltip.style.display = 'none';
     });
 
     // Hide tooltip when clicking anywhere (fixes tooltip staying visible after click)
     cy.on('tap', function(evt) {
+        // Clear timeout and hide tooltip
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
         tooltip.style.display = 'none';
     });
 
