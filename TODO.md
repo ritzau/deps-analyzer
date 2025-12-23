@@ -64,6 +64,12 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 - Can we use bazel to generate and cache this info?
 - Concurrent operations?
 
-# BUG: . as project name
+## BUG: . as project name
 
 - If we use the crurent dir, at least check to see what its name is
+
+## Tooltips on all edges
+
+- Store in the edge (type and text)
+- Maybe for each node?
+- Maybe some more info when clicking on edges?
