@@ -9,15 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
-	"github.com/ritzau/deps-analyzer/pkg/cycles"
-	"github.com/ritzau/deps-analyzer/pkg/deps"
-	"github.com/ritzau/deps-analyzer/pkg/finder"
-	"github.com/ritzau/deps-analyzer/pkg/graph"
-	"github.com/ritzau/deps-analyzer/pkg/output"
-	"github.com/ritzau/deps-analyzer/pkg/symbols"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 )
 
@@ -29,54 +22,21 @@ func main() {
 	flag.Parse()
 
 	if *webMode {
-		// Start web server first, then run analysis in background
+		// Start web server and run streamlined analysis
 		startWebServerAsync(*workspace, *port)
 	} else {
-		// Run analysis synchronously for CLI mode
-		allFiles, _, uncovered, err := runAnalysis(*workspace)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		coveredCount := len(allFiles) - len(uncovered)
-		// Print colorized coverage report to console
-		output.PrintCoverageReport(*workspace, len(allFiles), coveredCount, uncovered)
+		// TODO: Add CLI mode back with Module-based output
+		// - Show targets, dependencies by type, packages
+		// - Show dependency issues/warnings
+		// - Optional: coverage analysis (files not in any target)
+		fmt.Fprintf(os.Stderr, "CLI mode not yet implemented. Use --web flag to start web server.\n")
+		os.Exit(1)
 	}
-}
-
-func runAnalysis(workspace string) ([]string, []string, []analysis.UncoveredFile, error) {
-	// Find all source files in the workspace
-	allFiles, err := finder.FindSourceFiles(workspace)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("finding source files: %w", err)
-	}
-
-	// Query Bazel for covered files
-	coveredFiles, err := bazel.QueryAllSourceFiles(workspace)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("querying Bazel for covered files: %w", err)
-	}
-
-	// Find uncovered files
-	uncovered := analysis.FindUncoveredFiles(allFiles, coveredFiles)
-
-	return allFiles, coveredFiles, uncovered, nil
 }
 
 func startWebServerAsync(workspace string, port int) {
-	// Create server with initial empty data
+	// Create server
 	server := web.NewServer()
-
-	// Set initial "loading" state
-	initialData := &web.AnalysisData{
-		Workspace:       workspace,
-		TotalFiles:      0,
-		CoveredFiles:    0,
-		UncoveredFiles:  []analysis.UncoveredFile{},
-		CoveragePercent: 0,
-	}
-	server.SetAnalysisData(initialData)
 
 	url := fmt.Sprintf("http://localhost:%d", port)
 	fmt.Printf("Starting web server on %s\n", url)
@@ -95,157 +55,94 @@ func startWebServerAsync(workspace string, port int) {
 	fmt.Println("Opening browser...")
 	openBrowser(url)
 
-	// Run analysis in background and update server data progressively
+	// Run streamlined analysis in background
 	go func() {
-		log.Println("[1/4] Finding source files...")
-		allFiles, _, uncovered, err := runAnalysis(workspace)
+		// Publish initial state
+		server.PublishWorkspaceStatus("initializing", "Starting analysis...", 0, 5)
+
+		// Query the Module model with all dependency types
+		log.Println("[1/2] Querying Bazel module...")
+		server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 5)
+
+		module, err := bazel.QueryWorkspace(workspace)
 		if err != nil {
-			log.Printf("Error during analysis: %v", err)
+			log.Printf("[1/2] Error: Could not query module: %v", err)
+			server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 5)
 			return
 		}
 
-		coveredCount := len(allFiles) - len(uncovered)
-		percentage := 100.0
-		if len(allFiles) > 0 {
-			percentage = float64(coveredCount) / float64(len(allFiles)) * 100.0
-		}
+		log.Printf("[1/2] Found %d targets, %d dependencies", len(module.Targets), len(module.Dependencies))
+		server.SetModule(module)
+		server.PublishTargetGraph("partial_data", false)
 
-		log.Printf("[1/4] Complete: Found %d source files, %d covered (%.0f%%)", len(allFiles), coveredCount, percentage)
+		// Add compile dependencies from .d files
+		log.Println("[1/2] Adding compile dependencies from .d files...")
+		server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 5)
 
-		// Update with coverage data
-		data := &web.AnalysisData{
-			Workspace:       workspace,
-			TotalFiles:      len(allFiles),
-			CoveredFiles:    coveredCount,
-			UncoveredFiles:  uncovered,
-			CoveragePercent: percentage,
-			AnalysisStep:    1,
-		}
-		server.SetAnalysisData(data)
-
-		// Build dependency graph
-		log.Println("[2/4] Building target dependency graph...")
-		targetGraph, err := graph.BuildTargetGraph(workspace)
-		var graphData *web.GraphData
-		if err != nil {
-			log.Printf("[2/4] Warning: Could not build dependency graph: %v", err)
+		if err := bazel.AddCompileDependencies(module, workspace); err != nil {
+			log.Printf("[1/2] Warning: Could not add compile dependencies: %v", err)
 		} else {
-			graphData = &web.GraphData{
-				Nodes: make([]web.GraphNode, 0),
-				Edges: make([]web.GraphEdge, 0),
-			}
+			log.Printf("[1/2] Added compile dependencies, now have %d total dependencies", len(module.Dependencies))
+		}
+		server.PublishTargetGraph("partial_data", false)
 
-			for _, node := range targetGraph.Nodes() {
-				graphData.Nodes = append(graphData.Nodes, web.GraphNode{
-					ID:    node.Label,
-					Label: node.Label,
-					Type:  node.Kind,
-				})
-			}
+		// Add symbol dependencies from nm
+		log.Println("[1/2] Adding symbol dependencies from nm analysis...")
+		server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 5)
 
-			for _, edge := range targetGraph.Edges() {
-				graphData.Edges = append(graphData.Edges, web.GraphEdge{
-					Source: edge[0],
-					Target: edge[1],
-				})
+		if err := bazel.AddSymbolDependencies(module, workspace); err != nil {
+			log.Printf("[1/2] Warning: Could not add symbol dependencies: %v", err)
+		} else {
+			log.Printf("[1/2] Module has %d total dependencies", len(module.Dependencies))
+			if len(module.Issues) > 0 {
+				log.Printf("[1/2] ⚠️  Found %d dependency issues", len(module.Issues))
+				for _, issue := range module.Issues {
+					log.Printf("[1/2]   %s: %s -> %s (%v)", issue.Severity, issue.From, issue.To, issue.Types)
+				}
 			}
-
-			log.Printf("[2/4] Complete: Graph has %d nodes, %d edges", len(graphData.Nodes), len(graphData.Edges))
 		}
 
-		// Update with graph data
-		data.Graph = graphData
-		data.AnalysisStep = 2
-		server.SetAnalysisData(data)
+		// Store module in server and publish targets ready
+		server.SetModule(module)
+		server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 4, 5)
+		server.PublishTargetGraph("complete", true)
 
 		// Extract binary-level information
-		log.Println("[2.5/4] Analyzing binary dependencies...")
+		log.Println("[2/2] Analyzing binary dependencies...")
+		server.PublishWorkspaceStatus("analyzing_binaries", "Analyzing binaries...", 5, 5)
+
 		binaryInfos, err := binaries.GetAllBinariesInfo(workspace)
 		if err != nil {
-			log.Printf("[2.5/4] Warning: Could not extract binary info: %v", err)
+			log.Printf("[2/2] Warning: Could not extract binary info: %v", err)
 		} else {
-			log.Printf("[2.5/4] Found %d binaries", len(binaryInfos))
+			log.Printf("[2/2] Found %d binaries", len(binaryInfos))
 			for _, bin := range binaryInfos {
-				log.Printf("[2.5/4]   %s (%s)", bin.Label, bin.Kind)
+				log.Printf("[2/2]   %s (%s)", bin.Label, bin.Kind)
 				if len(bin.DynamicDeps) > 0 {
-					log.Printf("[2.5/4]     Dynamic deps: %v", bin.DynamicDeps)
+					log.Printf("[2/2]     Dynamic deps: %v", bin.DynamicDeps)
 				}
 				if len(bin.DataDeps) > 0 {
-					log.Printf("[2.5/4]     Data deps: %v", bin.DataDeps)
+					log.Printf("[2/2]     Data deps: %v", bin.DataDeps)
 				}
 				if len(bin.SystemLibraries) > 0 {
-					log.Printf("[2.5/4]     System libs: %v", bin.SystemLibraries)
+					log.Printf("[2/2]     System libs: %v", bin.SystemLibraries)
 				}
 				if len(bin.OverlappingDeps) > 0 {
-					log.Printf("[2.5/4]     ⚠️  Overlapping deps (potential duplicate symbols):")
+					log.Printf("[2/2]     ⚠️  Overlapping deps (potential duplicate symbols):")
 					for sharedLib, targets := range bin.OverlappingDeps {
-						log.Printf("[2.5/4]       %s shares: %v", sharedLib, targets)
+						log.Printf("[2/2]       %s shares: %v", sharedLib, targets)
 					}
 				}
 			}
 			server.SetBinaries(binaryInfos)
 		}
 
-		// Build file dependency graph and detect cycles
-		log.Println("[3/4] Parsing .d files for file-level dependencies...")
-		var crossPackageDeps []analysis.CrossPackageDep
-		var fileCycles []cycles.FileCycle
-		var fileGraph *graph.FileGraph
-		fileDeps, err := deps.ParseAllDFiles(workspace)
-		if err != nil {
-			log.Printf("[3/4] Warning: Could not parse .d files: %v", err)
-		} else if len(fileDeps) == 0 {
-			log.Println("[3/4] Note: No .d files found. Run 'bazel build //... --save_temps' to generate them.")
-		} else {
-			log.Printf("[3/4] Found %d .d files", len(fileDeps))
-			fileGraph = graph.BuildFileGraph(fileDeps)
+		log.Printf("[2/2] Analysis complete! Module has %d targets, %d dependencies (%d packages)",
+			len(module.Targets), len(module.Dependencies), module.GetPackageCount())
+		log.Println("View results at", url)
 
-			// Build file-to-target mapping for accurate target labels
-			log.Println("[3/4] Building file-to-target mapping...")
-			fileToTarget, err := bazel.BuildFileToTargetMap(workspace)
-			if err != nil {
-				log.Printf("[3/4] Warning: Could not build file-to-target map: %v", err)
-				crossPackageDeps = analysis.FindCrossPackageDeps(fileGraph)
-			} else {
-				log.Printf("[3/4] Mapped %d files to targets", len(fileToTarget))
-				crossPackageDeps = analysis.FindCrossPackageDepsWithTargets(fileGraph, fileToTarget)
-			}
-
-			fileCycles = cycles.FindFileCycles(fileGraph)
-			log.Printf("[3/4] Complete: Found %d cross-package file dependencies, %d circular dependencies", len(crossPackageDeps), len(fileCycles))
-
-			// Build symbol dependencies if we have file-to-target mapping
-			if fileToTarget != nil {
-				log.Println("[3/4] Analyzing symbol-level dependencies...")
-				// Build target-to-kind mapping for linkage detection
-				targetToKind := make(map[string]string)
-				if targetGraph != nil {
-					for _, node := range targetGraph.Nodes() {
-						targetToKind[node.Label] = node.Kind
-					}
-				}
-
-				symbolDeps, err := symbols.BuildSymbolGraph(workspace, fileToTarget, targetToKind)
-				if err != nil {
-					log.Printf("[3/4] Warning: Could not build symbol graph: %v", err)
-				} else {
-					log.Printf("[3/4] Found %d symbol-level dependencies", len(symbolDeps))
-					server.SetSymbolDeps(symbolDeps)
-				}
-			}
-
-			// Store file graph and cross-package deps in server for target detail queries
-			server.SetFileGraph(fileGraph)
-			server.SetCrossPackageDeps(crossPackageDeps)
-		}
-
-		// Update with cross-package deps and cycles
-		data.CrossPackageDeps = crossPackageDeps
-		data.FileCycles = fileCycles
-		data.AnalysisStep = 4
-		server.SetAnalysisData(data)
-
-		log.Println("[4/4] Analysis complete! View results at", url)
+		// Publish final ready state
+		server.PublishWorkspaceStatus("ready", "Analysis complete", 5, 5)
 	}()
 
 	// Block forever (server runs in goroutine)

@@ -6,6 +6,8 @@
     <title>Bazel C++ Analyzer</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
 </head>
 <body>
     <div class="container">
@@ -18,19 +20,19 @@
             <div class="loading-checklist">
                 <div class="loading-checklist-item" data-step="1">
                     <span class="checklist-icon"></span>
-                    <span class="checklist-text">Finding source files...</span>
+                    <span class="checklist-text">Querying Bazel workspace...</span>
                 </div>
                 <div class="loading-checklist-item" data-step="2">
                     <span class="checklist-icon"></span>
-                    <span class="checklist-text">Building dependency graph...</span>
+                    <span class="checklist-text">Adding compile dependencies...</span>
                 </div>
                 <div class="loading-checklist-item" data-step="3">
                     <span class="checklist-icon"></span>
-                    <span class="checklist-text">Analyzing file dependencies...</span>
+                    <span class="checklist-text">Analyzing symbol dependencies...</span>
                 </div>
                 <div class="loading-checklist-item" data-step="4">
                     <span class="checklist-icon"></span>
-                    <span class="checklist-text">Detecting circular dependencies...</span>
+                    <span class="checklist-text">Analyzing binaries...</span>
                 </div>
             </div>
         </div>
@@ -115,20 +117,6 @@
                         <span>System library link</span>
                     </div>
                 </div>
-            </div>
-
-            <!-- Cross-Package Dependencies -->
-            <div id="crossPackageSection" class="card" style="display: none;">
-                <h2>🔗 Cross-Package File Dependencies</h2>
-                <p class="help-text">File-level dependencies that cross package boundaries. These may indicate tight coupling.</p>
-                <div id="crossPackageList" class="file-list"></div>
-            </div>
-
-            <!-- Circular Dependencies -->
-            <div id="cyclesSection" class="card" style="display: none;">
-                <h2>🔄 Circular Dependencies</h2>
-                <p class="help-text">Files that have circular include dependencies. These can cause compilation issues and should be refactored.</p>
-                <div id="cyclesList" class="file-list"></div>
             </div>
             </div>
         </div>

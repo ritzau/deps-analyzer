@@ -44,6 +44,7 @@ func QueryAllBinaries(workspace string) ([]string, error) {
 // GetBinaryInfo retrieves detailed information about a binary or shared library
 func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 	// Query for rule kind
+	fmt.Printf("  - Querying rule kind...\n")
 	cmd := exec.Command("bazel", "query", "--output=label_kind", label)
 	cmd.Dir = workspace
 	output, err := cmd.CombinedOutput()
@@ -76,10 +77,12 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 	}
 
 	// Get shared library dependencies (both dynamic_deps and from data)
+	fmt.Printf("  - Querying shared library dependencies...\n")
 	sharedLibDeps := querySharedLibraryDeps(workspace, label)
 
 	// Separate into dynamic_deps and data_deps based on how they're referenced
 	// For now, we'll use a heuristic: query deps to see what's linked
+	fmt.Printf("  - Querying linked dependencies...\n")
 	linkedDeps := queryLinkedDeps(workspace, label)
 
 	for _, dep := range sharedLibDeps {
@@ -91,12 +94,15 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 	}
 
 	// Get system libraries from linkopts
+	fmt.Printf("  - Querying system libraries...\n")
 	info.SystemLibraries = querySystemLibraries(workspace, label)
 
 	// Get all cc_library targets this binary depends on (excluding shared libraries)
+	fmt.Printf("  - Querying internal cc_library targets...\n")
 	info.InternalTargets = queryInternalTargets(workspace, label)
 
 	// Get direct cc_library dependencies (depth 1)
+	fmt.Printf("  - Querying direct dependencies...\n")
 	info.RegularDeps = queryDirectDeps(workspace, label)
 
 	return info, nil
@@ -227,13 +233,17 @@ func contains(slice []string, value string) bool {
 
 // GetAllBinariesInfo retrieves information for all binaries
 func GetAllBinariesInfo(workspace string) ([]*BinaryInfo, error) {
+	fmt.Println("Querying for all cc_binary and cc_shared_library targets...")
 	labels, err := QueryAllBinaries(workspace)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("Found %d binaries to analyze\n", len(labels))
+
 	var binaries []*BinaryInfo
-	for _, label := range labels {
+	for i, label := range labels {
+		fmt.Printf("[%d/%d] Analyzing binary: %s\n", i+1, len(labels), label)
 		info, err := GetBinaryInfo(workspace, label)
 		if err != nil {
 			// Log error but continue
@@ -244,6 +254,7 @@ func GetAllBinariesInfo(workspace string) ([]*BinaryInfo, error) {
 	}
 
 	// Compute overlapping dependencies (potential duplicate symbols)
+	fmt.Println("Computing overlapping dependencies...")
 	computeOverlappingDeps(binaries)
 
 	return binaries, nil

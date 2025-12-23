@@ -4,9 +4,12 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/model"
+	"github.com/ritzau/deps-analyzer/pkg/symbols"
 )
 
 // QueryResult represents the XML output from bazel query
@@ -42,7 +45,7 @@ type StringXML struct {
 }
 
 // QueryWorkspace queries all cc_* targets and their dependencies
-func QueryWorkspace(workspacePath string) (*model.Workspace, error) {
+func QueryWorkspace(workspacePath string) (*model.Module, error) {
 	// Query all cc_binary, cc_shared_library, and cc_library targets
 	cmd := exec.Command("bazel", "query",
 		"kind('cc_binary|cc_shared_library|cc_library', //...)",
@@ -65,39 +68,28 @@ func QueryWorkspace(workspacePath string) (*model.Workspace, error) {
 		return nil, fmt.Errorf("failed to parse XML: %w", err)
 	}
 
-	// Build workspace structure
-	workspace := &model.Workspace{
+	// Build module structure
+	module := &model.Module{
 		Targets:      make(map[string]*model.Target),
 		Dependencies: make([]model.Dependency, 0),
-		Packages:     make(map[string]*model.Package),
+		Issues:       make([]model.DependencyIssue, 0),
 	}
 
 	// First pass: create all targets
 	for _, rule := range result.Rules {
 		target := parseTarget(rule)
 		if target != nil {
-			workspace.Targets[target.Label] = target
-
-			// Add to package
-			pkg, exists := workspace.Packages[target.Package]
-			if !exists {
-				pkg = &model.Package{
-					Path:    target.Package,
-					Targets: make(map[string]*model.Target),
-				}
-				workspace.Packages[target.Package] = pkg
-			}
-			pkg.Targets[target.Name] = target
+			module.Targets[target.Label] = target
 		}
 	}
 
 	// Second pass: create typed dependencies
 	for _, rule := range result.Rules {
-		deps := parseDependencies(rule, workspace.Targets)
-		workspace.Dependencies = append(workspace.Dependencies, deps...)
+		deps := parseDependencies(rule, module.Targets)
+		module.Dependencies = append(module.Dependencies, deps...)
 	}
 
-	return workspace, nil
+	return module, nil
 }
 
 // parseTarget converts RuleXML to Target
@@ -138,18 +130,6 @@ func parseTarget(rule RuleXML) *model.Target {
 				if strings.HasSuffix(label.Value, ".h") || strings.HasSuffix(label.Value, ".hpp") {
 					target.Headers = append(target.Headers, label.Value)
 				}
-			}
-		case "deps":
-			for _, label := range list.Labels {
-				target.Deps = append(target.Deps, label.Value)
-			}
-		case "dynamic_deps":
-			for _, label := range list.Labels {
-				target.DynamicDeps = append(target.DynamicDeps, label.Value)
-			}
-		case "data":
-			for _, label := range list.Labels {
-				target.Data = append(target.Data, label.Value)
 			}
 		case "linkopts":
 			for _, str := range list.Strings {
@@ -223,4 +203,286 @@ func determineDependencyType(depLabel string, targets map[string]*model.Target) 
 	default:
 		return model.DependencyStatic
 	}
+}
+
+// AddCompileDependencies adds compile-time dependencies from .d files to the module
+func AddCompileDependencies(module *model.Module, workspacePath string) error {
+	// Parse all .d files
+	fileDeps, err := deps.ParseAllDFiles(workspacePath)
+	if err != nil {
+		return fmt.Errorf("parsing .d files: %w", err)
+	}
+
+	// Build a map from file paths to targets
+	fileToTarget := make(map[string]*model.Target)
+	for _, target := range module.Targets {
+		// Map source files to their target
+		for _, src := range target.Sources {
+			// Normalize the path - src is like "//main:main.cc"
+			// We need to extract just the file path part
+			filePath := normalizeSourcePath(src)
+			fileToTarget[filePath] = target
+		}
+		// Map header files to their target
+		for _, hdr := range target.Headers {
+			filePath := normalizeSourcePath(hdr)
+			fileToTarget[filePath] = target
+		}
+	}
+
+	// Process each file dependency
+	for _, fileDep := range fileDeps {
+		// Find which target owns the source file
+		sourceTarget := findTargetForFile(fileDep.SourceFile, fileToTarget)
+		if sourceTarget == nil {
+			continue // Skip files not associated with any target
+		}
+
+		// For each header dependency, find which target owns it
+		for _, depFile := range fileDep.Dependencies {
+			depTarget := findTargetForFile(depFile, fileToTarget)
+			if depTarget == nil {
+				continue // Skip external or unknown dependencies
+			}
+
+			// Skip dependencies within the same target
+			if sourceTarget.Label == depTarget.Label {
+				continue
+			}
+
+			// Check if this compile dependency already exists
+			exists := false
+			for _, dep := range module.Dependencies {
+				if dep.From == sourceTarget.Label && dep.To == depTarget.Label && dep.Type == model.DependencyCompile {
+					exists = true
+					break
+				}
+			}
+
+			// Add the compile dependency if it doesn't exist
+			if !exists {
+				module.Dependencies = append(module.Dependencies, model.Dependency{
+					From: sourceTarget.Label,
+					To:   depTarget.Label,
+					Type: model.DependencyCompile,
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+// normalizeSourcePath converts a Bazel label source path to a workspace-relative path
+// Example: "//main:main.cc" -> "main/main.cc"
+func normalizeSourcePath(labelPath string) string {
+	// Remove leading "//" if present
+	path := strings.TrimPrefix(labelPath, "//")
+
+	// If there's a colon, it's a label like "//main:main.cc"
+	if idx := strings.Index(path, ":"); idx != -1 {
+		pkg := path[:idx]
+		file := path[idx+1:]
+		return filepath.Join(pkg, file)
+	}
+
+	// Otherwise it's already a file path
+	return path
+}
+
+// findTargetForFile finds the target that owns a given file path
+func findTargetForFile(filePath string, fileToTarget map[string]*model.Target) *model.Target {
+	// Try exact match first
+	if target, ok := fileToTarget[filePath]; ok {
+		return target
+	}
+
+	// Try normalizing the file path (handle different formats)
+	normalized := filepath.Clean(filePath)
+	if target, ok := fileToTarget[normalized]; ok {
+		return target
+	}
+
+	// Try matching by base path components
+	// .d files might have paths like "util/math.cc" while targets have "//util:math.cc"
+	for candidatePath, target := range fileToTarget {
+		if strings.HasSuffix(candidatePath, filePath) || strings.HasSuffix(filePath, filepath.Base(candidatePath)) {
+			// Check if the package matches
+			if strings.Contains(candidatePath, filepath.Dir(filePath)) {
+				return target
+			}
+		}
+	}
+
+	return nil
+}
+
+// AddSymbolDependencies adds symbol-level dependencies from nm analysis to the module
+// It also detects and reports issues like duplicate symbols (both static and dynamic linkage)
+func AddSymbolDependencies(module *model.Module, workspacePath string) error {
+	// Build file-to-target and target-to-kind maps
+	fileToTarget := make(map[string]string)
+	targetToKind := make(map[string]string)
+
+	for _, target := range module.Targets {
+		targetToKind[target.Label] = string(target.Kind)
+
+		// Map source files to their target
+		for _, src := range target.Sources {
+			filePath := normalizeSourcePath(src)
+			fileToTarget[filePath] = target.Label
+		}
+	}
+
+	// Run symbol analysis
+	symbolDeps, err := symbols.BuildSymbolGraph(workspacePath, fileToTarget, targetToKind)
+	if err != nil {
+		return fmt.Errorf("building symbol graph: %w", err)
+	}
+
+	// Track dependencies by source->target pair to detect conflicts
+	depPairs := make(map[string][]model.DependencyType) // "from->to" -> list of types
+
+	// Add symbol dependencies to module
+	for _, symDep := range symbolDeps {
+		if symDep.SourceTarget == "" || symDep.TargetTarget == "" {
+			continue // Skip if we couldn't map to targets
+		}
+
+		// Skip dependencies within the same target
+		if symDep.SourceTarget == symDep.TargetTarget {
+			continue
+		}
+
+		// Check if this symbol dependency already exists
+		exists := false
+		for _, dep := range module.Dependencies {
+			if dep.From == symDep.SourceTarget && dep.To == symDep.TargetTarget && dep.Type == model.DependencySymbol {
+				exists = true
+				break
+			}
+		}
+
+		// Add the symbol dependency if it doesn't exist
+		if !exists {
+			module.Dependencies = append(module.Dependencies, model.Dependency{
+				From: symDep.SourceTarget,
+				To:   symDep.TargetTarget,
+				Type: model.DependencySymbol,
+			})
+		}
+
+		// Track this dependency type for conflict detection
+		key := symDep.SourceTarget + " -> " + symDep.TargetTarget
+		depPairs[key] = append(depPairs[key], model.DependencySymbol)
+	}
+
+	// Detect conflicts: Check if any dependency pair has both static/symbol and dynamic types
+	for _, dep := range module.Dependencies {
+		key := dep.From + " -> " + dep.To
+		depPairs[key] = append(depPairs[key], dep.Type)
+	}
+
+	// Look for problematic combinations
+	for key, types := range depPairs {
+		hasStatic := false
+		hasDynamic := false
+		hasSymbol := false
+
+		for _, t := range types {
+			switch t {
+			case model.DependencyStatic, model.DependencySymbol:
+				if t == model.DependencyStatic {
+					hasStatic = true
+				}
+				if t == model.DependencySymbol {
+					hasSymbol = true
+				}
+			case model.DependencyDynamic:
+				hasDynamic = true
+			}
+		}
+
+		// Issue: Both static and dynamic linkage to the same target
+		if (hasStatic || hasSymbol) && hasDynamic {
+			parts := strings.Split(key, " -> ")
+			if len(parts) == 2 {
+				typeList := make([]string, 0)
+				if hasStatic {
+					typeList = append(typeList, "static")
+				}
+				if hasSymbol {
+					typeList = append(typeList, "symbol")
+				}
+				if hasDynamic {
+					typeList = append(typeList, "dynamic")
+				}
+
+				module.Issues = append(module.Issues, model.DependencyIssue{
+					From:     parts[0],
+					To:       parts[1],
+					Issue:    "duplicate_linkage",
+					Types:    typeList,
+					Severity: "warning",
+					Description: fmt.Sprintf("Target %s has both static and dynamic linkage to %s. "+
+						"This can cause duplicate symbols and runtime issues. "+
+						"Symbols may be included both statically (via deps) and dynamically (via dynamic_deps/shared library).",
+						parts[0], parts[1]),
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+// QueryAllSourceFiles returns all source files covered by Bazel targets
+// This is a compatibility function for the old code
+func QueryAllSourceFiles(workspacePath string) ([]string, error) {
+	module, err := QueryWorkspace(workspacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect all source files from all targets
+	sourceFiles := make([]string, 0)
+	seen := make(map[string]bool)
+
+	for _, target := range module.Targets {
+		for _, src := range target.Sources {
+			normalized := normalizeSourcePath(src)
+			if !seen[normalized] {
+				seen[normalized] = true
+				sourceFiles = append(sourceFiles, normalized)
+			}
+		}
+	}
+
+	return sourceFiles, nil
+}
+
+// BuildFileToTargetMap creates a mapping from file paths to target labels
+// This is a compatibility function for the old code
+func BuildFileToTargetMap(workspacePath string) (map[string]string, error) {
+	module, err := QueryWorkspace(workspacePath)
+	if err != nil {
+		return nil, err
+	}
+
+	fileToTarget := make(map[string]string)
+
+	for _, target := range module.Targets {
+		// Map source files
+		for _, src := range target.Sources {
+			filePath := normalizeSourcePath(src)
+			fileToTarget[filePath] = target.Label
+		}
+		// Map header files
+		for _, hdr := range target.Headers {
+			filePath := normalizeSourcePath(hdr)
+			fileToTarget[filePath] = target.Label
+		}
+	}
+
+	return fileToTarget, nil
 }

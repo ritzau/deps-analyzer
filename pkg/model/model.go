@@ -16,6 +16,8 @@ const (
 	DependencyStatic  DependencyType = "static"  // Static linkage (deps to cc_library)
 	DependencyDynamic DependencyType = "dynamic" // Dynamic linkage (dynamic_deps or deps to cc_shared_library)
 	DependencyData    DependencyType = "data"    // Runtime data dependency
+	DependencyCompile DependencyType = "compile" // Compile-time header dependency (from .d files)
+	DependencySymbol  DependencyType = "symbol"  // Symbol-level linkage dependency (from nm analysis)
 )
 
 // Target represents a Bazel build target
@@ -29,11 +31,8 @@ type Target struct {
 	Sources []string `json:"sources,omitempty"` // .cc files
 	Headers []string `json:"headers,omitempty"` // .h files
 
-	// Dependencies (raw lists from BUILD file)
-	Deps        []string `json:"deps,omitempty"`         // Regular deps attribute
-	DynamicDeps []string `json:"dynamicDeps,omitempty"`  // dynamic_deps attribute
-	Data        []string `json:"data,omitempty"`         // data attribute
-	Linkopts    []string `json:"linkopts,omitempty"`     // linkopts (for system libraries)
+	// System library linking options (not represented as Dependencies)
+	Linkopts []string `json:"linkopts,omitempty"` // linkopts (for system libraries like -ldl)
 }
 
 // Dependency represents a typed dependency between two targets
@@ -62,22 +61,60 @@ type Edge struct {
 	ToTarget   string `json:"toTarget"`   // Target dependency label
 }
 
-// Workspace represents the complete build graph
-type Workspace struct {
+// DependencyIssue represents a problem with dependencies
+type DependencyIssue struct {
+	From        string   `json:"from"`        // Source target label
+	To          string   `json:"to"`          // Target dependency label
+	Issue       string   `json:"issue"`       // Description of the issue
+	Types       []string `json:"types"`       // Conflicting dependency types
+	Severity    string   `json:"severity"`    // "warning" or "error"
+	Description string   `json:"description"` // Detailed explanation
+}
+
+// Module represents the complete build graph (a Bazel workspace/module)
+type Module struct {
 	Targets      map[string]*Target `json:"targets"`      // Map of label -> Target
 	Dependencies []Dependency       `json:"dependencies"` // All target-level dependencies
-	Packages     map[string]*Package `json:"packages"`    // Map of package path -> Package
+	Issues       []DependencyIssue  `json:"issues"`       // Dependency issues/warnings
+}
+
+// GetPackages derives the package structure from targets
+func (m *Module) GetPackages() map[string]*Package {
+	packages := make(map[string]*Package)
+
+	for _, target := range m.Targets {
+		pkg, exists := packages[target.Package]
+		if !exists {
+			pkg = &Package{
+				Path:    target.Package,
+				Targets: make(map[string]*Target),
+			}
+			packages[target.Package] = pkg
+		}
+		pkg.Targets[target.Name] = target
+	}
+
+	return packages
+}
+
+// GetPackageCount returns the number of unique packages
+func (m *Module) GetPackageCount() int {
+	packageSet := make(map[string]bool)
+	for _, target := range m.Targets {
+		packageSet[target.Package] = true
+	}
+	return len(packageSet)
 }
 
 // GetPackageDependencies returns all dependencies for a given package
-func (w *Workspace) GetPackageDependencies(packagePath string) []PackageDependency {
+func (m *Module) GetPackageDependencies(packagePath string) []PackageDependency {
 	// Map to aggregate dependencies by target package
 	depsByPackage := make(map[string]*PackageDependency)
 
 	// Iterate through all dependencies
-	for _, dep := range w.Dependencies {
-		fromTarget := w.Targets[dep.From]
-		toTarget := w.Targets[dep.To]
+	for _, dep := range m.Dependencies {
+		fromTarget := m.Targets[dep.From]
+		toTarget := m.Targets[dep.To]
 
 		if fromTarget == nil || toTarget == nil {
 			continue
@@ -121,14 +158,14 @@ func (w *Workspace) GetPackageDependencies(packagePath string) []PackageDependen
 	return result
 }
 
-// GetAllPackageDependencies returns all package-to-package dependencies in the workspace
-func (w *Workspace) GetAllPackageDependencies() []PackageDependency {
+// GetAllPackageDependencies returns all package-to-package dependencies in the module
+func (m *Module) GetAllPackageDependencies() []PackageDependency {
 	// Map to aggregate dependencies by package pair
 	depsByPair := make(map[string]*PackageDependency)
 
-	for _, dep := range w.Dependencies {
-		fromTarget := w.Targets[dep.From]
-		toTarget := w.Targets[dep.To]
+	for _, dep := range m.Dependencies {
+		fromTarget := m.Targets[dep.From]
+		toTarget := m.Targets[dep.To]
 
 		if fromTarget == nil || toTarget == nil {
 			continue

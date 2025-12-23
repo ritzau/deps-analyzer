@@ -9,11 +9,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
-	"github.com/ritzau/deps-analyzer/pkg/cycles"
-	"github.com/ritzau/deps-analyzer/pkg/graph"
-	"github.com/ritzau/deps-analyzer/pkg/symbols"
+	"github.com/ritzau/deps-analyzer/pkg/model"
+	"github.com/ritzau/deps-analyzer/pkg/pubsub"
 )
 
 //go:embed static/*
@@ -42,56 +40,37 @@ type GraphData struct {
 	Edges []GraphEdge `json:"edges"`
 }
 
-// AnalysisData holds all the analysis results to send to the frontend
-type AnalysisData struct {
-	Workspace         string                      `json:"workspace"`
-	TotalFiles        int                         `json:"totalFiles"`
-	CoveredFiles      int                         `json:"coveredFiles"`
-	UncoveredFiles    []analysis.UncoveredFile    `json:"uncoveredFiles"`
-	CoveragePercent   float64                     `json:"coveragePercent"`
-	Graph             *GraphData                  `json:"graph,omitempty"`
-	CrossPackageDeps  []analysis.CrossPackageDep  `json:"crossPackageDeps,omitempty"`
-	FileCycles        []cycles.FileCycle          `json:"fileCycles,omitempty"`
-	AnalysisStep      int                         `json:"analysisStep"` // 1-4, which step is complete
-}
-
 // Server represents the web server
 type Server struct {
-	router           *mux.Router
-	analysisData     *AnalysisData
-	fileGraph        *graph.FileGraph
-	crossPackageDeps []analysis.CrossPackageDep
-	symbolDeps       []symbols.SymbolDependency
-	binaries         []*binaries.BinaryInfo
+	router    *mux.Router
+	binaries  []*binaries.BinaryInfo
+	module    *model.Module
+	publisher pubsub.Publisher
 }
 
 // NewServer creates a new web server
 func NewServer() *Server {
+	ssePublisher := pubsub.NewSSEPublisher()
+
+	// Configure topic buffering
+	// workspace_status: buffer last 10 events, replay only last event to new subscribers
+	ssePublisher.ConfigureTopic("workspace_status", pubsub.TopicConfig{
+		BufferSize: 10,
+		ReplayAll:  false, // Only send current state
+	})
+
+	// target_graph: buffer last 5 events, replay only last event
+	ssePublisher.ConfigureTopic("target_graph", pubsub.TopicConfig{
+		BufferSize: 5,
+		ReplayAll:  false, // Only send current state
+	})
+
 	s := &Server{
-		router: mux.NewRouter(),
+		router:    mux.NewRouter(),
+		publisher: ssePublisher,
 	}
 	s.setupRoutes()
 	return s
-}
-
-// SetAnalysisData updates the analysis data
-func (s *Server) SetAnalysisData(data *AnalysisData) {
-	s.analysisData = data
-}
-
-// SetFileGraph stores the file graph for target detail queries
-func (s *Server) SetFileGraph(fg *graph.FileGraph) {
-	s.fileGraph = fg
-}
-
-// SetCrossPackageDeps stores cross-package dependencies for target detail queries
-func (s *Server) SetCrossPackageDeps(deps []analysis.CrossPackageDep) {
-	s.crossPackageDeps = deps
-}
-
-// SetSymbolDeps stores symbol-level dependencies for target detail queries
-func (s *Server) SetSymbolDeps(deps []symbols.SymbolDependency) {
-	s.symbolDeps = deps
 }
 
 // SetBinaries stores binary-level information
@@ -99,13 +78,54 @@ func (s *Server) SetBinaries(bins []*binaries.BinaryInfo) {
 	s.binaries = bins
 }
 
+// SetModule stores the new Module data model
+func (s *Server) SetModule(m *model.Module) {
+	s.module = m
+}
+
+// PublishWorkspaceStatus publishes a workspace status event
+func (s *Server) PublishWorkspaceStatus(state, message string, step, total int) error {
+	status := pubsub.WorkspaceStatus{
+		State:   state,
+		Message: message,
+		Step:    step,
+		Total:   total,
+	}
+	return s.publisher.Publish("workspace_status", state, status)
+}
+
+// PublishTargetGraph publishes a target graph event
+func (s *Server) PublishTargetGraph(eventType string, complete bool) error {
+	var targetsCount, depsCount int
+	if s.module != nil {
+		targetsCount = len(s.module.Targets)
+		depsCount = len(s.module.Dependencies)
+	}
+
+	data := pubsub.TargetGraphData{
+		TargetsCount:      targetsCount,
+		DependenciesCount: depsCount,
+		Complete:          complete,
+	}
+	return s.publisher.Publish("target_graph", eventType, data)
+}
+
 func (s *Server) setupRoutes() {
+	// SSE subscription endpoints
+	s.router.HandleFunc("/api/subscribe/workspace_status", s.handleSubscribeWorkspaceStatus).Methods("GET")
+	s.router.HandleFunc("/api/subscribe/target_graph", s.handleSubscribeTargetGraph).Methods("GET")
+
 	// API routes - more specific routes must come first
-	s.router.HandleFunc("/api/analysis", s.handleAnalysis).Methods("GET")
+	s.router.HandleFunc("/api/analysis", s.handleAnalysis).Methods("GET") // Legacy endpoint for UI polling
+	s.router.HandleFunc("/api/module", s.handleModule).Methods("GET")
+	s.router.HandleFunc("/api/module/graph", s.handleModuleGraph).Methods("GET")
+	s.router.HandleFunc("/api/module/packages", s.handlePackages).Methods("GET")
 	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
 	s.router.HandleFunc("/api/binaries/graph", s.handleBinaryGraph).Methods("GET")
-	s.router.HandleFunc("/api/target/{label:.*}/graph", s.handleTargetGraph).Methods("GET")
-	s.router.HandleFunc("/api/target/{label:.*}", s.handleTargetDetails).Methods("GET")
+
+	// TODO: Bring back target detail endpoints using Module data
+	// - /api/target/{label} - show target details from Module
+	// - /api/target/{label}/graph - show file-level dependencies from compile deps
 
 	// Serve static files
 	staticFS, err := fs.Sub(staticFiles, "static")
@@ -115,15 +135,70 @@ func (s *Server) setupRoutes() {
 	s.router.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 }
 
-func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func (s *Server) handleSubscribeWorkspaceStatus(w http.ResponseWriter, r *http.Request) {
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS support
 
-	if s.analysisData == nil {
-		http.Error(w, "No analysis data available", http.StatusServiceUnavailable)
-		return
+	// Send initial comment to establish connection (Safari compatibility)
+	fmt.Fprintf(w, ": connected\n\n")
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
 	}
 
-	json.NewEncoder(w).Encode(s.analysisData)
+	// Create subscription
+	sub, err := s.publisher.Subscribe(r.Context(), "workspace_status")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer sub.Close()
+
+	// Stream events
+	for event := range sub.Events() {
+		if err := pubsub.WriteSSE(w, event); err != nil {
+			log.Printf("Error writing SSE event: %v", err)
+			return
+		}
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}
+}
+
+func (s *Server) handleSubscribeTargetGraph(w http.ResponseWriter, r *http.Request) {
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS support
+
+	// Send initial comment to establish connection (Safari compatibility)
+	fmt.Fprintf(w, ": connected\n\n")
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+
+	// Create subscription
+	sub, err := s.publisher.Subscribe(r.Context(), "target_graph")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer sub.Close()
+
+	// Stream events
+	for event := range sub.Events() {
+		if err := pubsub.WriteSSE(w, event); err != nil {
+			log.Printf("Error writing SSE event: %v", err)
+			return
+		}
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}
 }
 
 func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +210,28 @@ func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(s.binaries)
+}
+
+func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Legacy endpoint for UI polling - returns Module data in expected format
+	// Since we now do analysis in one go, we always report as complete (step 4)
+	response := map[string]interface{}{
+		"analysisStep":     4, // Always complete
+		"graph":            &GraphData{Nodes: []GraphNode{}, Edges: []GraphEdge{}},
+		"crossPackageDeps": []interface{}{},
+		"fileCycles":       []interface{}{},
+	}
+
+	if s.module != nil {
+		// Convert Module to graph format
+		response["graph"] = buildModuleGraphData(s.module)
+		// Convert package dependencies
+		response["crossPackageDeps"] = s.module.GetAllPackageDependencies()
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *Server) handleBinaryGraph(w http.ResponseWriter, r *http.Request) {
@@ -153,51 +250,44 @@ func (s *Server) handleBinaryGraph(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(graphData)
 }
 
-func (s *Server) handleTargetDetails(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleModule(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	vars := mux.Vars(r)
-	targetLabel := vars["label"]
-
-	// HTTP path normalization strips leading //, so restore it if missing
-	if len(targetLabel) > 0 && targetLabel[0] != '/' {
-		targetLabel = "//" + targetLabel
-	}
-
-	if s.fileGraph == nil {
-		http.Error(w, "File graph not available", http.StatusServiceUnavailable)
+	if s.module == nil {
+		http.Error(w, "Module data not available", http.StatusServiceUnavailable)
 		return
 	}
 
-	// Get target file details
-	details := analysis.GetTargetFileDetails(targetLabel, s.fileGraph, s.crossPackageDeps)
-
-	json.NewEncoder(w).Encode(details)
+	json.NewEncoder(w).Encode(s.module)
 }
 
-func (s *Server) handleTargetGraph(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	vars := mux.Vars(r)
-	targetLabel := vars["label"]
-
-	// HTTP path normalization strips leading //, so restore it if missing
-	if len(targetLabel) > 0 && targetLabel[0] != '/' {
-		targetLabel = "//" + targetLabel
-	}
-
-	if s.fileGraph == nil {
-		http.Error(w, "File graph not available", http.StatusServiceUnavailable)
+	if s.module == nil {
+		json.NewEncoder(w).Encode(&GraphData{
+			Nodes: []GraphNode{},
+			Edges: []GraphEdge{},
+		})
 		return
 	}
 
-	// Get target file details first
-	details := analysis.GetTargetFileDetails(targetLabel, s.fileGraph, s.crossPackageDeps)
-
-	// Build file-level graph for this target
-	graphData := buildFileGraphData(targetLabel, details, s.fileGraph, s.symbolDeps)
-
+	// Build target-level graph from module
+	graphData := buildModuleGraphData(s.module)
 	json.NewEncoder(w).Encode(graphData)
+}
+
+func (s *Server) handlePackages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.module == nil {
+		json.NewEncoder(w).Encode([]model.PackageDependency{})
+		return
+	}
+
+	// Get all package dependencies
+	pkgDeps := s.module.GetAllPackageDependencies()
+	json.NewEncoder(w).Encode(pkgDeps)
 }
 
 // buildBinaryGraphData creates a graph visualization for binaries and their shared library dependencies
@@ -275,245 +365,36 @@ func buildBinaryGraphData(binaryInfos []*binaries.BinaryInfo) *GraphData {
 	return graphData
 }
 
-// buildFileGraphData creates a graph visualization for files within and connected to a target
-func buildFileGraphData(targetLabel string, details *analysis.TargetFileDetails, fileGraph *graph.FileGraph, symbolDeps []symbols.SymbolDependency) *GraphData {
+// TODO: Bring back file-level graph visualization using Module compile dependencies
+// This would show files within a target and their compile-time dependencies to other targets
+
+// buildModuleGraphData creates a graph visualization from the Module model
+func buildModuleGraphData(module *model.Module) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
 	}
 
-	// Track which targets we've seen for creating parent nodes
-	targetParents := make(map[string]bool)
-
-	// Create parent node for the current target
-	currentTargetParent := "parent-" + targetLabel
-	targetParents[currentTargetParent] = true
-	graphData.Nodes = append(graphData.Nodes, GraphNode{
-		ID:    currentTargetParent,
-		Label: targetLabel,
-		Type:  "target-group",
-	})
-
-	// Create nodes for all files in this target
-	filesInTarget := make(map[string]bool)
-	for _, file := range details.Files {
-		filesInTarget[file.Path] = true
+	// Create nodes for all targets
+	for _, target := range module.Targets {
 		graphData.Nodes = append(graphData.Nodes, GraphNode{
-			ID:     file.Path,
-			Label:  getFileName(file.Path),
-			Type:   file.Type, // "source" or "header"
-			Parent: currentTargetParent,
+			ID:    target.Label,
+			Label: target.Label,
+			Type:  string(target.Kind),
 		})
 	}
 
-	// Create nodes for external files (files from other targets that this target depends on)
-	externalFiles := make(map[string]bool)
-
-	// Helper function to ensure parent node exists for a target
-	ensureParentNode := func(targetLabel string) string {
-		parentID := "parent-" + targetLabel
-		if !targetParents[parentID] {
-			targetParents[parentID] = true
-			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:    parentID,
-				Label: targetLabel,
-				Type:  "target-group",
-			})
-		}
-		return parentID
-	}
-
-	// Add outgoing dependency files (files this target depends on)
-	for _, dep := range details.OutgoingFileDeps {
-		if !filesInTarget[dep.TargetFile] && !externalFiles[dep.TargetFile] {
-			externalFiles[dep.TargetFile] = true
-			parentID := ensureParentNode(dep.TargetTarget)
-			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:     dep.TargetFile,
-				Label:  getFileName(dep.TargetFile),
-				Type:   getFileType(dep.TargetFile),
-				Parent: parentID,
-			})
-		}
-	}
-
-	// Add incoming dependency files (files from other targets that depend on this target)
-	for _, dep := range details.IncomingFileDeps {
-		if !filesInTarget[dep.SourceFile] && !externalFiles[dep.SourceFile] {
-			externalFiles[dep.SourceFile] = true
-			parentID := ensureParentNode(dep.SourceTarget)
-			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:     dep.SourceFile,
-				Label:  getFileName(dep.SourceFile),
-				Type:   getFileType(dep.SourceFile),
-				Parent: parentID,
-			})
-		}
-	}
-
-	// Add internal edges (dependencies within this target from .d files)
-	for _, sourceNode := range fileGraph.Nodes() {
-		if !filesInTarget[sourceNode.Path] {
-			continue
-		}
-
-		// Get all dependencies from this file
-		deps := fileGraph.GetDependencies(sourceNode.Path)
-		for _, targetPath := range deps {
-			if filesInTarget[targetPath] {
-				// Internal dependency
-				graphData.Edges = append(graphData.Edges, GraphEdge{
-					Source: sourceNode.Path,
-					Target: targetPath,
-					Type:   "file",
-				})
-			}
-		}
-	}
-
-	// Add cross-target edges (outgoing) from .d files
-	for _, dep := range details.OutgoingFileDeps {
+	// Create edges for all dependencies, colored by type
+	for _, dep := range module.Dependencies {
 		graphData.Edges = append(graphData.Edges, GraphEdge{
-			Source: dep.SourceFile,
-			Target: dep.TargetFile,
-			Type:   "file",
+			Source:  dep.From,
+			Target:  dep.To,
+			Type:    string(dep.Type),
+			Symbols: []string{},
 		})
-	}
-
-	// Add cross-target edges (incoming) from .d files
-	for _, dep := range details.IncomingFileDeps {
-		graphData.Edges = append(graphData.Edges, GraphEdge{
-			Source: dep.SourceFile,
-			Target: dep.TargetFile,
-			Type:   "file",
-		})
-	}
-
-	// Add symbol-level edges and nodes for symbol-referenced files
-	if symbolDeps != nil {
-		// First pass: add any missing nodes for source files referenced by symbols
-		for _, symDep := range symbolDeps {
-			// Check if this symbol dependency involves files in the current target
-			sourceInTarget := filesInTarget[symDep.SourceFile]
-			targetInTarget := filesInTarget[symDep.TargetFile]
-
-			// If source is in target and target is not, add target as external node
-			if sourceInTarget && !targetInTarget && !externalFiles[symDep.TargetFile] {
-				externalFiles[symDep.TargetFile] = true
-				parentID := ensureParentNode(symDep.TargetTarget)
-				graphData.Nodes = append(graphData.Nodes, GraphNode{
-					ID:     symDep.TargetFile,
-					Label:  getFileName(symDep.TargetFile),
-					Type:   getFileType(symDep.TargetFile),
-					Parent: parentID,
-				})
-			}
-
-			// If target is in target and source is not, add source as external node
-			if targetInTarget && !sourceInTarget && !externalFiles[symDep.SourceFile] {
-				externalFiles[symDep.SourceFile] = true
-				parentID := ensureParentNode(symDep.SourceTarget)
-				graphData.Nodes = append(graphData.Nodes, GraphNode{
-					ID:     symDep.SourceFile,
-					Label:  getFileName(symDep.SourceFile),
-					Type:   getFileType(symDep.SourceFile),
-					Parent: parentID,
-				})
-			}
-		}
-
-		// Second pass: deduplicate and add symbol edges
-		// Map of (source, target, linkage) -> set of unique symbols
-		type edgeKey struct {
-			source  string
-			target  string
-			linkage string
-		}
-		symbolEdgeMap := make(map[edgeKey]map[string]bool)
-
-		for _, symDep := range symbolDeps {
-			// Only include symbol edges where at least one endpoint is in the focused target
-			sourceInFocusedTarget := filesInTarget[symDep.SourceFile]
-			targetInFocusedTarget := filesInTarget[symDep.TargetFile]
-
-			// At least one endpoint must be in the focused target
-			if !sourceInFocusedTarget && !targetInFocusedTarget {
-				continue
-			}
-
-			// Both endpoints must be visible (either in focused target or in external files)
-			sourceVisible := sourceInFocusedTarget || externalFiles[symDep.SourceFile]
-			targetVisible := targetInFocusedTarget || externalFiles[symDep.TargetFile]
-
-			if sourceVisible && targetVisible {
-				key := edgeKey{
-					source:  symDep.SourceFile,
-					target:  symDep.TargetFile,
-					linkage: string(symDep.Linkage),
-				}
-				// Initialize the symbol set if needed
-				if symbolEdgeMap[key] == nil {
-					symbolEdgeMap[key] = make(map[string]bool)
-				}
-				// Add symbol to the set (automatically deduplicates)
-				symbolEdgeMap[key][symDep.Symbol] = true
-			}
-		}
-
-		// Create deduplicated edges with combined symbol lists
-		for key, symbolSet := range symbolEdgeMap {
-			// Convert set to sorted list for consistent display
-			symbols := make([]string, 0, len(symbolSet))
-			for symbol := range symbolSet {
-				symbols = append(symbols, symbol)
-			}
-
-			graphData.Edges = append(graphData.Edges, GraphEdge{
-				Source:  key.source,
-				Target:  key.target,
-				Type:    "symbol",
-				Linkage: key.linkage,
-				Symbols: symbols,
-			})
-		}
 	}
 
 	return graphData
-}
-
-// getFileName extracts just the filename from a path
-func getFileName(path string) string {
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '/' {
-			return path[i+1:]
-		}
-	}
-	return path
-}
-
-// getFileType determines if a file is a source or header file
-func getFileType(path string) string {
-	// Check file extension
-	if len(path) > 2 {
-		ext := path[len(path)-2:]
-		if ext == ".h" {
-			return "header"
-		}
-	}
-	if len(path) > 3 {
-		ext := path[len(path)-3:]
-		if ext == ".cc" || ext == ".cpp" {
-			return "source"
-		}
-	}
-	if len(path) > 4 {
-		ext := path[len(path)-4:]
-		if ext == ".hpp" {
-			return "header"
-		}
-	}
-	// Default to source for external files
-	return "source"
 }
 
 // Start starts the web server on the specified port

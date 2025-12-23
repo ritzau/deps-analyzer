@@ -305,19 +305,14 @@ function displayDependencyGraph(graphData) {
         ],
 
         layout: {
-            name: 'cose',
-            directed: true,
-            padding: 50,
+            name: 'dagre',
+            rankDir: 'TB',           // Top-to-bottom layout (use 'LR' for left-to-right)
+            ranker: 'network-simplex', // Algorithm: 'network-simplex', 'tight-tree', or 'longest-path'
+            nodeSep: 80,             // Horizontal spacing between nodes
+            edgeSep: 20,             // Spacing between edges
+            rankSep: 120,            // Vertical spacing between ranks/layers
             animate: false,
-            nodeRepulsion: 8000,
-            idealEdgeLength: 100,
-            edgeElasticity: 100,
-            nestingFactor: 1.2,
-            gravity: 1,
-            numIter: 1000,
-            initialTemp: 200,
-            coolingFactor: 0.95,
-            minTemp: 1.0
+            padding: 50
         }
     });
 
@@ -463,220 +458,177 @@ function displayDependencyGraph(graphData) {
     });
 }
 
-function displayCrossPackageDeps(deps) {
-    const listEl = document.getElementById('crossPackageList');
-    listEl.innerHTML = '';
+// SSE subscriptions
+let workspaceStatusSource = null;
+let targetGraphSource = null;
 
-    // Group by source package
-    const grouped = {};
-    deps.forEach(dep => {
-        if (!grouped[dep.sourcePackage]) {
-            grouped[dep.sourcePackage] = [];
-        }
-        grouped[dep.sourcePackage].push(dep);
-    });
+// State tracking for UI updates
+let graphDataLoaded = false;
+let analysisComplete = false;
 
-    // Display grouped dependencies
-    Object.keys(grouped).sort().forEach(sourcePackage => {
-        const packageDeps = grouped[sourcePackage];
+// Map workspace status state to loading step
+const statusToStep = {
+    'initializing': 1,
+    'bazel_querying': 1,
+    'analyzing_deps': 2,
+    'analyzing_symbols': 3,
+    'targets_ready': 3,
+    'analyzing_binaries': 4,
+    'ready': 4
+};
 
-        const packageDiv = document.createElement('div');
-        packageDiv.style.marginBottom = '15px';
+// Subscribe to workspace status events
+function subscribeToWorkspaceStatus() {
+    console.log('Creating EventSource for workspace_status...');
+    workspaceStatusSource = new EventSource('/api/subscribe/workspace_status');
 
-        const headerDiv = document.createElement('div');
-        headerDiv.style.fontWeight = 'bold';
-        headerDiv.style.marginBottom = '5px';
-        headerDiv.style.color = '#0d6efd';
-        headerDiv.textContent = `${sourcePackage} dependencies:`;
-        packageDiv.appendChild(headerDiv);
+    workspaceStatusSource.onopen = function() {
+        console.log('workspace_status EventSource connected, readyState:', workspaceStatusSource.readyState);
+    };
 
-        packageDeps.forEach(dep => {
-            const depDiv = document.createElement('div');
-            depDiv.className = 'file-item';
-            depDiv.style.marginLeft = '20px';
+    workspaceStatusSource.onmessage = function(event) {
+        console.log('Raw workspace_status event data:', event.data);
+        try {
+            const sseEvent = JSON.parse(event.data);
+            console.log('Parsed SSE event:', sseEvent);
 
-            const pathDiv = document.createElement('div');
-            pathDiv.className = 'file-path';
-            pathDiv.textContent = `${dep.sourceFile} → ${dep.targetFile}`;
+            // sseEvent.data is json.RawMessage (already a JSON string), parse it
+            let status;
+            if (typeof sseEvent.data === 'string') {
+                status = JSON.parse(sseEvent.data);
+            } else {
+                status = sseEvent.data; // Already an object (shouldn't happen with json.RawMessage)
+            }
+            console.log('Parsed status:', status);
 
-            const targetDiv = document.createElement('div');
-            targetDiv.className = 'file-package';
-            targetDiv.textContent = `Depends on: ${dep.targetPackage}`;
+            console.log('Workspace status:', status.state, '-', status.message);
 
-            depDiv.appendChild(pathDiv);
-            depDiv.appendChild(targetDiv);
-            packageDiv.appendChild(depDiv);
-        });
-
-        listEl.appendChild(packageDiv);
-    });
-}
-
-function displayFileCycles(cycles) {
-    const listEl = document.getElementById('cyclesList');
-    listEl.innerHTML = '';
-
-    cycles.forEach((cycle, index) => {
-        const cycleDiv = document.createElement('div');
-        cycleDiv.style.marginBottom = '20px';
-
-        const headerDiv = document.createElement('div');
-        headerDiv.style.fontWeight = 'bold';
-        headerDiv.style.marginBottom = '10px';
-        headerDiv.style.color = '#dc3545';
-        headerDiv.textContent = `Cycle ${index + 1} (${cycle.files.length} files):`;
-        cycleDiv.appendChild(headerDiv);
-
-        const cycleItemDiv = document.createElement('div');
-        cycleItemDiv.className = 'file-item';
-        cycleItemDiv.style.background = '#ffe6e6';
-        cycleItemDiv.style.borderLeftColor = '#dc3545';
-
-        // Display the cycle as a chain
-        const pathDiv = document.createElement('div');
-        pathDiv.className = 'file-path';
-        pathDiv.style.fontFamily = 'Courier New, monospace';
-        pathDiv.style.fontSize = '0.9em';
-        pathDiv.style.lineHeight = '1.6';
-
-        // Show cycle as: file1 → file2 → file3 → file1
-        const cycleChain = cycle.files.join(' → ') + ' → ' + cycle.files[0];
-        pathDiv.textContent = cycleChain;
-
-        cycleItemDiv.appendChild(pathDiv);
-        cycleDiv.appendChild(cycleItemDiv);
-        listEl.appendChild(cycleDiv);
-    });
-}
-
-let refreshInterval;
-let lastDataHash = '';
-
-// Hash the data to detect changes
-function hashData(data) {
-    return JSON.stringify({
-        total: data.totalFiles,
-        covered: data.coveredFiles,
-        uncoveredCount: data.uncoveredFiles ? data.uncoveredFiles.length : 0,
-        hasGraph: !!data.graph,
-        hasCrossDeps: !!data.crossPackageDeps && data.crossPackageDeps.length > 0,
-        hasCycles: !!data.fileCycles && data.fileCycles.length > 0
-    });
-}
-
-let hasShownGraph = false;
-let hasShownCrossDeps = false;
-let hasShownCycles = false;
-let hasShownCoverageResult = false;
-let graphSectionShown = false;
-
-// Load data and check if analysis is complete
-async function loadAndCheckComplete() {
-    try {
-        const response = await fetch('/api/analysis');
-        if (!response.ok) return;
-
-        const data = await response.json();
-        const currentHash = hashData(data);
-
-        // Only update if data changed
-        if (currentHash !== lastDataHash) {
-            lastDataHash = currentHash;
-
-            // Use backend's analysisStep to drive UI progress
-            const step = data.analysisStep || 0;
-            console.log('Analysis step:', step, 'Flags:', {graphSectionShown, hasShownGraph, hasShownCrossDeps});
-
-            // Step 1: Coverage complete
-            if (step >= 1 && !graphSectionShown) {
-                console.log('Step 1 -> 2');
-                updateLoadingProgress(1, 2);
+            // Update loading progress based on state
+            if (status.state === 'bazel_querying') {
+                updateLoadingProgress(null, 1);
                 document.getElementById('graphSection').style.display = 'block';
-                graphSectionShown = true;
+            } else if (status.state === 'analyzing_deps') {
+                updateLoadingProgress(1, 2);
+            } else if (status.state === 'analyzing_symbols') {
+                updateLoadingProgress(2, 3);
+            } else if (status.state === 'targets_ready') {
+                updateLoadingProgress(3, 4);
+            } else if (status.state === 'analyzing_binaries') {
+                updateLoadingProgress(3, 4); // Keep step 4 active during binary analysis
+            } else if (status.state === 'ready') {
+                updateLoadingProgress(4, null); // Mark step 4 complete
+                analysisComplete = true;
+
+                setTimeout(() => {
+                    hideLoadingOverlay();
+                    // Close SSE connections when done
+                    if (workspaceStatusSource) {
+                        workspaceStatusSource.close();
+                        workspaceStatusSource = null;
+                    }
+                    if (targetGraphSource) {
+                        targetGraphSource.close();
+                        targetGraphSource = null;
+                    }
+                }, 1000);
+            }
+        } catch (e) {
+            console.error('Error processing workspace status:', e, 'Raw data:', event.data);
+        }
+    };
+
+    workspaceStatusSource.onerror = function(error) {
+        console.error('Workspace status SSE error:', error, 'readyState:', workspaceStatusSource.readyState);
+        workspaceStatusSource.close();
+    };
+}
+
+// Subscribe to target graph events
+function subscribeToTargetGraph() {
+    targetGraphSource = new EventSource('/api/subscribe/target_graph');
+
+    targetGraphSource.onmessage = function(event) {
+        try {
+            const sseEvent = JSON.parse(event.data);
+
+            // sseEvent.data is json.RawMessage (already a JSON string), parse it
+            let graphData;
+            if (typeof sseEvent.data === 'string') {
+                graphData = JSON.parse(sseEvent.data);
+            } else {
+                graphData = sseEvent.data;
             }
 
-            // Step 2: Graph complete
-            if (step >= 2 && data.graph && !hasShownGraph) {
-                console.log('Step 2 -> 3');
+            console.log('Target graph update:', sseEvent.type, 'complete:', graphData.complete);
 
-                // Store the analysis data and package graph
-                analysisData = data;
-                packageGraph = data.graph;
+            // Load full graph data when available
+            if (sseEvent.type === 'complete' && !graphDataLoaded) {
+                loadGraphData();
+                graphDataLoaded = true;
+            }
+        } catch (e) {
+            console.error('Error processing target graph event:', e);
+        }
+    };
 
-                // Fetch binary data
-                try {
-                    const binariesResponse = await fetch('/api/binaries');
-                    if (binariesResponse.ok) {
-                        binaryData = await binariesResponse.json();
-                        console.log('Loaded binary data:', binaryData);
-                    }
-                } catch (e) {
-                    console.error('Failed to fetch binary data:', e);
-                }
+    targetGraphSource.onerror = function(error) {
+        console.error('Target graph SSE error:', error);
+        targetGraphSource.close();
+    };
+}
 
-                displayDependencyGraph(data.graph);
+// Load full graph data from API
+async function loadGraphData() {
+    try {
+        // Fetch module graph
+        const graphResponse = await fetch('/api/module/graph');
+        if (graphResponse.ok) {
+            packageGraph = await graphResponse.json();
+            console.log('Loaded graph with', packageGraph.nodes?.length, 'nodes');
+
+            // Display the graph
+            if (packageGraph && packageGraph.nodes && packageGraph.nodes.length > 0) {
+                displayDependencyGraph(packageGraph);
                 const graphLoading = document.getElementById('graphLoading');
                 if (graphLoading) {
                     graphLoading.style.display = 'none';
                 }
-                updateLoadingProgress(2, 3);
-                hasShownGraph = true;
-
-                // Populate tree browser (after binary data is loaded)
-                if (data.graph.nodes) {
-                    populateTreeBrowser(data);
-                }
-
-                console.log('Binary list populated, binaryData count:', binaryData ? binaryData.length : 0);
             }
+        }
 
-            // Step 4: All complete
-            if (step >= 4 && !hasShownCrossDeps) {
-                console.log('Step 4 - completing all');
-                // Display cross-package deps if any
-                if (data.crossPackageDeps && data.crossPackageDeps.length > 0) {
-                    displayCrossPackageDeps(data.crossPackageDeps);
-                    document.getElementById('crossPackageSection').style.display = 'block';
-                }
+        // Fetch binary data
+        const binariesResponse = await fetch('/api/binaries');
+        if (binariesResponse.ok) {
+            binaryData = await binariesResponse.json();
+            console.log('Loaded binary data:', binaryData);
+        }
 
-                // Display cycles if any
-                if (data.fileCycles && data.fileCycles.length > 0) {
-                    displayFileCycles(data.fileCycles);
-                    document.getElementById('cyclesSection').style.display = 'block';
-                }
+        // Fetch module data for tree browser
+        const moduleResponse = await fetch('/api/module');
+        if (moduleResponse.ok) {
+            const moduleData = await moduleResponse.json();
+            analysisData = {
+                graph: packageGraph,
+                module: moduleData
+            };
 
-                // Complete steps 3 and 4, then hide overlay
-                updateLoadingProgress(3, 4);
-                updateLoadingProgress(4, null);
-
-                setTimeout(() => {
-                    console.log('Hiding overlay');
-                    hideLoadingOverlay();
-                    if (refreshInterval) {
-                        clearInterval(refreshInterval);
-                        refreshInterval = null;
-                    }
-                }, 1000);
-
-                hasShownCrossDeps = true;
-                hasShownCycles = true;
+            // Populate tree browser
+            if (packageGraph && packageGraph.nodes) {
+                populateTreeBrowser(analysisData);
             }
         }
     } catch (e) {
-        console.error('Error checking for updates:', e);
+        console.error('Error loading graph data:', e);
     }
 }
 
-// Load data when page loads
+// Initialize subscriptions when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Activate step 1 immediately
-    updateLoadingProgress(null, 1);
+    console.log('Starting SSE subscriptions...');
 
-    // Start polling immediately
-    loadAndCheckComplete();
-
-    // Poll every 1 second for updates during analysis
-    refreshInterval = setInterval(loadAndCheckComplete, 1000);
+    // Subscribe to both event streams
+    subscribeToWorkspaceStatus();
+    subscribeToTargetGraph();
 });
 
 // Modal functions for showing target details

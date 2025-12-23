@@ -12,18 +12,18 @@ func TestQueryWorkspace(t *testing.T) {
 	// Find the example directory
 	workspacePath := findExampleWorkspace(t)
 
-	// Query the workspace
-	workspace, err := QueryWorkspace(workspacePath)
+	// Query the module
+	module, err := QueryWorkspace(workspacePath)
 	if err != nil {
 		t.Fatalf("QueryWorkspace failed: %v", err)
 	}
 
 	// Verify we found targets
-	if len(workspace.Targets) == 0 {
+	if len(module.Targets) == 0 {
 		t.Fatal("No targets found")
 	}
 
-	t.Logf("Found %d targets", len(workspace.Targets))
+	t.Logf("Found %d targets", len(module.Targets))
 
 	// Verify specific targets exist
 	requiredTargets := []struct {
@@ -38,7 +38,7 @@ func TestQueryWorkspace(t *testing.T) {
 	}
 
 	for _, req := range requiredTargets {
-		target, exists := workspace.Targets[req.label]
+		target, exists := module.Targets[req.label]
 		if !exists {
 			t.Errorf("Target %s not found", req.label)
 			continue
@@ -48,31 +48,10 @@ func TestQueryWorkspace(t *testing.T) {
 		}
 	}
 
-	// Verify test_app has the expected dependencies
-	testApp, exists := workspace.Targets["//main:test_app"]
+	// Verify test_app exists
+	testApp, exists := module.Targets["//main:test_app"]
 	if !exists {
 		t.Fatal("//main:test_app not found")
-	}
-
-	// Check deps (should have core, util, graphics_impl)
-	expectedDeps := []string{"//core:core", "//util:util", "//graphics:graphics_impl"}
-	if len(testApp.Deps) != len(expectedDeps) {
-		t.Errorf("test_app deps: got %d, want %d", len(testApp.Deps), len(expectedDeps))
-	}
-	for _, dep := range expectedDeps {
-		if !contains(testApp.Deps, dep) {
-			t.Errorf("test_app missing dep: %s", dep)
-		}
-	}
-
-	// Check dynamic_deps (should have graphics)
-	if len(testApp.DynamicDeps) != 1 || testApp.DynamicDeps[0] != "//graphics:graphics" {
-		t.Errorf("test_app dynamic_deps: got %v, want [//graphics:graphics]", testApp.DynamicDeps)
-	}
-
-	// Check data (should have audio)
-	if len(testApp.Data) != 1 || testApp.Data[0] != "//audio:audio" {
-		t.Errorf("test_app data: got %v, want [//audio:audio]", testApp.Data)
 	}
 
 	// Check linkopts (should include -ldl)
@@ -80,12 +59,47 @@ func TestQueryWorkspace(t *testing.T) {
 		t.Errorf("test_app missing -ldl in linkopts: %v", testApp.Linkopts)
 	}
 
+	// Helper to find dependencies from test_app
+	getDepsFrom := func(from string, depType model.DependencyType) []string {
+		var result []string
+		for _, dep := range module.Dependencies {
+			if dep.From == from && dep.Type == depType {
+				result = append(result, dep.To)
+			}
+		}
+		return result
+	}
+
+	// Check static deps (should have core, util, graphics_impl)
+	staticDeps := getDepsFrom("//main:test_app", model.DependencyStatic)
+	expectedStatic := []string{"//core:core", "//util:util", "//graphics:graphics_impl"}
+	if len(staticDeps) != len(expectedStatic) {
+		t.Errorf("test_app static deps: got %d, want %d", len(staticDeps), len(expectedStatic))
+	}
+	for _, dep := range expectedStatic {
+		if !contains(staticDeps, dep) {
+			t.Errorf("test_app missing static dep: %s", dep)
+		}
+	}
+
+	// Check dynamic deps (should have graphics)
+	dynamicDeps := getDepsFrom("//main:test_app", model.DependencyDynamic)
+	if len(dynamicDeps) != 1 || dynamicDeps[0] != "//graphics:graphics" {
+		t.Errorf("test_app dynamic deps: got %v, want [//graphics:graphics]", dynamicDeps)
+	}
+
+	// Check data deps (should have audio)
+	dataDeps := getDepsFrom("//main:test_app", model.DependencyData)
+	if len(dataDeps) != 1 || dataDeps[0] != "//audio:audio" {
+		t.Errorf("test_app data deps: got %v, want [//audio:audio]", dataDeps)
+	}
+
 	// Verify dependencies are typed correctly
-	t.Logf("Found %d dependencies", len(workspace.Dependencies))
+	t.Logf("Found %d dependencies", len(module.Dependencies))
 
 	// Count by type
 	byType := make(map[model.DependencyType]int)
-	for _, dep := range workspace.Dependencies {
+	for _, dep := range module.Dependencies {
 		byType[dep.Type]++
 	}
 
@@ -108,7 +122,7 @@ func TestQueryWorkspace(t *testing.T) {
 
 	for _, tc := range testCases {
 		found := false
-		for _, dep := range workspace.Dependencies {
+		for _, dep := range module.Dependencies {
 			if dep.From == tc.from && dep.To == tc.to {
 				found = true
 				if dep.Type != tc.typ {
@@ -125,15 +139,16 @@ func TestQueryWorkspace(t *testing.T) {
 
 	// Test package-level dependencies
 	t.Run("PackageDependencies", func(t *testing.T) {
-		// Check packages were created
-		if len(workspace.Packages) == 0 {
+		// Check packages can be derived
+		packages := module.GetPackages()
+		if len(packages) == 0 {
 			t.Fatal("No packages found")
 		}
 
-		t.Logf("Found %d packages", len(workspace.Packages))
+		t.Logf("Found %d packages", len(packages))
 
 		// Get dependencies for //main package
-		mainDeps := workspace.GetPackageDependencies("//main")
+		mainDeps := module.GetPackageDependencies("//main")
 		t.Logf("//main has %d package dependencies", len(mainDeps))
 
 		// Should depend on //core, //util, //graphics, //audio
@@ -158,7 +173,7 @@ func TestQueryWorkspace(t *testing.T) {
 		}
 
 		// Get all package dependencies
-		allPkgDeps := workspace.GetAllPackageDependencies()
+		allPkgDeps := module.GetAllPackageDependencies()
 		t.Logf("Total package-to-package dependencies: %d", len(allPkgDeps))
 	})
 }
