@@ -11,8 +11,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
+	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/model"
 	"github.com/ritzau/deps-analyzer/pkg/pubsub"
+	"github.com/ritzau/deps-analyzer/pkg/symbols"
 )
 
 //go:embed static/*
@@ -43,10 +45,13 @@ type GraphData struct {
 
 // Server represents the web server
 type Server struct {
-	router    *mux.Router
-	binaries  []*binaries.BinaryInfo
-	module    *model.Module
-	publisher pubsub.Publisher
+	router         *mux.Router
+	binaries       []*binaries.BinaryInfo
+	module         *model.Module
+	publisher      pubsub.Publisher
+	fileDeps       []*deps.FileDependency       // Compile-time file dependencies from .d files
+	symbolDeps     []symbols.SymbolDependency   // Link-time symbol dependencies from nm
+	fileToTarget   map[string]string            // Maps file paths to target labels
 }
 
 // NewServer creates a new web server
@@ -82,6 +87,21 @@ func (s *Server) SetBinaries(bins []*binaries.BinaryInfo) {
 // SetModule stores the new Module data model
 func (s *Server) SetModule(m *model.Module) {
 	s.module = m
+}
+
+// SetFileDependencies stores file-level compile dependencies from .d files
+func (s *Server) SetFileDependencies(fileDeps []*deps.FileDependency) {
+	s.fileDeps = fileDeps
+}
+
+// SetSymbolDependencies stores file-level symbol dependencies from nm analysis
+func (s *Server) SetSymbolDependencies(symbolDeps []symbols.SymbolDependency) {
+	s.symbolDeps = symbolDeps
+}
+
+// SetFileToTargetMap stores the mapping from file paths to target labels
+func (s *Server) SetFileToTargetMap(fileToTarget map[string]string) {
+	s.fileToTarget = fileToTarget
 }
 
 // PublishWorkspaceStatus publishes a workspace status event
@@ -316,8 +336,8 @@ func (s *Server) handleTargetFocused(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build focused graph data
-	graphData := buildTargetFocusedGraph(s.module, target)
+	// Build focused graph data with file-level dependencies
+	graphData := buildTargetFocusedGraph(s.module, target, s.fileDeps, s.symbolDeps, s.fileToTarget)
 	json.NewEncoder(w).Encode(graphData)
 }
 
@@ -433,7 +453,7 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 // - Incoming dependencies (targets that depend on this one) with their files
 // - Outgoing dependencies (targets this one depends on) with their files
 // - All compile-time and link-time dependencies between files and targets
-func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target) *GraphData {
+func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
@@ -509,8 +529,8 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target) 
 		}
 	}
 
-	// Add edges - only those that connect to/from the focused target
-	// Edges now connect to the parent node IDs (with "parent-" prefix)
+	// Add target-level edges - only those that connect to/from the focused target
+	// Edges connect to the parent node IDs (with "parent-" prefix)
 	for _, dep := range module.Dependencies {
 		// Include edge if it connects to or from the focused target
 		if dep.From == focusedTarget.Label || dep.To == focusedTarget.Label {
@@ -526,6 +546,133 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target) 
 				Symbols: []string{},
 			})
 		}
+	}
+
+	// Add file-to-file edges from compile dependencies (.d files)
+	// Build a reverse map from normalized paths to original source paths
+	normalizedToOriginal := make(map[string]string)
+	if module != nil {
+		for _, target := range module.Targets {
+			for _, src := range target.Sources {
+				normalized := strings.ReplaceAll(strings.TrimPrefix(src, "//"), ":", "/")
+				normalizedToOriginal[normalized] = src
+			}
+			for _, hdr := range target.Headers {
+				normalized := strings.ReplaceAll(strings.TrimPrefix(hdr, "//"), ":", "/")
+				normalizedToOriginal[normalized] = hdr
+			}
+		}
+	}
+
+	if fileDeps != nil && fileToTarget != nil {
+		for _, fileDep := range fileDeps {
+			// Find which target owns the source file
+			sourceTarget, sourceOK := fileToTarget[fileDep.SourceFile]
+			if !sourceOK || !relevantTargets[sourceTarget] {
+				continue // Skip if source is not in a relevant target
+			}
+
+			// Get the original Bazel format for the source file
+			sourceOriginal, ok := normalizedToOriginal[fileDep.SourceFile]
+			if !ok {
+				continue // Skip if we can't find the original format
+			}
+
+			// Process each header dependency
+			for _, depFile := range fileDep.Dependencies {
+				// Find which target owns the dependency file
+				targetTarget, targetOK := fileToTarget[depFile]
+				if !targetOK || !relevantTargets[targetTarget] {
+					continue // Skip if target is not in a relevant target
+				}
+
+				// Get the original Bazel format for the dependency file
+				depOriginal, ok := normalizedToOriginal[depFile]
+				if !ok {
+					continue // Skip if we can't find the original format
+				}
+
+				// Create file node IDs using original Bazel format
+				// Source file ID format: targetLabel:file:bazelPath
+				sourceFileID := sourceTarget + ":file:" + sourceOriginal
+				targetFileID := targetTarget + ":file:" + depOriginal
+
+				// Add compile dependency edge between files
+				graphData.Edges = append(graphData.Edges, GraphEdge{
+					Source:  sourceFileID,
+					Target:  targetFileID,
+					Type:    "compile",
+					Linkage: "compile",
+					Symbols: []string{},
+				})
+			}
+		}
+	}
+
+	// Add file-to-file edges from symbol dependencies (nm analysis)
+	// Use a map to deduplicate and aggregate symbols for the same edge
+	type edgeKey struct {
+		source  string
+		target  string
+		linkage string
+	}
+	symbolEdges := make(map[edgeKey]*GraphEdge)
+
+	if symbolDeps != nil {
+		for _, symDep := range symbolDeps {
+			// Only include if both targets are relevant
+			if !relevantTargets[symDep.SourceTarget] || !relevantTargets[symDep.TargetTarget] {
+				continue
+			}
+
+			// Get the original Bazel format for source and target files
+			sourceOriginal, sourceOK := normalizedToOriginal[symDep.SourceFile]
+			targetOriginal, targetOK := normalizedToOriginal[symDep.TargetFile]
+			if !sourceOK || !targetOK {
+				continue // Skip if we can't find the original format
+			}
+
+			// Create file node IDs using original Bazel format
+			sourceFileID := symDep.SourceTarget + ":file:" + sourceOriginal
+			targetFileID := symDep.TargetTarget + ":file:" + targetOriginal
+
+			// Create edge key for deduplication
+			key := edgeKey{
+				source:  sourceFileID,
+				target:  targetFileID,
+				linkage: string(symDep.Linkage),
+			}
+
+			// Get or create edge
+			edge, exists := symbolEdges[key]
+			if !exists {
+				edge = &GraphEdge{
+					Source:  sourceFileID,
+					Target:  targetFileID,
+					Type:    "symbol",
+					Linkage: string(symDep.Linkage),
+					Symbols: []string{},
+				}
+				symbolEdges[key] = edge
+			}
+
+			// Add symbol to the edge (avoiding duplicates)
+			symbolExists := false
+			for _, existingSym := range edge.Symbols {
+				if existingSym == symDep.Symbol {
+					symbolExists = true
+					break
+				}
+			}
+			if !symbolExists {
+				edge.Symbols = append(edge.Symbols, symDep.Symbol)
+			}
+		}
+	}
+
+	// Add deduplicated symbol edges to graph
+	for _, edge := range symbolEdges {
+		graphData.Edges = append(graphData.Edges, *edge)
 	}
 
 	return graphData

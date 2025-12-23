@@ -11,6 +11,8 @@ import (
 
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
+	"github.com/ritzau/deps-analyzer/pkg/deps"
+	"github.com/ritzau/deps-analyzer/pkg/symbols"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 )
 
@@ -79,6 +81,16 @@ func startWebServerAsync(workspace string, port int) {
 		log.Println("[1/2] Adding compile dependencies from .d files...")
 		server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 5)
 
+		// Parse file-level dependencies and store them
+		fileDeps, err := deps.ParseAllDFiles(workspace)
+		if err != nil {
+			log.Printf("[1/2] Warning: Could not parse .d files: %v", err)
+		} else {
+			log.Printf("[1/2] Parsed %d file dependencies from .d files", len(fileDeps))
+			server.SetFileDependencies(fileDeps)
+		}
+
+		// Add target-level compile dependencies
 		if err := bazel.AddCompileDependencies(module, workspace); err != nil {
 			log.Printf("[1/2] Warning: Could not add compile dependencies: %v", err)
 		} else {
@@ -90,6 +102,34 @@ func startWebServerAsync(workspace string, port int) {
 		log.Println("[1/2] Adding symbol dependencies from nm analysis...")
 		server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 5)
 
+		// Build file-to-target map for symbol analysis and file dependencies
+		fileToTarget := make(map[string]string)
+		targetToKind := make(map[string]string)
+		for _, target := range module.Targets {
+			targetToKind[target.Label] = string(target.Kind)
+			// Map source files
+			for _, src := range target.Sources {
+				filePath := bazel.NormalizeSourcePath(src)
+				fileToTarget[filePath] = target.Label
+			}
+			// Map header files
+			for _, hdr := range target.Headers {
+				filePath := bazel.NormalizeSourcePath(hdr)
+				fileToTarget[filePath] = target.Label
+			}
+		}
+		server.SetFileToTargetMap(fileToTarget)
+
+		// Build symbol graph and store file-level symbol dependencies
+		symbolDeps, err := symbols.BuildSymbolGraph(workspace, fileToTarget, targetToKind)
+		if err != nil {
+			log.Printf("[1/2] Warning: Could not build symbol graph: %v", err)
+		} else {
+			log.Printf("[1/2] Found %d symbol dependencies between files", len(symbolDeps))
+			server.SetSymbolDependencies(symbolDeps)
+		}
+
+		// Add target-level symbol dependencies
 		if err := bazel.AddSymbolDependencies(module, workspace); err != nil {
 			log.Printf("[1/2] Warning: Could not add symbol dependencies: %v", err)
 		} else {

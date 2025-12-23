@@ -220,12 +220,12 @@ func AddCompileDependencies(module *model.Module, workspacePath string) error {
 		for _, src := range target.Sources {
 			// Normalize the path - src is like "//main:main.cc"
 			// We need to extract just the file path part
-			filePath := normalizeSourcePath(src)
+			filePath := NormalizeSourcePath(src)
 			fileToTarget[filePath] = target
 		}
 		// Map header files to their target
 		for _, hdr := range target.Headers {
-			filePath := normalizeSourcePath(hdr)
+			filePath := NormalizeSourcePath(hdr)
 			fileToTarget[filePath] = target
 		}
 	}
@@ -273,9 +273,9 @@ func AddCompileDependencies(module *model.Module, workspacePath string) error {
 	return nil
 }
 
-// normalizeSourcePath converts a Bazel label source path to a workspace-relative path
+// NormalizeSourcePath converts a Bazel label source path to a workspace-relative path
 // Example: "//main:main.cc" -> "main/main.cc"
-func normalizeSourcePath(labelPath string) string {
+func NormalizeSourcePath(labelPath string) string {
 	// Remove leading "//" if present
 	path := strings.TrimPrefix(labelPath, "//")
 
@@ -329,7 +329,7 @@ func AddSymbolDependencies(module *model.Module, workspacePath string) error {
 
 		// Map source files to their target
 		for _, src := range target.Sources {
-			filePath := normalizeSourcePath(src)
+			filePath := NormalizeSourcePath(src)
 			fileToTarget[filePath] = target.Label
 		}
 	}
@@ -450,7 +450,7 @@ func QueryAllSourceFiles(workspacePath string) ([]string, error) {
 
 	for _, target := range module.Targets {
 		for _, src := range target.Sources {
-			normalized := normalizeSourcePath(src)
+			normalized := NormalizeSourcePath(src)
 			if !seen[normalized] {
 				seen[normalized] = true
 				sourceFiles = append(sourceFiles, normalized)
@@ -474,12 +474,12 @@ func BuildFileToTargetMap(workspacePath string) (map[string]string, error) {
 	for _, target := range module.Targets {
 		// Map source files
 		for _, src := range target.Sources {
-			filePath := normalizeSourcePath(src)
+			filePath := NormalizeSourcePath(src)
 			fileToTarget[filePath] = target.Label
 		}
 		// Map header files
 		for _, hdr := range target.Headers {
-			filePath := normalizeSourcePath(hdr)
+			filePath := NormalizeSourcePath(hdr)
 			fileToTarget[filePath] = target.Label
 		}
 	}

@@ -458,10 +458,18 @@ function displayDependencyGraph(graphData) {
                 showFocusedTargetView(nodeId);
             }
         } else if (currentView === 'focused') {
-            // In focused mode, clicking another target switches focus
-            if (!nodeType.includes('_focused')) {
-                console.log('Switching focus to:', nodeId);
-                showFocusedTargetView(nodeId);
+            // In focused mode, clicking a target-group or different target switches focus
+            if (nodeType === 'target-group') {
+                // Clicked a target group container - extract target label
+                const targetLabel = nodeId.replace('parent-', '');
+                console.log('Target group clicked, switching focus to:', targetLabel);
+                showFocusedTargetView(targetLabel);
+            } else if (nodeType.includes('_incoming') || nodeType.includes('_outgoing')) {
+                // Clicked a file within an incoming/outgoing target - switch to that target
+                // File node ID format: "//target:name:file:..." - extract the target part
+                const targetLabel = nodeId.split(':file:')[0];
+                console.log('File clicked, switching focus to parent target:', targetLabel);
+                showFocusedTargetView(targetLabel);
             }
         } else if (currentView === 'file') {
             // At file level, check what type of node was clicked
