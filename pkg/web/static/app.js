@@ -421,15 +421,9 @@ function displayDependencyGraph(graphData) {
             {
                 selector: 'node[isPublic]',
                 style: {
-                    'background-image': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><text x="12" y="18" text-anchor="middle" font-size="18" fill="%23ffd700">★</text></svg>',
-                    'background-image-opacity': 1,
-                    'background-fit': 'none',
-                    'background-width': '20px',
-                    'background-height': '20px',
-                    'background-position-x': '100%',
-                    'background-position-y': '0%',
-                    'background-offset-x': '-5px',
-                    'background-offset-y': '5px'
+                    'border-style': 'dashed',
+                    'border-width': '3px',
+                    'border-color': '#ffd700'
                 }
             }
         ],
