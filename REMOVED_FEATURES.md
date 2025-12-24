@@ -26,16 +26,12 @@ This document tracks features that were removed during the Module model migratio
 **Replaced by**: Module model
 
 ### 4. File-Level Graph Visualization
-**Status**: Removed
-**Location**: `pkg/web/server.go` (buildFileGraphData function)
-**Endpoints removed**:
-- `GET /api/target/{label}` - Target file details
-- `GET /api/target/{label}/graph` - File-level dependency graph
-**What it did**: Showed individual files within a target and their compile dependencies to files in other targets
-**TODO**: Bring back using Module compile dependencies
-- Location: `pkg/web/server.go:76-78`
-- Can build from Module.Dependencies where Type == DependencyCompile
-- Would show which specific files in target A depend on files in target B
+**Status**: ✅ **RESTORED** (2025-12-24)
+**Location**: `pkg/web/server.go` (buildTargetFocusedGraph function)
+**Endpoints**:
+- `GET /api/target/{label}/focused` - Target-focused graph with file-level dependencies
+**What it does**: Shows individual files within a target and their compile/symbol dependencies to files in other targets
+**Implementation**: Uses Module compile dependencies (from .d files) and symbol dependencies (from nm analysis) to show file-level edges between targets
 
 ### 5. File Cycles Detection
 **Status**: Removed
@@ -65,8 +61,10 @@ This document tracks features that were removed during the Module model migratio
 ### Core Functionality
 ✅ **Module Model**: Complete dependency graph with 5 types (static, dynamic, data, compile, symbol)
 ✅ **Target-level Graph**: Visualization of all targets and their dependencies
+✅ **File-level Graph**: Click on any target to see files and their dependencies (compile & symbol edges)
 ✅ **Package-level Dependencies**: Aggregated dependencies between packages
 ✅ **Binary Analysis**: Binary metadata, system libraries, overlapping dependencies
+✅ **Overlapping Dependency Visualization**: Red highlighting for duplicate symbols in module overview and binary-focused views
 ✅ **Issue Detection**: Duplicate linkage warnings (static+dynamic to same target)
 ✅ **Web Server**: API endpoints for Module, graph, packages, binaries
 
@@ -74,8 +72,11 @@ This document tracks features that were removed during the Module model migratio
 - `GET /api/module` - Full module JSON
 - `GET /api/module/graph` - Target-level dependency graph
 - `GET /api/module/packages` - Package-to-package dependencies
-- `GET /api/binaries` - Binary metadata
+- `GET /api/target/{label}/focused` - File-level dependency graph for a target
+- `GET /api/binaries` - Binary metadata with overlapping dependencies
 - `GET /api/binaries/graph` - Binary dependency graph
+- `SSE /api/subscribe/workspace_status` - Real-time analysis progress
+- `SSE /api/subscribe/target_graph` - Streaming graph updates
 
 ## Performance Improvements
 
@@ -101,7 +102,21 @@ These packages are no longer used and could be deleted:
 
 ## Next Steps
 
-1. **Decide on CLI mode**: Do we want file coverage analysis back?
-2. **File-level visualization**: Implement using Module compile dependencies if desired
-3. **Clean up unused packages**: Remove or document obsolete code
-4. **Update frontend**: Web UI may reference removed endpoints (/api/analysis, /api/target/*)
+1. **CLI Mode (Optional)**: Decide if file coverage analysis should be restored
+   - Would show files not in any Bazel target
+   - Requires `pkg/finder` and `pkg/analysis` packages
+
+2. **File Cycles Detection (Optional)**: Consider bringing back cycle detection
+   - Original `pkg/cycles` detected circular file dependencies
+   - Could be useful for identifying problematic include chains
+
+3. **Clean up unused packages**:
+   - `pkg/finder` - Only needed if CLI coverage analysis is restored
+   - `pkg/analysis` - CrossPackageDep and UncoveredFile types
+   - `pkg/output` - CLI output formatting
+
+4. **Potential Enhancements**:
+   - Add legend entry for overlapping dependency visualization
+   - Package-level view for overlapping dependencies
+   - Export overlapping dependency report
+   - Cycle detection in dependency graph
