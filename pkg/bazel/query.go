@@ -135,6 +135,10 @@ func parseTarget(rule RuleXML) *model.Target {
 			for _, str := range list.Strings {
 				target.Linkopts = append(target.Linkopts, str.Value)
 			}
+		case "visibility":
+			for _, label := range list.Labels {
+				target.Visibility = append(target.Visibility, label.Value)
+			}
 		}
 	}
 

@@ -22,10 +22,11 @@ var staticFiles embed.FS
 
 // GraphNode represents a node in the dependency graph
 type GraphNode struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Type   string `json:"type"`   // "cc_library", "cc_binary", "source", "header", "external"
-	Parent string `json:"parent"` // Parent node ID for grouping (optional)
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	Type     string `json:"type"`     // "cc_library", "cc_binary", "source", "header", "external"
+	Parent   string `json:"parent"`   // Parent node ID for grouping (optional)
+	IsPublic bool   `json:"isPublic"` // Whether target has public visibility
 }
 
 // GraphEdge represents an edge in the dependency graph
@@ -432,9 +433,10 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 	// Create nodes for all targets
 	for _, target := range module.Targets {
 		graphData.Nodes = append(graphData.Nodes, GraphNode{
-			ID:    target.Label,
-			Label: target.Label,
-			Type:  string(target.Kind),
+			ID:       target.Label,
+			Label:    target.Label,
+			Type:     string(target.Kind),
+			IsPublic: target.IsPublic(),
 		})
 	}
 

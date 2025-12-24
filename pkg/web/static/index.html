@@ -74,14 +74,14 @@
                     </div>
                 </div>
                 <div class="graph-legend">
-                    <div style="font-weight: bold; margin-bottom: 8px;">Node Types:</div>
+                    <div style="font-weight: bold; margin-bottom: 8px;">Target Types:</div>
                     <div class="legend-item">
                         <div class="legend-color library"></div>
-                        <span>Library</span>
+                        <span>Library (cc_library)</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color binary"></div>
-                        <span>Binary</span>
+                        <span>Binary (cc_binary)</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color shared"></div>
@@ -90,6 +90,19 @@
                     <div class="legend-item">
                         <div class="legend-color" style="background: #d7ba7d;"></div>
                         <span>System Library</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #6a6a6a;"></div>
+                        <span>External/Unknown</span>
+                    </div>
+                    <div style="font-weight: bold; margin: 12px 0 8px 0;">File Types (Focused View):</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #89d185; border-radius: 50%; width: 18px; height: 18px;"></div>
+                        <span>Source file (.cc)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4fc1ff; border-radius: 50%; width: 18px; height: 18px;"></div>
+                        <span>Header file (.h)</span>
                     </div>
                     <div style="font-weight: bold; margin: 12px 0 8px 0;">Dependency Types:</div>
                     <div class="legend-item">
@@ -101,24 +114,44 @@
                         <span>Dynamic link (shared lib)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dashed" style="background: #89d185; width: 40px;"></div>
+                        <div class="legend-line dashed" style="color: #89d185; width: 40px;"></div>
                         <span>Data dependency (runtime)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dotted" style="background: #4fc1ff; width: 40px;"></div>
+                        <div class="legend-line dotted" style="color: #4fc1ff; width: 40px;"></div>
                         <span>Compile (#include headers)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dashed" style="background: #4ec9b0; width: 40px;"></div>
+                        <div class="legend-line dashed" style="color: #4ec9b0; width: 40px;"></div>
                         <span>Symbol (static)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dashed" style="background: #c586c0; width: 40px;"></div>
+                        <div class="legend-line dashed" style="color: #c586c0; width: 40px;"></div>
                         <span>Symbol (dynamic)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-line dotted" style="background: #d7ba7d; width: 40px;"></div>
+                        <div class="legend-line dotted" style="color: #d7ba7d; width: 40px;"></div>
                         <span>System library</span>
+                    </div>
+                    <div style="font-weight: bold; margin: 12px 0 8px 0;">Warnings:</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: transparent; border: 4px double #ff4444; width: 16px; height: 16px;"></div>
+                        <span>Overlapping dependency (duplicate symbols)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #ff4444; width: 40px; height: 4px;"></div>
+                        <span>Edge to overlapping target</span>
+                    </div>
+                    <div style="font-weight: bold; margin: 12px 0 8px 0;">Visibility:</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4fc1ff; position: relative;">
+                            <span style="position: absolute; top: -4px; right: -4px; font-size: 16px;">★</span>
+                        </div>
+                        <span>Public visibility</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color library"></div>
+                        <span>Private visibility (default)</span>
                     </div>
                 </div>
             </div>

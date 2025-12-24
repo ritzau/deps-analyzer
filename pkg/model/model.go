@@ -31,8 +31,34 @@ type Target struct {
 	Sources []string `json:"sources,omitempty"` // .cc files
 	Headers []string `json:"headers,omitempty"` // .h files
 
+	// Visibility control
+	Visibility []string `json:"visibility,omitempty"` // Visibility specifications (e.g., ["//visibility:public"])
+
 	// System library linking options (not represented as Dependencies)
 	Linkopts []string `json:"linkopts,omitempty"` // linkopts (for system libraries like -ldl)
+}
+
+// IsPublic returns true if the target has public visibility
+func (t *Target) IsPublic() bool {
+	for _, vis := range t.Visibility {
+		if vis == "//visibility:public" {
+			return true
+		}
+	}
+	return false
+}
+
+// IsPrivate returns true if the target has private visibility or no visibility specified
+func (t *Target) IsPrivate() bool {
+	if len(t.Visibility) == 0 {
+		return true // Default is private
+	}
+	for _, vis := range t.Visibility {
+		if vis == "//visibility:private" {
+			return true
+		}
+	}
+	return false
 }
 
 // Dependency represents a typed dependency between two targets
