@@ -6,9 +6,7 @@
 
 2. ✅ Remove the collapse package toggle (DONE - removed non-functional toggle and 75 lines of unused code)
 
-3. Front end layout: Make the layout fit the screen as in no longer a scrollable
-   main. Have a title row, navigation to the left, and the remaining area is for
-   the graph.
+3. ✅ Front end layout (DONE - Full-screen responsive layout: header row, navigation sidebar, graph fills remaining space with compact legend and proper canvas sizing)
 
 4. File coverage: It would be cool if we can identify files in packages that are
    not included in the build and show them as such in the focused views (where
