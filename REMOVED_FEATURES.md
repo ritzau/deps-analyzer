@@ -92,30 +92,29 @@ This document tracks features that were removed during the Module model migratio
 
 **Result**: Eliminated 3 redundant analysis passes, significantly faster initialization.
 
-## Packages That Could Be Removed
+## Removed Packages (Cleanup 2025-12-24)
 
-These packages are no longer used and could be deleted:
-- ~~`pkg/cycles`~~ - File cycle detection
-- ~~`pkg/graph/target_graph.go`~~ - Old target graph (already renamed to .old)
-- Potentially `pkg/finder` and `pkg/output` if CLI coverage analysis not brought back
-- Potentially `pkg/analysis` (CrossPackageDep, UncoveredFile) if those features not brought back
+The following unused packages have been deleted:
+- ✅ ~~`pkg/cycles`~~ - File cycle detection (removed)
+- ✅ ~~`pkg/finder`~~ - File discovery for coverage analysis (removed)
+- ✅ ~~`pkg/output`~~ - CLI output formatting (removed)
+- ✅ ~~`pkg/analysis`~~ - CrossPackageDep and UncoveredFile types (removed)
+- ✅ ~~`pkg/graph/target_graph.go.old`~~ - Old backup files (removed)
 
-## Next Steps
+These can be restored from git history if CLI mode is needed in the future.
 
-1. **CLI Mode (Optional)**: Decide if file coverage analysis should be restored
-   - Would show files not in any Bazel target
-   - Requires `pkg/finder` and `pkg/analysis` packages
+## Remaining Packages (All Active)
 
-2. **File Cycles Detection (Optional)**: Consider bringing back cycle detection
-   - Original `pkg/cycles` detected circular file dependencies
-   - Could be useful for identifying problematic include chains
+- `pkg/bazel` - Bazel query and workspace interaction
+- `pkg/binaries` - Binary analysis and overlapping dependency detection
+- `pkg/deps` - Compile dependency parsing (.d files)
+- `pkg/graph` - File graph construction
+- `pkg/model` - Core Module data model
+- `pkg/pubsub` - SSE event streaming
+- `pkg/symbols` - Symbol dependency analysis (nm)
+- `pkg/web` - Web server and API endpoints
 
-3. **Clean up unused packages**:
-   - `pkg/finder` - Only needed if CLI coverage analysis is restored
-   - `pkg/analysis` - CrossPackageDep and UncoveredFile types
-   - `pkg/output` - CLI output formatting
-
-4. **Potential Enhancements**:
+## Potential Enhancements
    - Add legend entry for overlapping dependency visualization
    - Package-level view for overlapping dependencies
    - Export overlapping dependency report
