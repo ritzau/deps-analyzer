@@ -30,13 +30,14 @@ type GraphNode struct {
 
 // GraphEdge represents an edge in the dependency graph
 type GraphEdge struct {
-	Source      string   `json:"source"`
-	Target      string   `json:"target"`
-	Type        string   `json:"type"`        // "file" (from .d files) or "symbol" (from nm)
-	Linkage     string   `json:"linkage"`     // For symbol edges: "static", "dynamic", or "cross"
-	Symbols     []string `json:"symbols"`     // For symbol edges: list of symbol names
-	SourceLabel string   `json:"sourceLabel"` // Human-readable label for source node
-	TargetLabel string   `json:"targetLabel"` // Human-readable label for target node
+	Source      string            `json:"source"`
+	Target      string            `json:"target"`
+	Type        string            `json:"type"`        // "file" (from .d files) or "symbol" (from nm)
+	Linkage     string            `json:"linkage"`     // For symbol edges: "static", "dynamic", or "cross"
+	Symbols     []string          `json:"symbols"`     // For symbol edges: list of symbol names
+	SourceLabel string            `json:"sourceLabel"` // Human-readable label for source node
+	TargetLabel string            `json:"targetLabel"` // Human-readable label for target node
+	FileDetails map[string]string `json:"fileDetails"` // File-level details: source file -> target file(s)
 }
 
 // GraphData holds the dependency graph for visualization
@@ -245,8 +246,8 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.module != nil {
-		// Convert Module to graph format
-		response["graph"] = buildModuleGraphData(s.module)
+		// Convert Module to graph format with file-level details
+		response["graph"] = buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget)
 		// Convert package dependencies
 		response["crossPackageDeps"] = s.module.GetAllPackageDependencies()
 	}
@@ -292,8 +293,8 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build target-level graph from module
-	graphData := buildModuleGraphData(s.module)
+	// Build target-level graph from module with file-level details
+	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget)
 	json.NewEncoder(w).Encode(graphData)
 }
 
@@ -422,7 +423,7 @@ func buildBinaryGraphData(binaryInfos []*binaries.BinaryInfo) *GraphData {
 // This would show files within a target and their compile-time dependencies to other targets
 
 // buildModuleGraphData creates a graph visualization from the Module model
-func buildModuleGraphData(module *model.Module) *GraphData {
+func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
@@ -460,15 +461,83 @@ func buildModuleGraphData(module *model.Module) *GraphData {
 		}
 	}
 
+	// Build a map to track file-level and symbol details for each target-level edge
+	type edgeKey struct {
+		from string
+		to   string
+	}
+	edgeDetails := make(map[edgeKey]map[string][]string) // edgeKey -> (sourceFile -> []targetFiles)
+	edgeSymbols := make(map[edgeKey]map[string]bool)    // edgeKey -> set of symbols
+
+	// Aggregate compile dependencies (file-level header includes)
+	if fileDeps != nil && fileToTarget != nil {
+		for _, fileDep := range fileDeps {
+			sourceTarget, sourceOK := fileToTarget[fileDep.SourceFile]
+			if !sourceOK {
+				continue
+			}
+
+			for _, depFile := range fileDep.Dependencies {
+				targetTarget, targetOK := fileToTarget[depFile]
+				if !targetOK || sourceTarget == targetTarget {
+					continue // Skip if same target or unknown
+				}
+
+				key := edgeKey{from: sourceTarget, to: targetTarget}
+				if edgeDetails[key] == nil {
+					edgeDetails[key] = make(map[string][]string)
+				}
+				sourceFileName := getFileName(fileDep.SourceFile)
+				targetFileName := getFileName(depFile)
+				edgeDetails[key][sourceFileName] = append(edgeDetails[key][sourceFileName], targetFileName)
+			}
+		}
+	}
+
+	// Aggregate symbol dependencies
+	if symbolDeps != nil {
+		for _, symDep := range symbolDeps {
+			if symDep.SourceTarget == symDep.TargetTarget {
+				continue // Skip intra-target symbols
+			}
+
+			key := edgeKey{from: symDep.SourceTarget, to: symDep.TargetTarget}
+			if edgeSymbols[key] == nil {
+				edgeSymbols[key] = make(map[string]bool)
+			}
+			edgeSymbols[key][symDep.Symbol] = true
+		}
+	}
+
 	// Create edges for all dependencies, colored by type
 	for _, dep := range module.Dependencies {
+		key := edgeKey{from: dep.From, to: dep.To}
+
+		// Collect file details for this edge
+		fileDetailsMap := make(map[string]string)
+		if details, exists := edgeDetails[key]; exists {
+			for sourceFile, targetFiles := range details {
+				// Store as "source.cc" -> "header1.h, header2.h"
+				fileDetailsMap[sourceFile] = strings.Join(targetFiles, ", ")
+			}
+		}
+
+		// Collect symbols for this edge
+		var symbols []string
+		if symMap, exists := edgeSymbols[key]; exists {
+			for sym := range symMap {
+				symbols = append(symbols, sym)
+			}
+		}
+
 		graphData.Edges = append(graphData.Edges, GraphEdge{
 			Source:      dep.From,
 			Target:      dep.To,
 			Type:        string(dep.Type),
-			Symbols:     []string{},
+			Symbols:     symbols,
 			SourceLabel: dep.From, // Use full label for module graph
 			TargetLabel: dep.To,
+			FileDetails: fileDetailsMap,
 		})
 	}
 

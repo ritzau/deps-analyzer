@@ -102,7 +102,8 @@ function displayDependencyGraph(graphData) {
                 linkage: edge.linkage,
                 symbols: edge.symbols || [],
                 sourceLabel: edge.sourceLabel,
-                targetLabel: edge.targetLabel
+                targetLabel: edge.targetLabel,
+                fileDetails: edge.fileDetails || {}
             }
         }))
     ];
@@ -417,6 +418,7 @@ function displayDependencyGraph(graphData) {
         const edgeType = edge.data('type');
         const linkage = edge.data('linkage');
         const symbols = edge.data('symbols');
+        const fileDetails = edge.data('fileDetails');
 
         // Get source and target node labels (prefer edge labels if available)
         const sourceLabel = edge.data('sourceLabel') || (() => {
@@ -433,8 +435,34 @@ function displayDependencyGraph(graphData) {
         // Add description based on edge type with directional information
         if (edgeType === 'static') {
             tooltipText = `📦 Static Linkage\n\n${sourceLabel}\n  depends on (statically links)\n${targetLabel}\n\nCode from ${targetLabel} is included in ${sourceLabel} at link time.`;
+
+            // Add file-level compile details if available
+            if (fileDetails && Object.keys(fileDetails).length > 0) {
+                tooltipText += '\n\nHeader Includes:';
+                const entries = Object.entries(fileDetails).slice(0, 10);
+                for (const [sourceFile, targetFiles] of entries) {
+                    tooltipText += `\n  ${sourceFile} → ${targetFiles}`;
+                }
+                if (Object.keys(fileDetails).length > 10) {
+                    tooltipText += `\n  ... and ${Object.keys(fileDetails).length - 10} more files`;
+                }
+            }
+
+            // Add symbols if available
+            if (symbols && symbols.length > 0) {
+                const symbolList = symbols.slice(0, 10).join(', ');
+                const more = symbols.length > 10 ? ` ... +${symbols.length - 10} more` : '';
+                tooltipText += `\n\nSymbols (${symbols.length}): ${symbolList}${more}`;
+            }
         } else if (edgeType === 'dynamic') {
             tooltipText = `🔗 Dynamic Linkage\n\n${sourceLabel}\n  depends on (dynamically links)\n${targetLabel}\n\nShared library ${targetLabel} is loaded at runtime.`;
+
+            // Add symbols if available
+            if (symbols && symbols.length > 0) {
+                const symbolList = symbols.slice(0, 10).join(', ');
+                const more = symbols.length > 10 ? ` ... +${symbols.length - 10} more` : '';
+                tooltipText += `\n\nSymbols (${symbols.length}): ${symbolList}${more}`;
+            }
         } else if (edgeType === 'data') {
             tooltipText = `📄 Data Dependency\n\n${sourceLabel}\n  needs at runtime\n${targetLabel}\n\nSpecified in 'data' attribute.`;
         } else if (edgeType === 'compile') {
