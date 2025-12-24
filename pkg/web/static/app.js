@@ -419,7 +419,7 @@ function displayDependencyGraph(graphData) {
             },
             // Public visibility indicator (star badge)
             {
-                selector: 'node[isPublic = true]',
+                selector: 'node[isPublic]',
                 style: {
                     'background-image': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><text x="12" y="18" text-anchor="middle" font-size="18" fill="%23ffd700">★</text></svg>',
                     'background-image-opacity': 1,
