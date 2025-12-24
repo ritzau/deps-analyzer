@@ -109,7 +109,8 @@ function displayDependencyGraph(graphData) {
                 symbols: edge.symbols || [],
                 sourceLabel: edge.sourceLabel,
                 targetLabel: edge.targetLabel,
-                fileDetails: edge.fileDetails || {}
+                fileDetails: edge.fileDetails || {},
+                isOverlapping: edge.isOverlapping || false
             }
         }))
     ];
@@ -236,14 +237,6 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'node[hasOverlap]',
-                style: {
-                    'border-width': 3,
-                    'border-color': '#f48771',
-                    'border-style': 'dashed'
-                }
-            },
-            {
                 selector: 'node[type = "target-group"]',
                 style: {
                     'shape': 'roundrectangle',
@@ -367,6 +360,24 @@ function displayDependencyGraph(graphData) {
                     'line-color': '#c586c0',
                     'target-arrow-color': '#c586c0',
                     'width': 2.5,
+                    'line-style': 'solid'
+                }
+            },
+            // Overlapping dependencies - MUST be after type-specific selectors to override
+            {
+                selector: 'node[hasOverlap][type = "cc_binary"], node[hasOverlap][type = "cc_shared_library"], node[hasOverlap][type = "cc_library"]',
+                style: {
+                    'border-width': '8px',
+                    'border-color': '#ff4444',
+                    'border-style': 'double'
+                }
+            },
+            {
+                selector: 'edge[isOverlapping]',
+                style: {
+                    'line-color': '#ff4444',
+                    'target-arrow-color': '#ff4444',
+                    'width': 4,
                     'line-style': 'solid'
                 }
             },
@@ -523,13 +534,19 @@ function displayDependencyGraph(graphData) {
         const nodeType = node.data('type');
         const nodeLabel = node.data('label');
         const overlappingTargets = node.data('overlappingTargets');
+        const overlappingWith = node.data('overlappingWith');
 
         let tooltipText = '';
 
-        // Special handling for overlapping dependencies warning
+        // Special handling for overlapping shared library warning
         if (overlappingTargets && overlappingTargets.length > 0) {
             const targetList = overlappingTargets.join('\n  ');
-            tooltipText = `⚠️ Duplicate symbols!\n\nBoth this binary and ${nodeLabel} link:\n  ${targetList}`;
+            tooltipText = `⚠️ DUPLICATE SYMBOLS!\n\nBoth this binary and ${nodeLabel} statically link:\n  ${targetList}\n\nThis can cause symbol conflicts at runtime!`;
+        }
+        // Special handling for overlapping library targets
+        else if (overlappingWith && overlappingWith.length > 0) {
+            const sharedLibList = overlappingWith.join('\n  ');
+            tooltipText = `⚠️ DUPLICATE SYMBOLS!\n\n${nodeLabel} is statically linked by both:\n  • This binary\n  • Shared libraries:\n    ${sharedLibList}\n\nThis can cause symbol conflicts at runtime!`;
         }
         // Show type information for regular nodes
         else {
@@ -1660,12 +1677,26 @@ function buildBinaryFocusedGraphData(focusedBinary) {
         // Show individual targets - but only our internal (static) targets
         const allTargets = packageGraph ? packageGraph.nodes : [];
 
+        // Collect all overlapping target labels
+        const overlappingTargetSet = new Set();
+        if (focusedBinary.overlappingDeps) {
+            Object.values(focusedBinary.overlappingDeps).forEach(targets => {
+                targets.forEach(target => overlappingTargetSet.add(target));
+            });
+        }
+
         allTargets.forEach(target => {
             const targetLabel = target.label || target.id;
             if (internalTargetSet.has(targetLabel)) {
+                const isOverlapping = overlappingTargetSet.has(targetLabel);
                 graphData.nodes.push({
                     ...target,
-                    parent: 'internal-group'
+                    parent: 'internal-group',
+                    hasOverlap: isOverlapping,
+                    overlappingWith: isOverlapping ?
+                        Object.keys(focusedBinary.overlappingDeps || {}).filter(sharedLib =>
+                            focusedBinary.overlappingDeps[sharedLib].includes(targetLabel)
+                        ) : []
                 });
             }
         });
@@ -1683,11 +1714,13 @@ function buildBinaryFocusedGraphData(focusedBinary) {
         if (focusedBinary.regularDeps) {
             focusedBinary.regularDeps.forEach(depLabel => {
                 if (internalTargetSet.has(depLabel)) {
+                    const isOverlapping = overlappingTargetSet.has(depLabel);
                     graphData.edges.push({
                         source: focusedBinary.label,
                         target: depLabel,
                         type: 'static',
-                        symbols: []
+                        symbols: [],
+                        isOverlapping: isOverlapping
                     });
                 }
             });

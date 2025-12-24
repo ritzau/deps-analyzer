@@ -73,3 +73,7 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 - Store in the edge (type and text)
 - Maybe for each node?
 - Maybe some more info when clicking on edges?
+
+## Show visibility in graph
+
+## BUG: Splash screen says that we load the workspace, should be module(?)

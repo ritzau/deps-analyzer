@@ -24,3 +24,4 @@ Thumbs.db
 .claude/settings.local.json
 workspace.json
 test-bazel-xml
+example/deps-analyzer
