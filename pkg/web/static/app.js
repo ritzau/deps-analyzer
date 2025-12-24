@@ -365,7 +365,7 @@ function displayDependencyGraph(graphData) {
             },
             // Overlapping dependencies - MUST be after type-specific selectors to override
             {
-                selector: 'node[hasOverlap][type = "cc_binary"], node[hasOverlap][type = "cc_shared_library"], node[hasOverlap][type = "cc_library"]',
+                selector: 'node[hasOverlap = true][type = "cc_binary"], node[hasOverlap = true][type = "cc_shared_library"], node[hasOverlap = true][type = "cc_library"]',
                 style: {
                     'border-width': '8px',
                     'border-color': '#ff4444',
@@ -373,7 +373,7 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'edge[isOverlapping]',
+                selector: 'edge[isOverlapping = true]',
                 style: {
                     'line-color': '#ff4444',
                     'target-arrow-color': '#ff4444',
