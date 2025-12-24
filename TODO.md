@@ -4,7 +4,7 @@
 
 1. ✅ Show visibility in graph (DONE - dashed gold border for public targets)
 
-2. Remove the collapse package toggle, it doesn't do anything, right?
+2. ✅ Remove the collapse package toggle (DONE - removed non-functional toggle and 75 lines of unused code)
 
 3. Front end layout: Make the layout fit the screen as in no longer a scrollable
    main. Have a title row, navigation to the left, and the remaining area is for

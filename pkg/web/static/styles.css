@@ -69,8 +69,10 @@ header h1 {
 .content-area {
     flex: 1;
     min-width: 0;
-    overflow-y: auto;
+    overflow: hidden;
     background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
 }
 
 /* Tree Browser */
@@ -282,7 +284,11 @@ header h1 {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 20px;
-    margin: 12px;
+    margin: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .card h2 {
@@ -301,11 +307,11 @@ header h1 {
 /* Graph visualization */
 .graph-container {
     width: 100%;
-    height: 600px;
+    flex: 1;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    margin-bottom: 15px;
     position: relative;
+    min-height: 0;
 }
 
 .graph-loading {
