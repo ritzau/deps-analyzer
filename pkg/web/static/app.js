@@ -836,9 +836,49 @@ async function loadGraphData() {
     }
 }
 
+// Clean up connections when page is being unloaded
+window.addEventListener('beforeunload', function() {
+    console.log('Page unloading, closing SSE connections');
+    if (workspaceStatusSource) {
+        workspaceStatusSource.close();
+        workspaceStatusSource = null;
+    }
+    if (targetGraphSource) {
+        targetGraphSource.close();
+        targetGraphSource = null;
+    }
+    if (cy) {
+        cy.destroy();
+        cy = null;
+    }
+});
+
 // Initialize subscriptions when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Starting SSE subscriptions...');
+
+    // Close any existing connections first (in case of reload)
+    if (workspaceStatusSource) {
+        console.log('Closing existing workspace_status connection');
+        workspaceStatusSource.close();
+        workspaceStatusSource = null;
+    }
+    if (targetGraphSource) {
+        console.log('Closing existing target_graph connection');
+        targetGraphSource.close();
+        targetGraphSource = null;
+    }
+
+    // Destroy any existing Cytoscape instance
+    if (cy) {
+        console.log('Destroying existing Cytoscape instance');
+        cy.destroy();
+        cy = null;
+    }
+
+    // Reset state flags
+    graphDataLoaded = false;
+    analysisComplete = false;
 
     // Subscribe to both event streams
     subscribeToWorkspaceStatus();
