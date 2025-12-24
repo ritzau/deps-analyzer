@@ -1,47 +1,28 @@
 # Ideas for future evolution
 
-## ✅ Binary/so-level (DONE)
+## Prioritized backlog
 
-✅ Start at the level of the generated artefacts. Clicking let's you see what is
-inside. You may also be able to see what is accessed from other artefacts, and
-what is used in external ones.
+1. ✅ Show visibility in graph (DONE - dashed gold border for public targets)
 
-**Status**: Implemented! Click binaries in sidebar to see binary-focused view with overlapping dependencies highlighted.
+2. Remove the collapse package toggle, it doesn't do anything, right?
 
-## ✅ Message bus (DONE)
+3. Front end layout: Make the layout fit the screen as in no longer a scrollable
+   main. Have a title row, navigation to the left, and the remaining area is for
+   the graph.
 
-✅ Communicate from the server to the UI using a pub/sub
-✅ UI subscribes to get ui state messages
-✅ Great for start up
-✅ Awesome also to do live updates
-- Can also be fun to develop a terminal client (not done)
+4. File coverage: It would be cool if we can identify files in packages that are
+   not included in the build and show them as such in the focused views (where
+   sorce files are shown.)
 
-**Status**: SSE (Server-Sent Events) implemented with `/api/subscribe/workspace_status` and `/api/subscribe/target_graph`
+5. Live updates: Watch the project files for changes and update continously. At
+   least make it possible to trigger restarting the analysis.
 
-## ✅ Tooltips on all edges (DONE)
-
-✅ Store in the edge (type and text)
-✅ Maybe for each node?
-✅ Maybe some more info when clicking on edges?
-
-**Status**: Comprehensive tooltips with hover delay, directional info, file details, and symbol lists
-
-## ✅ Color scheme (DONE)
-
-✅ Make a good looking color scheme and support dark/light (auto detected by
-default). Maybe dive deeper and also choose a font that we can enjoy some :)
-
-**Status**: VS Code dark theme colors, good font stack, professional UI
-
-## ✅ Optimize analysis (PARTIALLY DONE)
-
-✅ Fewer queries should be possible for many phases
-✅ Can we use bazel to generate and cache this info?
-- Concurrent operations? (could still be improved)
-
-**Status**: Reduced from 4 analysis passes to 2, eliminated redundant work
+6. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+   made it
 
 ---
+
+## Attic below
 
 ## Test coverage
 
@@ -51,11 +32,6 @@ metrics. Test coverage is just one example. Maybe an idea?
 ## Integrated browser
 
 Maybe skip the actual browser dependency and use something like electron?
-
-## Live updates
-
-Watch the project files for changes and update continously. At least make it
-possible to trigger restarting the analysis.
 
 ## Investigate compiler options to also track header:header deps
 
@@ -75,19 +51,53 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 - May require support of .a files
 
-## Real so file test cases
-
-## Detect eliminated symbols
-
-- Analyze the built artifacts to see which symbols made it
-- Use ldd to see which libraries are dynamically linked
-
 ## BUG: . as project name
 
 - If we use the current dir, at least check to see what its name is
 
-## Show visibility in graph
+---
 
-## ✅ BUG: Splash screen says that we load the workspace, should be module(?) (FIXED)
+# Archive
 
-**Status**: Loading checklist now shows correct terminology
+## ✅ Binary/so-level (DONE)
+
+✅ Start at the level of the generated artefacts. Clicking let's you see what is
+inside. You may also be able to see what is accessed from other artefacts, and
+what is used in external ones.
+
+**Status**: Implemented! Click binaries in sidebar to see binary-focused view
+with overlapping dependencies highlighted.
+
+## ✅ Message bus (DONE)
+
+✅ Communicate from the server to the UI using a pub/sub ✅ UI subscribes to get
+ui state messages ✅ Great for start up ✅ Awesome also to do live updates
+
+- Can also be fun to develop a terminal client (not done)
+
+**Status**: SSE (Server-Sent Events) implemented with
+`/api/subscribe/workspace_status` and `/api/subscribe/target_graph`
+
+## ✅ Tooltips on all edges (DONE)
+
+✅ Store in the edge (type and text) ✅ Maybe for each node? ✅ Maybe some more
+info when clicking on edges?
+
+**Status**: Comprehensive tooltips with hover delay, directional info, file
+details, and symbol lists
+
+## ✅ Color scheme (DONE)
+
+✅ Make a good looking color scheme and support dark/light (auto detected by
+default). Maybe dive deeper and also choose a font that we can enjoy some :)
+
+**Status**: VS Code dark theme colors, good font stack, professional UI
+
+## ✅ Optimize analysis (PARTIALLY DONE)
+
+✅ Fewer queries should be possible for many phases ✅ Can we use bazel to
+generate and cache this info?
+
+- Concurrent operations? (could still be improved)
+
+**Status**: Reduced from 4 analysis passes to 2, eliminated redundant work

@@ -1107,110 +1107,7 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.style.display = 'none';
         }
     };
-
-    // Package collapse toggle handler
-    const packageCollapseToggle = document.getElementById('packageCollapseToggle');
-    if (packageCollapseToggle) {
-        packageCollapseToggle.addEventListener('change', function() {
-            packagesCollapsed = this.checked;
-            console.log('Package collapse toggled:', packagesCollapsed);
-
-            // Rebuild the current view based on mode
-            if (currentView === 'package' && packageGraph) {
-                // Package level view
-                if (packagesCollapsed) {
-                    displayDependencyGraph(buildCollapsedPackageGraph(packageGraph));
-                } else {
-                    displayDependencyGraph(packageGraph);
-                }
-            } else if (currentView === 'binary' && currentBinary && binaryData) {
-                // Binary-focused view - rebuild with new collapse state
-                const focusedBinary = binaryData.find(b => b.label === currentBinary);
-                if (focusedBinary) {
-                    const graphData = buildBinaryFocusedGraphData(focusedBinary);
-                    displayDependencyGraph(graphData);
-                }
-            }
-        });
-    }
 });
-
-// Build a collapsed version of the package graph where targets are grouped by package
-function buildCollapsedPackageGraph(graph) {
-    const packages = new Map(); // packageName -> { targets: [], edges: [] }
-    const packageEdges = new Map(); // "srcPkg->dstPkg" -> { type, symbols, sources[], targets[] }
-
-    // Group targets by package
-    graph.nodes.forEach(node => {
-        const packageName = node.label.split(':')[0]; // Extract "//path/to/package" from "//path/to/package:target"
-        if (!packages.has(packageName)) {
-            packages.set(packageName, { targets: [], edges: [] });
-        }
-        packages.get(packageName).targets.push(node);
-    });
-
-    // Group edges by package-to-package connections
-    graph.edges.forEach(edge => {
-        const srcPackage = edge.source.split(':')[0];
-        const dstPackage = edge.target.split(':')[0];
-
-        // Skip intra-package edges
-        if (srcPackage === dstPackage) {
-            return;
-        }
-
-        const edgeKey = `${srcPackage}->${dstPackage}`;
-        if (!packageEdges.has(edgeKey)) {
-            packageEdges.set(edgeKey, {
-                source: srcPackage,
-                target: dstPackage,
-                type: edge.type,
-                linkage: edge.linkage,
-                symbols: [],
-                sources: new Set(),
-                targets: new Set()
-            });
-        }
-
-        const pkgEdge = packageEdges.get(edgeKey);
-        if (edge.symbols) {
-            pkgEdge.symbols.push(...edge.symbols);
-        }
-        pkgEdge.sources.add(edge.source);
-        pkgEdge.targets.add(edge.target);
-    });
-
-    // Build collapsed graph
-    const collapsedGraph = {
-        nodes: [],
-        edges: []
-    };
-
-    // Create package nodes
-    packages.forEach((info, packageName) => {
-        collapsedGraph.nodes.push({
-            id: packageName,
-            label: packageName,
-            type: 'package',
-            targetCount: info.targets.length
-        });
-    });
-
-    // Create package edges
-    packageEdges.forEach((edgeInfo, key) => {
-        collapsedGraph.edges.push({
-            source: edgeInfo.source,
-            target: edgeInfo.target,
-            type: edgeInfo.type,
-            linkage: edgeInfo.linkage,
-            symbols: edgeInfo.symbols,
-            sourceTargets: Array.from(edgeInfo.sources),
-            targetTargets: Array.from(edgeInfo.targets)
-        });
-    });
-
-    return collapsedGraph;
-}
 
 // ============================================================================
 // Tree Browser Implementation
@@ -1226,7 +1123,6 @@ let cy = null; // Store the Cytoscape instance
 let currentView = 'package'; // Track current view: 'package', 'file', 'binary', or 'focused'
 let currentTarget = null; // Track which target we're viewing at file or focused level
 let currentBinary = null; // Track which binary we're viewing at binary level
-let packagesCollapsed = false; // Track if packages are collapsed
 
 // Build tree structure from analysis data
 function buildTreeData(data) {
