@@ -307,12 +307,12 @@ header h1 {
 
 /* Graph visualization */
 .graph-container {
-    width: 100%;
     flex: 1;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     position: relative;
     min-height: 200px; /* Ensure minimum height for Cytoscape */
+    min-width: 0; /* Allow flex shrinking */
 }
 
 .graph-loading {

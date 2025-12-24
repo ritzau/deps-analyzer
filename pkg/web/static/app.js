@@ -711,6 +711,9 @@ function displayDependencyGraph(graphData) {
         }
     });
 
+    // Set explicit dimensions based on flex container size
+    updateCytoscapeSize();
+
     // Center and fit the graph after layout completes and canvas is ready
     cy.one('layoutstop', function() {
         // Small delay to ensure canvas has final dimensions
@@ -723,6 +726,24 @@ function displayDependencyGraph(graphData) {
             cy.fit(cy.elements(), 50);
         }, 10);
     });
+}
+
+// Update Cytoscape canvas size based on actual container dimensions
+function updateCytoscapeSize() {
+    const container = document.getElementById('cy');
+    if (!container) return;
+
+    // Get the actual computed size of the flex container
+    const rect = container.getBoundingClientRect();
+
+    // Set explicit pixel dimensions
+    container.style.width = rect.width + 'px';
+    container.style.height = rect.height + 'px';
+
+    // Tell Cytoscape to update its canvas size
+    if (cy) {
+        cy.resize();
+    }
 }
 
 // SSE subscriptions
@@ -1856,7 +1877,7 @@ window.addEventListener('resize', function() {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(function() {
         if (cy) {
-            cy.resize();
+            updateCytoscapeSize();
             cy.fit(undefined, 50); // Refit with padding after resize
         }
     }, 150);
