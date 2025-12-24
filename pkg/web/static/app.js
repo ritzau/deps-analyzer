@@ -835,6 +835,52 @@ function subscribeToTargetGraph() {
     };
 }
 
+// Enrich graph nodes with overlapping dependency information from binaries
+function enrichGraphWithOverlappingInfo(graph, binaries) {
+    // Collect all overlapping targets across all binaries
+    const allOverlappingTargets = new Map(); // target -> Set of shared libraries causing overlap
+
+    binaries.forEach(binary => {
+        if (binary.overlappingDeps) {
+            Object.entries(binary.overlappingDeps).forEach(([sharedLib, targets]) => {
+                targets.forEach(target => {
+                    if (!allOverlappingTargets.has(target)) {
+                        allOverlappingTargets.set(target, new Set());
+                    }
+                    allOverlappingTargets.get(target).add(sharedLib);
+                });
+            });
+        }
+    });
+
+    console.log('Overlapping targets found:', Array.from(allOverlappingTargets.keys()));
+
+    // Mark nodes that have overlapping dependencies
+    graph.nodes.forEach(node => {
+        const nodeLabel = node.label || node.id;
+        if (allOverlappingTargets.has(nodeLabel)) {
+            node.hasOverlap = true;
+            node.overlappingWith = Array.from(allOverlappingTargets.get(nodeLabel));
+            console.log('Marked node as overlapping:', nodeLabel, 'with:', node.overlappingWith);
+        }
+    });
+
+    // Mark shared library nodes that have overlapping deps
+    binaries.forEach(binary => {
+        if (binary.kind === 'cc_shared_library' && binary.overlappingDeps) {
+            const overlappingCount = Object.keys(binary.overlappingDeps).length;
+            if (overlappingCount > 0) {
+                const node = graph.nodes.find(n => (n.label || n.id) === binary.label);
+                if (node) {
+                    node.hasOverlap = true;
+                    node.overlappingTargets = Object.values(binary.overlappingDeps).flat();
+                    console.log('Marked shared library as overlapping:', binary.label);
+                }
+            }
+        }
+    });
+}
+
 // Load full graph data from API
 async function loadGraphData() {
     console.log('loadGraphData() called');
@@ -862,6 +908,13 @@ async function loadGraphData() {
         if (binariesResponse.ok) {
             binaryData = await binariesResponse.json();
             console.log('Loaded binary data:', binaryData);
+
+            // Enrich the displayed graph with overlapping dependency information
+            if (packageGraph && packageGraph.nodes) {
+                enrichGraphWithOverlappingInfo(packageGraph, binaryData);
+                // Redisplay the graph with overlapping info
+                displayDependencyGraph(packageGraph);
+            }
         }
 
         // Fetch module data for tree browser
@@ -1704,9 +1757,11 @@ function buildBinaryFocusedGraphData(focusedBinary) {
         // Collect all overlapping target labels
         const overlappingTargetSet = new Set();
         if (focusedBinary.overlappingDeps) {
+            console.log('Overlapping deps for', focusedBinary.label, ':', focusedBinary.overlappingDeps);
             Object.values(focusedBinary.overlappingDeps).forEach(targets => {
                 targets.forEach(target => overlappingTargetSet.add(target));
             });
+            console.log('Overlapping target set:', Array.from(overlappingTargetSet));
         }
 
         allTargets.forEach(target => {
