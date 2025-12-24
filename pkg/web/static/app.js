@@ -62,7 +62,7 @@ function displayDependencyGraph(graphData) {
     // Show the graph section (in case it's hidden)
     const graphSection = document.getElementById('graphSection');
     if (graphSection) {
-        graphSection.style.display = 'block';
+        graphSection.style.display = 'flex';
     }
 
     // Hide the graph loading spinner
@@ -794,7 +794,7 @@ function subscribeToWorkspaceStatus() {
             // Update loading progress based on state
             if (status.state === 'bazel_querying') {
                 updateLoadingProgress(null, 1);
-                document.getElementById('graphSection').style.display = 'block';
+                document.getElementById('graphSection').style.display = 'flex';
             } else if (status.state === 'analyzing_deps') {
                 updateLoadingProgress(1, 2);
             } else if (status.state === 'analyzing_symbols') {
