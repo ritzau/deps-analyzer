@@ -338,9 +338,21 @@ header h1 {
 }
 
 .graph-legend {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
     font-size: 0.85em;
+}
+
+.legend-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.legend-section-title {
+    font-weight: bold;
+    margin-bottom: 4px;
 }
 
 .legend-item {
