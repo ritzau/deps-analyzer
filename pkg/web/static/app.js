@@ -59,6 +59,12 @@ function displayUncoveredFiles(files) {
 function displayDependencyGraph(graphData) {
     console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
 
+    // Show the graph section (in case it's hidden)
+    const graphSection = document.getElementById('graphSection');
+    if (graphSection) {
+        graphSection.style.display = 'block';
+    }
+
     // Hide the graph loading spinner
     const graphLoading = document.getElementById('graphLoading');
     if (graphLoading) {
