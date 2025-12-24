@@ -97,11 +97,24 @@ function displayDependencyGraph(graphData) {
                 }
             }
 
+            // Only set hasOverlap if it's true (don't set it at all if false)
+            if (node.hasOverlap === true) {
+                nodeData.hasOverlap = true;
+            }
+
+            // Add overlapping metadata for tooltips
+            if (node.overlappingTargets && node.overlappingTargets.length > 0) {
+                nodeData.overlappingTargets = node.overlappingTargets;
+            }
+            if (node.overlappingWith && node.overlappingWith.length > 0) {
+                nodeData.overlappingWith = node.overlappingWith;
+            }
+
             return { data: nodeData };
         }),
         // Edges
-        ...graphData.edges.map(edge => ({
-            data: {
+        ...graphData.edges.map(edge => {
+            const edgeData = {
                 source: edge.source,
                 target: edge.target,
                 type: edge.type,
@@ -109,13 +122,23 @@ function displayDependencyGraph(graphData) {
                 symbols: edge.symbols || [],
                 sourceLabel: edge.sourceLabel,
                 targetLabel: edge.targetLabel,
-                fileDetails: edge.fileDetails || {},
-                isOverlapping: edge.isOverlapping || false
+                fileDetails: edge.fileDetails || {}
+            };
+            // Only set isOverlapping if it's true (don't set it at all if false)
+            if (edge.isOverlapping === true) {
+                edgeData.isOverlapping = true;
             }
-        }))
+            return { data: edgeData };
+        })
     ];
 
     console.log('Creating new cytoscape instance with', elements.length, 'elements');
+
+    // Debug: Log overlapping flags
+    const overlappingNodes = elements.filter(e => e.data.hasOverlap === true);
+    const overlappingEdges = elements.filter(e => e.data.isOverlapping === true);
+    console.log('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.label || n.data.id));
+    console.log('Edges with isOverlapping=true:', overlappingEdges.map(e => `${e.data.source} -> ${e.data.target}`));
 
     cy = cytoscape({
         container: document.getElementById('cy'),
@@ -364,8 +387,9 @@ function displayDependencyGraph(graphData) {
                 }
             },
             // Overlapping dependencies - MUST be after type-specific selectors to override
+            // Note: Only nodes/edges with hasOverlap/isOverlapping set to true will have this attribute
             {
-                selector: 'node[hasOverlap = true][type = "cc_binary"], node[hasOverlap = true][type = "cc_shared_library"], node[hasOverlap = true][type = "cc_library"]',
+                selector: 'node[hasOverlap][type = "cc_binary"], node[hasOverlap][type = "cc_shared_library"], node[hasOverlap][type = "cc_library"]',
                 style: {
                     'border-width': '8px',
                     'border-color': '#ff4444',
@@ -373,7 +397,7 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'edge[isOverlapping = true]',
+                selector: 'edge[isOverlapping]',
                 style: {
                     'line-color': '#ff4444',
                     'target-arrow-color': '#ff4444',
