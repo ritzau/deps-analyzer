@@ -102,6 +102,11 @@ function displayDependencyGraph(graphData) {
                 nodeData.hasOverlap = true;
             }
 
+            // Only set isPublic if it's true (don't set it at all if false)
+            if (node.isPublic === true) {
+                nodeData.isPublic = true;
+            }
+
             // Add overlapping metadata for tooltips
             if (node.overlappingTargets && node.overlappingTargets.length > 0) {
                 nodeData.overlappingTargets = node.overlappingTargets;
