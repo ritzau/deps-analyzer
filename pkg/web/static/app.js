@@ -1848,3 +1848,16 @@ function populateTreeBrowser(data) {
         });
     }
 }
+
+// Handle window resize to update Cytoscape canvas size
+let resizeTimeout;
+window.addEventListener('resize', function() {
+    // Debounce resize events to avoid excessive updates
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(function() {
+        if (cy) {
+            cy.resize();
+            cy.fit(undefined, 50); // Refit with padding after resize
+        }
+    }, 150);
+});
