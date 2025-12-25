@@ -572,11 +572,11 @@ function displayDependencyGraph(graphData) {
                     'border-color': '#ff8c00'
                 }
             },
-            // Public visibility indicator (star badge)
+            // Public visibility indicator (solid gold border)
             {
                 selector: 'node[isPublic]',
                 style: {
-                    'border-style': 'dashed',
+                    'border-style': 'solid',
                     'border-width': '3px',
                     'border-color': '#ffd700'
                 }
