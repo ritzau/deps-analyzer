@@ -892,12 +892,12 @@ function monitoredFetch(url, options) {
 
 // Start periodic health check
 function startHealthCheck() {
-    // Check every 5 seconds if we haven't had a successful request in 10 seconds
+    // Check every 2 seconds if we haven't had a successful request in 3 seconds
     healthCheckInterval = setInterval(() => {
         const timeSinceLastSuccess = Date.now() - lastSuccessfulRequest;
 
         // Only check if analysis is complete and it's been a while
-        if (analysisComplete && timeSinceLastSuccess > 10000 && !connectionLost) {
+        if (analysisComplete && timeSinceLastSuccess > 3000 && !connectionLost) {
             console.log('Performing health check...');
             fetch('/api/module', { method: 'HEAD' })
                 .then(response => {
@@ -911,7 +911,7 @@ function startHealthCheck() {
                     handleConnectionLost('health_check');
                 });
         }
-    }, 5000);
+    }, 2000);
 }
 
 // Stop health check
