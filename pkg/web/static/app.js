@@ -504,10 +504,10 @@ function displayDependencyGraph(graphData) {
             {
                 selector: 'edge[type = "data_dependency"]',
                 style: {
-                    'line-color': '#89d185',
-                    'target-arrow-color': '#89d185',
+                    'line-color': '#4ec9b0',
+                    'target-arrow-color': '#4ec9b0',
                     'width': 2,
-                    'line-style': 'dashed'
+                    'line-style': 'dotted'
                 }
             },
             {
@@ -524,8 +524,8 @@ function displayDependencyGraph(graphData) {
                 style: {
                     'line-color': '#4fc1ff',
                     'target-arrow-color': '#4fc1ff',
-                    'width': 1.5,
-                    'line-style': 'dotted'
+                    'width': 2,
+                    'line-style': 'solid'
                 }
             },
             {

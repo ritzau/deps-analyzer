@@ -67,7 +67,12 @@ Simplified the dependency types legend for better clarity and visual consistency
 
 Implementation:
 - Updated legend HTML in [index.html:134-152](pkg/web/static/index.html#L134-L152)
-- Changed public border style in [app.js:579](pkg/web/static/app.js#L579)
+- Changed public border style in [app.js:450](pkg/web/static/app.js#L450)
+- Updated all edge styles across target and focused graph views:
+  - System library edges: teal dashed [app.js:514](pkg/web/static/app.js#L514)
+  - Dynamic edges: teal dashed [app.js:541](pkg/web/static/app.js#L541)
+  - Data edges: teal dotted [app.js:505](pkg/web/static/app.js#L505)
+  - Compile edges: blue solid [app.js:523](pkg/web/static/app.js#L523)
 - Removed unused wavy line CSS
 
 ## ✅ System library filtering (DONE)
