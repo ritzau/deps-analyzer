@@ -922,6 +922,63 @@ function stopHealthCheck() {
     }
 }
 
+// Check connection on user activity
+function checkConnectionOnActivity() {
+    if (!analysisComplete || connectionLost) return;
+
+    // Check if SSE connections are closed
+    if (workspaceStatusSource && workspaceStatusSource.readyState === 2) {
+        console.log('Detected closed workspace_status connection on activity');
+        handleConnectionLost('activity_check');
+        return;
+    }
+
+    if (targetGraphSource && targetGraphSource.readyState === 2) {
+        console.log('Detected closed target_graph connection on activity');
+        handleConnectionLost('activity_check');
+        return;
+    }
+
+    // If it's been a while since last successful request, do a quick health check
+    const timeSinceLastSuccess = Date.now() - lastSuccessfulRequest;
+    if (timeSinceLastSuccess > 3000) {
+        console.log('Performing quick health check on activity');
+        fetch('/api/module', { method: 'HEAD' })
+            .then(response => {
+                if (response.ok) {
+                    lastSuccessfulRequest = Date.now();
+                } else {
+                    handleConnectionLost('activity_check');
+                }
+            })
+            .catch(() => {
+                handleConnectionLost('activity_check');
+            });
+    }
+}
+
+// Set up activity listeners
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        checkConnectionOnActivity();
+    }
+});
+
+// Also check on mouse/keyboard activity (throttled)
+let activityCheckTimeout = null;
+function scheduleActivityCheck() {
+    if (!activityCheckTimeout) {
+        activityCheckTimeout = setTimeout(() => {
+            checkConnectionOnActivity();
+            activityCheckTimeout = null;
+        }, 1000);
+    }
+}
+
+document.addEventListener('mousemove', scheduleActivityCheck);
+document.addEventListener('keydown', scheduleActivityCheck);
+document.addEventListener('click', scheduleActivityCheck);
+
 // Subscribe to workspace status events
 function subscribeToWorkspaceStatus() {
     console.log('Creating EventSource for workspace_status...');
