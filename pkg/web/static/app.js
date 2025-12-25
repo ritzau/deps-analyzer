@@ -957,27 +957,30 @@ function checkConnectionOnActivity() {
     }
 }
 
-// Set up activity listeners
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-        checkConnectionOnActivity();
-    }
-});
-
-// Also check on mouse/keyboard activity (throttled)
+// Set up activity listeners - will be called after page loads
 let activityCheckTimeout = null;
-function scheduleActivityCheck() {
-    if (!activityCheckTimeout) {
-        activityCheckTimeout = setTimeout(() => {
+function setupActivityListeners() {
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
             checkConnectionOnActivity();
-            activityCheckTimeout = null;
-        }, 1000);
-    }
-}
+        }
+    });
 
-document.addEventListener('mousemove', scheduleActivityCheck);
-document.addEventListener('keydown', scheduleActivityCheck);
-document.addEventListener('click', scheduleActivityCheck);
+    function scheduleActivityCheck() {
+        if (!activityCheckTimeout) {
+            activityCheckTimeout = setTimeout(() => {
+                checkConnectionOnActivity();
+                activityCheckTimeout = null;
+            }, 1000);
+        }
+    }
+
+    document.addEventListener('mousemove', scheduleActivityCheck);
+    document.addEventListener('keydown', scheduleActivityCheck);
+    document.addEventListener('click', scheduleActivityCheck);
+
+    console.log('Activity-based connection monitoring enabled');
+}
 
 // Subscribe to workspace status events
 function subscribeToWorkspaceStatus() {
@@ -1241,6 +1244,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Reset state flags
     graphDataLoaded = false;
     analysisComplete = false;
+
+    // Set up activity-based connection monitoring
+    setupActivityListeners();
 
     // Subscribe to both event streams
     subscribeToWorkspaceStatus();
