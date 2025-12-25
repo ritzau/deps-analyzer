@@ -817,7 +817,11 @@ function handleConnectionLost(source) {
     console.log('Calling showConnectionLostModal()');
 
     // Show connection lost modal
-    showConnectionLostModal();
+    try {
+        showConnectionLostModal();
+    } catch (error) {
+        console.error('Error showing connection lost modal:', error);
+    }
 }
 
 // Show connection lost modal
