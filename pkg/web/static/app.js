@@ -513,10 +513,10 @@ function displayDependencyGraph(graphData) {
             {
                 selector: 'edge[type = "system_link"]',
                 style: {
-                    'line-color': '#d7ba7d',
-                    'target-arrow-color': '#d7ba7d',
+                    'line-color': '#4ec9b0',
+                    'target-arrow-color': '#4ec9b0',
                     'width': 2,
-                    'line-style': 'dotted'
+                    'line-style': 'dashed'
                 }
             },
             {
