@@ -924,9 +924,23 @@ function stopHealthCheck() {
 
 // Check connection on user activity
 function checkConnectionOnActivity() {
-    if (!analysisComplete || connectionLost) return;
+    console.log('Activity check triggered - analysisComplete:', analysisComplete, 'connectionLost:', connectionLost);
+
+    if (!analysisComplete) {
+        console.log('Skipping activity check - analysis not complete yet');
+        return;
+    }
+
+    if (connectionLost) {
+        console.log('Skipping activity check - connection already marked as lost');
+        return;
+    }
 
     // Check if SSE connections are closed
+    const wsState = workspaceStatusSource ? workspaceStatusSource.readyState : 'null';
+    const tgState = targetGraphSource ? targetGraphSource.readyState : 'null';
+    console.log('SSE states - workspace_status:', wsState, 'target_graph:', tgState);
+
     if (workspaceStatusSource && workspaceStatusSource.readyState === 2) {
         console.log('Detected closed workspace_status connection on activity');
         handleConnectionLost('activity_check');
@@ -941,17 +955,21 @@ function checkConnectionOnActivity() {
 
     // If it's been a while since last successful request, do a quick health check
     const timeSinceLastSuccess = Date.now() - lastSuccessfulRequest;
+    console.log('Time since last successful request:', timeSinceLastSuccess, 'ms');
+
     if (timeSinceLastSuccess > 3000) {
         console.log('Performing quick health check on activity');
         fetch('/api/module', { method: 'HEAD' })
             .then(response => {
+                console.log('Health check response:', response.ok, response.status);
                 if (response.ok) {
                     lastSuccessfulRequest = Date.now();
                 } else {
                     handleConnectionLost('activity_check');
                 }
             })
-            .catch(() => {
+            .catch((error) => {
+                console.log('Health check failed:', error);
                 handleConnectionLost('activity_check');
             });
     }
