@@ -2,30 +2,27 @@
 
 ## Prioritized backlog
 
-1. BUG: Project name shows "." when using current directory. Should detect and
-   use the actual directory name (or is there a module name?).
-
-2. Improve symbol dependency analysis and presentation. Better distinguish
+1. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-3. Add collapsible external dependencies in focused view. Give users control
+2. Add collapsible external dependencies in focused view. Give users control
    over detail level:
    - Level 1: Hide external dependencies completely (only show files within
      focused target)
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-4. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+3. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-5. Ensure consistent logging in backend and frontend.
+4. Ensure consistent logging in backend and frontend.
 
-6. Make sure docs are up to date.
+5. Make sure docs are up to date.
 
-7. External packages: May require support of .a files.
+6. External packages: May require support of .a files.
 
-8. Collect styles in the CSS (if possible with the graph library).
+7. Collect styles in the CSS (if possible with the graph library).
 
 ---
 
@@ -57,6 +54,22 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Project name display fix (DONE)
+
+Fixed the bug where the project name showed "." when using the current directory.
+
+**Implementation**:
+- Created `pkg/bazel/workspace.go` with `GetWorkspaceName()` function
+- Extracts module name from `bazel mod graph` output (for bzlmod workspaces)
+- Falls back to directory name if bazel command fails
+- Added `Name` field to `model.Module` struct
+- Updated UI to display module name in subtitle via `updateModuleName()` function
+- Module name replaces the static "Coverage Analysis" text
+
+**Example**:
+- Before: Subtitle showed "Coverage Analysis"
+- After: Subtitle shows "bazel_test_workspace" (from MODULE.bazel)
 
 ## ✅ Legend simplification (DONE)
 
