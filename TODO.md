@@ -2,21 +2,23 @@
 
 ## Prioritized backlog
 
-1. System libraries are not targets, yet dl shows up as a target.
-
-2. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+1. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-4. BUG: Project name shows "." when using current directory. Should detect and
+2. BUG: Project name shows "." when using current directory. Should detect and
    use the actual directory name.
 
-5. Ensure consistent logging in backend and frontend.
+3. Ensure consistent logging in backend and frontend.
 
-6. Make sure docs are up to date.
+4. Make sure docs are up to date.
 
-7. External packages: May require support of .a files.
+5. External packages: May require support of .a files.
 
-8. Collect styles in the CSS (if possible with the graph library).
+6. Collect styles in the CSS (if possible with the graph library).
+
+7. Simplify legend:
+   - Dependencies: 1 color, static are solid, dynamic are dashed, and data are
+     dotted. Compile time needs something else though. Anything else?
 
 ---
 
@@ -48,6 +50,18 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+## ✅ System library filtering (DONE)
+
+Fixed system libraries incorrectly appearing in the targets navigation sidebar.
+System libraries (like 'dl', 'pthread', 'rt', etc.) are specified via linkopts
+and are not actual Bazel targets, so they should not be listed alongside real
+targets in the navigation.
+
+Implementation:
+- Added filter in app.js:2204 to exclude nodes with type 'system_library'
+- System libraries still appear correctly in graph visualizations
+- Only affects the clickable targets list in the navigation sidebar
+
 
 ## ✅ Horizontal sidebar resize (DONE)
 
@@ -56,6 +70,7 @@ now adjust the sidebar width by dragging the resize handle between the sidebar
 and graph area.
 
 Features:
+
 - Visual resize handle with hover effects (orange highlight)
 - Smooth dragging with min/max width constraints (200px - 600px)
 - Prevents text selection during drag operation
@@ -63,9 +78,13 @@ Features:
 - Active state indicator during resize
 
 Implementation details:
-- Added resize handle HTML element in [index.html:67](pkg/web/static/index.html#L67)
-- Added resize handle styles in [styles.css:149-162](pkg/web/static/styles.css#L149-L162)
-- Implemented mouse event handlers in [app.js:2219-2274](pkg/web/static/app.js#L2219-L2274)
+
+- Added resize handle HTML element in
+  [index.html:67](pkg/web/static/index.html#L67)
+- Added resize handle styles in
+  [styles.css:149-162](pkg/web/static/styles.css#L149-L162)
+- Implemented mouse event handlers in
+  [app.js:2219-2274](pkg/web/static/app.js#L2219-L2274)
 
 ## ✅ Target label simplification (DONE)
 
