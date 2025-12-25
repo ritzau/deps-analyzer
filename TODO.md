@@ -2,11 +2,9 @@
 
 ## Prioritized backlog
 
-1. Simplify targets so that //foo:foo is presented as //foo
+1. System libraries are not targets, yet dl shows up as a target.
 
-2. System libraries are not targets, yet dl shows up as a target.
-
-3. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+2. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
 4. BUG: Project name shows "." when using current directory. Should detect and
@@ -50,6 +48,18 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Target label simplification (DONE)
+
+Implemented client-side label simplification to reduce visual clutter.
+The `simplifyLabel()` function removes redundant target names when they match
+the package name:
+- `//foo:foo` → `//foo`
+- `//bar/baz:baz` → `//bar/baz`
+- `//util:util` → `//util`
+
+Applied to all label displays: graph nodes, sidebar navigation, tree browser,
+and modal dialogs. Internal lookups and API calls still use full labels.
 
 ## ✅ Symbol name simplification (DONE)
 

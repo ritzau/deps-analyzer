@@ -54,6 +54,30 @@ function simplifySymbol(symbol) {
     return simplified.trim();
 }
 
+// Simplify Bazel target labels by removing redundant target names
+// e.g., //foo:foo -> //foo, //bar/baz:baz -> //bar/baz
+function simplifyLabel(label) {
+    if (!label) return label;
+
+    // Match pattern //package:target or //package/subpackage:target
+    const match = label.match(/^(\/\/[^:]+):([^:]+)$/);
+    if (!match) return label;
+
+    const packagePath = match[1];  // e.g., "//foo" or "//bar/baz"
+    const targetName = match[2];   // e.g., "foo" or "baz"
+
+    // Get the last component of the package path
+    const packageParts = packagePath.split('/');
+    const lastPackage = packageParts[packageParts.length - 1];
+
+    // If target name matches the last package component, simplify
+    if (targetName === lastPackage) {
+        return packagePath;
+    }
+
+    return label;
+}
+
 // Track last update time for watching indicator
 let lastUpdateTime = null;
 let watchingUpdateInterval = null;
@@ -185,7 +209,7 @@ function displayDependencyGraph(graphData) {
         ...graphData.nodes.map(node => {
             const nodeData = {
                 id: node.id,
-                label: node.label,
+                label: simplifyLabel(node.label),
                 type: node.type,
                 parent: node.parent // For compound nodes (grouping)
             };
@@ -1401,7 +1425,7 @@ function displayTargetModal(details) {
     const outgoingEl = document.getElementById('modalOutgoing');
     
     // Set title
-    labelEl.textContent = details.targetLabel;
+    labelEl.textContent = simplifyLabel(details.targetLabel);
     
     // Display files in target
     filesEl.innerHTML = '';
@@ -1561,9 +1585,9 @@ function createTreeNode(item, type) {
 
     if (type === 'binary') {
         const icon = item.kind === 'cc_binary' ? '🔧' : '📚';
-        label.textContent = `${icon} ${item.label}`;
+        label.textContent = `${icon} ${simplifyLabel(item.label)}`;
     } else if (type === 'target') {
-        label.textContent = `📦 ${item.label}`;
+        label.textContent = `📦 ${simplifyLabel(item.label)}`;
     } else if (type === 'file') {
         const fileName = item.path ? item.path.split('/').pop() : item.split('/').pop();
         const icon = item.path && item.path.endsWith('.h') ? '📄' : '📝';
@@ -2159,7 +2183,7 @@ function populateTreeBrowser(data) {
             const item = document.createElement('div');
             item.className = 'nav-item';
             const icon = binary.kind === 'cc_binary' ? '🔧' : '📚';
-            item.textContent = `${icon} ${binary.label}`;
+            item.textContent = `${icon} ${simplifyLabel(binary.label)}`;
             item.onclick = () => selectBinary(binary.label, item);
             binariesItems.appendChild(item);
         });
@@ -2172,7 +2196,7 @@ function populateTreeBrowser(data) {
         data.graph.nodes.forEach(node => {
             const item = document.createElement('div');
             item.className = 'nav-item';
-            item.textContent = `📦 ${node.label}`;
+            item.textContent = `📦 ${simplifyLabel(node.label)}`;
             item.onclick = () => selectTarget(node.label, item);
             targetsItems.appendChild(item);
         });
