@@ -2,25 +2,25 @@
 
 ## Prioritized backlog
 
-1. BUG: Symbol dependencies within the same target (e.g., math.cc → strings.cc in //util)
-   are not being displayed in the file-level graph. The compile dependency (math.cc → strings.h)
-   shows up, but not the symbol dependency from the actual function call.
+1. Simplify symbols by hiding generic arguments.
 
 2. Simplify targets so that //foo:foo is presented as //foo
 
-3. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+3. System libraries are not targets, yet dl shows up as a target.
+
+5. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-4. BUG: Project name shows "." when using current directory. Should detect and
+6. BUG: Project name shows "." when using current directory. Should detect and
    use the actual directory name.
 
-5. Ensure consistent logging in backend and frontend.
+7. Ensure consistent logging in backend and frontend.
 
-6. Make sure docs are up to date.
+8. Make sure docs are up to date.
 
-7. External packages: May require support of .a files.
+9. External packages: May require support of .a files.
 
-8. Collect styles in the CSS (if possible with the graph library).
+10. Collect styles in the CSS (if possible with the graph library).
 
 ---
 
@@ -50,6 +50,15 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Symbol dependency parsing fix (DONE)
+
+Fixed nm output parsing to correctly handle C++ symbol names containing spaces
+(e.g., template parameters). The parser was using `strings.Fields()` which split
+on all whitespace, breaking symbol names like `util::ToUpper(std::__1::basic_string<char,
+std::__1::char_traits<char>, ...>)`. Now joins all parts after the type field to
+preserve the full symbol name. This fixed the bug where intra-target symbol
+dependencies (e.g., math.cc → strings.cc within //util) were not being detected.
 
 ## ✅ Show visibility in graph (DONE)
 
@@ -131,6 +140,6 @@ and cache this info?
 Watch the project files for changes and update continuously. Automatically
 re-analyze when BUILD files or build artifacts change.
 
-**Status**: Implemented with fsnotify-based file watcher, smart debouncing
-(1.5s quiet, 10s max), intelligent change detection for incremental updates,
-and discrete UI status indicator. Run with `--watch` flag.
+**Status**: Implemented with fsnotify-based file watcher, smart debouncing (1.5s
+quiet, 10s max), intelligent change detection for incremental updates, and
+discrete UI status indicator. Run with `--watch` flag.

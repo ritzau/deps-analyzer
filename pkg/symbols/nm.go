@@ -38,6 +38,21 @@ type SymbolDependency struct {
 	TargetBinary string      `json:"targetBinary"` // Which binary/library defines it
 }
 
+// isHexAddress checks if a string looks like a hexadecimal address
+func isHexAddress(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	// Hex addresses are all hex digits (0-9, a-f, A-F)
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	// Also check it's a reasonable length (typically 8 or 16 hex digits)
+	return len(s) >= 8
+}
+
 // ParseNMOutput parses the output of nm command for a single object file
 // nm output format: [address] <type> <symbol>
 // Example: 0000000000000000 T _Z3foov
@@ -61,17 +76,26 @@ func ParseNMOutput(objectFile string, nmOutput string) []Symbol {
 		symbol.File = objectFile
 
 		// Format can be:
-		// "U symbol_name" (undefined)
-		// "address T symbol_name" (defined)
+		// "U symbol_name" (undefined, symbol name may contain spaces)
+		// "address T symbol_name" (defined, symbol name may contain spaces)
 		if len(parts) == 2 {
 			// Undefined symbol (no address)
 			symbol.Type = parts[0]
 			symbol.Name = parts[1]
 		} else if len(parts) >= 3 {
-			// Defined symbol (has address)
-			symbol.Address = parts[0]
-			symbol.Type = parts[1]
-			symbol.Name = parts[2]
+			// Check if first part looks like an address (hex number)
+			// If so, it's "address type name...", otherwise it's "type name..."
+			if isHexAddress(parts[0]) {
+				// Defined symbol with address
+				symbol.Address = parts[0]
+				symbol.Type = parts[1]
+				// Symbol name is everything after type (may contain spaces)
+				symbol.Name = strings.Join(parts[2:], " ")
+			} else {
+				// Undefined symbol without address, but name has spaces
+				symbol.Type = parts[0]
+				symbol.Name = strings.Join(parts[1:], " ")
+			}
 		}
 
 		symbols = append(symbols, symbol)
