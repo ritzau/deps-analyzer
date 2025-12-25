@@ -2196,17 +2196,19 @@ function populateTreeBrowser(data) {
         });
     }
 
-    // Populate targets list
+    // Populate targets list (exclude system libraries)
     const targetsItems = document.getElementById('targetsItems');
     if (targetsItems && data.graph && data.graph.nodes) {
         targetsItems.innerHTML = '';
-        data.graph.nodes.forEach(node => {
-            const item = document.createElement('div');
-            item.className = 'nav-item';
-            item.textContent = `📦 ${simplifyLabel(node.label)}`;
-            item.onclick = () => selectTarget(node.label, item);
-            targetsItems.appendChild(item);
-        });
+        data.graph.nodes
+            .filter(node => node.type !== 'system_library')  // Exclude system libraries
+            .forEach(node => {
+                const item = document.createElement('div');
+                item.className = 'nav-item';
+                item.textContent = `📦 ${simplifyLabel(node.label)}`;
+                item.onclick = () => selectTarget(node.label, item);
+                targetsItems.appendChild(item);
+            });
     }
 }
 
