@@ -75,6 +75,15 @@ func QueryWorkspace(workspacePath string) (*model.Module, error) {
 		Issues:       make([]model.DependencyIssue, 0),
 	}
 
+	// Get workspace/module name
+	workspaceName, err := GetWorkspaceName(workspacePath)
+	if err != nil {
+		// Log warning but don't fail - use default
+		fmt.Printf("Warning: could not determine workspace name: %v\n", err)
+		workspaceName = filepath.Base(workspacePath)
+	}
+	module.Name = workspaceName
+
 	// First pass: create all targets
 	for _, rule := range result.Rules {
 		target := parseTarget(rule)

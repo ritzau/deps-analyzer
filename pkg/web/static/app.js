@@ -140,6 +140,14 @@ function markAnalysisUpdate() {
     updateWatchingText();
 }
 
+// Update the subtitle with the module/workspace name
+function updateModuleName(name) {
+    const subtitle = document.querySelector('.subtitle');
+    if (subtitle && name) {
+        subtitle.textContent = name;
+    }
+}
+
 // Show notification
 function showNotification(message, duration = 3000) {
     const notif = document.createElement('div');
@@ -1342,6 +1350,9 @@ async function loadGraphData() {
                 graph: packageGraph,
                 module: moduleData
             };
+
+            // Update subtitle with module name
+            updateModuleName(moduleData.name);
 
             // Populate tree browser
             if (packageGraph && packageGraph.nodes) {
