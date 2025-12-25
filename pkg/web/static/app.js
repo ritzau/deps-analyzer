@@ -784,6 +784,11 @@ let targetGraphSource = null;
 let graphDataLoaded = false;
 let analysisComplete = false;
 
+// Connection monitoring
+let connectionLost = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+
 // Map workspace status state to loading step
 const statusToStep = {
     'initializing': 1,
@@ -795,6 +800,76 @@ const statusToStep = {
     'analyzing_binaries': 5,
     'ready': 6
 };
+
+// Handle connection lost
+function handleConnectionLost(source) {
+    if (connectionLost) {
+        return; // Already handling connection loss
+    }
+
+    connectionLost = true;
+    console.error('Connection lost to backend server (source:', source, ')');
+
+    // Show connection lost modal
+    showConnectionLostModal();
+}
+
+// Show connection lost modal
+function showConnectionLostModal() {
+    const modal = document.getElementById('connectionLostModal');
+    const messageEl = document.getElementById('connectionErrorMessage');
+
+    if (reconnectAttempts > 0) {
+        messageEl.textContent = `Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} failed.`;
+    } else {
+        messageEl.textContent = 'Please check that the backend server is running.';
+    }
+
+    modal.style.display = 'flex';
+
+    // Set up button handlers
+    document.getElementById('retryConnection').onclick = attemptReconnect;
+    document.getElementById('reloadPage').onclick = () => window.location.reload();
+}
+
+// Hide connection lost modal
+function hideConnectionLostModal() {
+    document.getElementById('connectionLostModal').style.display = 'none';
+}
+
+// Attempt to reconnect
+function attemptReconnect() {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        const messageEl = document.getElementById('connectionErrorMessage');
+        messageEl.textContent = 'Maximum reconnection attempts reached. Please reload the page.';
+        document.getElementById('retryConnection').disabled = true;
+        return;
+    }
+
+    reconnectAttempts++;
+    hideConnectionLostModal();
+
+    // Try to reconnect by testing the API
+    fetch('/api/module')
+        .then(response => {
+            if (response.ok) {
+                // Connection restored
+                console.log('Connection restored, reloading page...');
+                window.location.reload();
+            } else {
+                throw new Error('Server not ready');
+            }
+        })
+        .catch(error => {
+            console.error('Reconnection failed:', error);
+            // Wait a bit before showing modal again
+            setTimeout(() => {
+                if (connectionLost) {
+                    showConnectionLostModal();
+                }
+            }, 1000);
+        });
+}
 
 // Subscribe to workspace status events
 function subscribeToWorkspaceStatus() {
@@ -865,7 +940,11 @@ function subscribeToWorkspaceStatus() {
 
     workspaceStatusSource.onerror = function(error) {
         console.error('Workspace status SSE error:', error, 'readyState:', workspaceStatusSource.readyState);
-        workspaceStatusSource.close();
+
+        // EventSource readyState: 0 = CONNECTING, 1 = OPEN, 2 = CLOSED
+        if (workspaceStatusSource.readyState === 2) {
+            handleConnectionLost('workspace_status');
+        }
     };
 }
 
@@ -899,7 +978,11 @@ function subscribeToTargetGraph() {
 
     targetGraphSource.onerror = function(error) {
         console.error('Target graph SSE error:', error);
-        targetGraphSource.close();
+
+        // EventSource readyState: 0 = CONNECTING, 1 = OPEN, 2 = CLOSED
+        if (targetGraphSource.readyState === 2) {
+            handleConnectionLost('target_graph');
+        }
     };
 }
 

@@ -11,11 +11,11 @@
    navigation sidebar, graph fills remaining space with compact legend and
    proper canvas sizing)
 
-4. Detect when the backend goes down, and let the user know.
+4. ✅ File coverage (DONE - Git-based discovery identifies C++ files not included
+   in any target; displayed as red warning nodes in focused view; includes bug
+   fix for header parsing in srcs attribute)
 
-5. File coverage: It would be cool if we can identify files in packages that are
-   not included in the build and show them as such in the focused views (where
-   sorce files are shown.)
+5. Detect when the backend goes down, and let the user know.
 
 6. Live updates: Watch the project files for changes and update continously. At
    least make it possible to trigger restarting the analysis.
