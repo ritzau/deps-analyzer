@@ -123,6 +123,8 @@ func parseTarget(rule RuleXML) *model.Target {
 			for _, label := range list.Labels {
 				if strings.HasSuffix(label.Value, ".cc") {
 					target.Sources = append(target.Sources, label.Value)
+				} else if strings.HasSuffix(label.Value, ".h") || strings.HasSuffix(label.Value, ".hpp") {
+					target.Headers = append(target.Headers, label.Value)
 				}
 			}
 		case "hdrs":

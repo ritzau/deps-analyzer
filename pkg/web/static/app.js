@@ -219,6 +219,36 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
+                selector: 'node[type = "uncovered_source"]',
+                style: {
+                    'background-color': '#ff6b6b',
+                    'border-width': '3px',
+                    'border-color': '#ff4444',
+                    'border-style': 'double',
+                    'opacity': 0.7,
+                    'color': '#ffffff',
+                    'shape': 'ellipse',
+                    'width': '60px',
+                    'height': '60px',
+                    'font-size': '10px'
+                }
+            },
+            {
+                selector: 'node[type = "uncovered_header"]',
+                style: {
+                    'background-color': '#ff6b6b',
+                    'border-width': '3px',
+                    'border-color': '#ff4444',
+                    'border-style': 'double',
+                    'opacity': 0.7,
+                    'color': '#ffffff',
+                    'shape': 'ellipse',
+                    'width': '60px',
+                    'height': '60px',
+                    'font-size': '10px'
+                }
+            },
+            {
                 selector: 'node[type = "external"]',
                 style: {
                     'background-color': '#6a6a6a',
@@ -760,9 +790,10 @@ const statusToStep = {
     'bazel_querying': 1,
     'analyzing_deps': 2,
     'analyzing_symbols': 3,
-    'targets_ready': 3,
-    'analyzing_binaries': 4,
-    'ready': 4
+    'discovering_files': 4,
+    'targets_ready': 5,
+    'analyzing_binaries': 5,
+    'ready': 6
 };
 
 // Subscribe to workspace status events
@@ -799,12 +830,14 @@ function subscribeToWorkspaceStatus() {
                 updateLoadingProgress(1, 2);
             } else if (status.state === 'analyzing_symbols') {
                 updateLoadingProgress(2, 3);
-            } else if (status.state === 'targets_ready') {
+            } else if (status.state === 'discovering_files') {
                 updateLoadingProgress(3, 4);
+            } else if (status.state === 'targets_ready') {
+                updateLoadingProgress(4, 5);
             } else if (status.state === 'analyzing_binaries') {
-                updateLoadingProgress(3, 4); // Keep step 4 active during binary analysis
+                updateLoadingProgress(5, 5); // Keep step 5 active during binary analysis
             } else if (status.state === 'ready') {
-                updateLoadingProgress(4, null); // Mark step 4 complete
+                updateLoadingProgress(5, null); // Mark step 5 complete
                 analysisComplete = true;
 
                 hideLoadingOverlay();

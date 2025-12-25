@@ -56,6 +56,7 @@ type Server struct {
 	fileDeps       []*deps.FileDependency       // Compile-time file dependencies from .d files
 	symbolDeps     []symbols.SymbolDependency   // Link-time symbol dependencies from nm
 	fileToTarget   map[string]string            // Maps file paths to target labels
+	uncoveredFiles []string                     // Files not included in any target
 }
 
 // NewServer creates a new web server
@@ -106,6 +107,11 @@ func (s *Server) SetSymbolDependencies(symbolDeps []symbols.SymbolDependency) {
 // SetFileToTargetMap stores the mapping from file paths to target labels
 func (s *Server) SetFileToTargetMap(fileToTarget map[string]string) {
 	s.fileToTarget = fileToTarget
+}
+
+// SetUncoveredFiles stores files that are not included in any target
+func (s *Server) SetUncoveredFiles(files []string) {
+	s.uncoveredFiles = files
 }
 
 // PublishWorkspaceStatus publishes a workspace status event
@@ -341,7 +347,7 @@ func (s *Server) handleTargetFocused(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build focused graph data with file-level dependencies
-	graphData := buildTargetFocusedGraph(s.module, target, s.fileDeps, s.symbolDeps, s.fileToTarget)
+	graphData := buildTargetFocusedGraph(s.module, target, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 	json.NewEncoder(w).Encode(graphData)
 }
 
@@ -573,7 +579,8 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 // - Incoming dependencies (targets that depend on this one) with their files
 // - Outgoing dependencies (targets this one depends on) with their files
 // - All compile-time and link-time dependencies between files and targets
-func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string) *GraphData {
+// - Uncovered files in the focused target's package
+func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string, uncoveredFiles []string) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
@@ -862,6 +869,29 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 
 	// Add file nodes for focused target
 	addFileNodes(focusedTarget, "_focused")
+
+	// Add uncovered files in the focused target's package
+	focusedPackage := focusedTarget.Package
+	parentID := "parent-" + focusedTarget.Label
+	for _, uncoveredFile := range uncoveredFiles {
+		// Check if file is in the focused package
+		filePath := uncoveredFile
+		if strings.HasPrefix(filePath, strings.TrimPrefix(focusedPackage, "//")+"/") {
+			// Determine if source or header
+			nodeType := "uncovered_source"
+			if strings.HasSuffix(filePath, ".h") || strings.HasSuffix(filePath, ".hpp") {
+				nodeType = "uncovered_header"
+			}
+
+			// Create node with warning styling
+			graphData.Nodes = append(graphData.Nodes, GraphNode{
+				ID:     "uncovered:" + uncoveredFile,
+				Label:  getFileName(uncoveredFile),
+				Type:   nodeType,
+				Parent: parentID, // Group under focused target
+			})
+		}
+	}
 
 	// Add file nodes for incoming dependency targets
 	for targetLabel := range incomingDeps {

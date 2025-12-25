@@ -60,16 +60,16 @@ func startWebServerAsync(workspace string, port int) {
 	// Run streamlined analysis in background
 	go func() {
 		// Publish initial state
-		server.PublishWorkspaceStatus("initializing", "Starting analysis...", 0, 5)
+		server.PublishWorkspaceStatus("initializing", "Starting analysis...", 0, 6)
 
 		// Query the Module model with all dependency types
 		log.Println("[1/2] Querying Bazel module...")
-		server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 5)
+		server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 6)
 
 		module, err := bazel.QueryWorkspace(workspace)
 		if err != nil {
 			log.Printf("[1/2] Error: Could not query module: %v", err)
-			server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 5)
+			server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 6)
 			return
 		}
 
@@ -79,7 +79,7 @@ func startWebServerAsync(workspace string, port int) {
 
 		// Add compile dependencies from .d files
 		log.Println("[1/2] Adding compile dependencies from .d files...")
-		server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 5)
+		server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 6)
 
 		// Parse file-level dependencies and store them
 		fileDeps, err := deps.ParseAllDFiles(workspace)
@@ -100,7 +100,7 @@ func startWebServerAsync(workspace string, port int) {
 
 		// Add symbol dependencies from nm
 		log.Println("[1/2] Adding symbol dependencies from nm analysis...")
-		server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 5)
+		server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 6)
 
 		// Build file-to-target map for symbol analysis and file dependencies
 		fileToTarget := make(map[string]string)
@@ -119,6 +119,30 @@ func startWebServerAsync(workspace string, port int) {
 			}
 		}
 		server.SetFileToTargetMap(fileToTarget)
+
+		// Discover source files in workspace
+		log.Println("[1/2] Discovering source files in workspace...")
+		server.PublishWorkspaceStatus("discovering_files", "Discovering source files...", 4, 6)
+
+		discovered, err := bazel.DiscoverSourceFiles(workspace)
+		if err != nil {
+			log.Printf("[1/2] Warning: Failed to discover source files: %v", err)
+			discovered = make(map[string]bool)
+		}
+
+		// Find uncovered files
+		uncoveredFiles := bazel.FindUncoveredFiles(discovered, fileToTarget)
+		if len(uncoveredFiles) > 0 {
+			log.Printf("[1/2] Found %d uncovered files not included in any target:", len(uncoveredFiles))
+			for _, file := range uncoveredFiles {
+				log.Printf("[1/2]   - %s", file)
+			}
+		} else {
+			log.Println("[1/2] All source files are covered by targets")
+		}
+
+		// Store for web API
+		server.SetUncoveredFiles(uncoveredFiles)
 
 		// Build symbol graph and store file-level symbol dependencies
 		symbolDeps, err := symbols.BuildSymbolGraph(workspace, fileToTarget, targetToKind)
@@ -144,12 +168,12 @@ func startWebServerAsync(workspace string, port int) {
 
 		// Store module in server and publish targets ready
 		server.SetModule(module)
-		server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 4, 5)
+		server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 5, 6)
 		server.PublishTargetGraph("complete", true)
 
 		// Derive binary-level information from the Module (fast, no additional queries)
 		log.Println("[2/2] Deriving binary information from module...")
-		server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 5, 5)
+		server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 6, 6)
 
 		binaryInfos := binaries.DeriveBinaryInfoFromModule(module)
 		log.Printf("[2/2] Found %d binaries", len(binaryInfos))
@@ -178,7 +202,7 @@ func startWebServerAsync(workspace string, port int) {
 		log.Println("View results at", url)
 
 		// Publish final ready state
-		server.PublishWorkspaceStatus("ready", "Analysis complete", 5, 5)
+		server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
 	}()
 
 	// Block forever (server runs in goroutine)

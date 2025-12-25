@@ -4,19 +4,35 @@
 
 1. ✅ Show visibility in graph (DONE - dashed gold border for public targets)
 
-2. ✅ Remove the collapse package toggle (DONE - removed non-functional toggle and 75 lines of unused code)
+2. ✅ Remove the collapse package toggle (DONE - removed non-functional toggle
+   and 75 lines of unused code)
 
-3. ✅ Front end layout (DONE - Full-screen responsive layout: header row, navigation sidebar, graph fills remaining space with compact legend and proper canvas sizing)
+3. ✅ Front end layout (DONE - Full-screen responsive layout: header row,
+   navigation sidebar, graph fills remaining space with compact legend and
+   proper canvas sizing)
 
-4. File coverage: It would be cool if we can identify files in packages that are
+4. Detect when the backend goes down, and let the user know.
+
+5. File coverage: It would be cool if we can identify files in packages that are
    not included in the build and show them as such in the focused views (where
    sorce files are shown.)
 
-5. Live updates: Watch the project files for changes and update continously. At
+6. Live updates: Watch the project files for changes and update continously. At
    least make it possible to trigger restarting the analysis.
 
-6. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+7. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it
+
+8. Collect styles in the CSS, or is that not possible with the graph?
+
+9. Ensure consistent logging in backend and frontent.
+
+10. Make sure docs are up to date.
+
+11. External packages: May require support of .a files
+
+12. BUG: . as project name. If we use the current dir, at least check to see
+    what its name is.
 
 ---
 
@@ -42,16 +58,6 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ## CI
 
 ## Test using a (headless?) browser
-
-## Real decent logging
-
-## External packages
-
-- May require support of .a files
-
-## BUG: . as project name
-
-- If we use the current dir, at least check to see what its name is
 
 ---
 
