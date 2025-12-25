@@ -15,7 +15,10 @@
    in any target; displayed as red warning nodes in focused view; includes bug
    fix for header parsing in srcs attribute)
 
-5. Detect when the backend goes down, and let the user know.
+5. ✅ Backend connection monitoring (DONE - Modal notification on connection loss
+   with retry/reload options; hybrid detection using SSE error handlers,
+   monitoredFetch wrapper for immediate failures, and periodic health checks
+   every 5s when idle; prevents silent failures when backend goes down)
 
 6. Live updates: Watch the project files for changes and update continously. At
    least make it possible to trigger restarting the analysis.
