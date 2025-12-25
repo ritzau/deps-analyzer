@@ -2,63 +2,76 @@
 
 ## Prioritized backlog
 
-1. Simplify symbols by hiding generic arguments.
+1. Simplify targets so that //foo:foo is presented as //foo
 
-2. Simplify targets so that //foo:foo is presented as //foo
+2. System libraries are not targets, yet dl shows up as a target.
 
-3. System libraries are not targets, yet dl shows up as a target.
-
-5. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+3. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-6. BUG: Project name shows "." when using current directory. Should detect and
+4. BUG: Project name shows "." when using current directory. Should detect and
    use the actual directory name.
 
-7. Ensure consistent logging in backend and frontend.
+5. Ensure consistent logging in backend and frontend.
 
-8. Make sure docs are up to date.
+6. Make sure docs are up to date.
 
-9. External packages: May require support of .a files.
+7. External packages: May require support of .a files.
 
-10. Collect styles in the CSS (if possible with the graph library).
+8. Collect styles in the CSS (if possible with the graph library).
 
 ---
 
 ## Attic below
 
-## Test coverage
+### Come up with a way to collapse edges between targets
+
+### Test coverage
 
 This is a weird one, but the term coverage led me to think about adding quality
 metrics. Test coverage is just one example. Maybe an idea?
 
-## Integrated browser
+### Integrated browser
 
 Maybe skip the actual browser dependency and use something like electron?
 
-## Investigate compiler options to also track header:header deps
+### Investigate compiler options to also track header:header deps
 
 Better track compile time deps to detect cycles.
 
-## Caching the result
+### Caching the result
 
 Store a cache so that we don't have to reanalyze unless there is a change.
 
-## CI
+### CI
 
-## Test using a (headless?) browser
+### Test using a (headless?) browser
 
 ---
 
 # Archive
 
+## ✅ Symbol name simplification (DONE)
+
+Added client-side symbol simplification to improve readability in tooltips.
+The `simplifySymbol()` function reduces C++ template verbosity by:
+- Replacing `std::__1::` with `std::` (implementation detail)
+- Converting `std::basic_string<char, std::char_traits<char>, std::allocator<char>>` to `std::string`
+- Removing verbose allocator and char_traits template parameters
+- Cleaning up spacing
+
+Example: `util::ToUpper(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&)`
+becomes: `util::ToUpper(std::string const&)`
+
 ## ✅ Symbol dependency parsing fix (DONE)
 
 Fixed nm output parsing to correctly handle C++ symbol names containing spaces
 (e.g., template parameters). The parser was using `strings.Fields()` which split
-on all whitespace, breaking symbol names like `util::ToUpper(std::__1::basic_string<char,
-std::__1::char_traits<char>, ...>)`. Now joins all parts after the type field to
-preserve the full symbol name. This fixed the bug where intra-target symbol
-dependencies (e.g., math.cc → strings.cc within //util) were not being detected.
+on all whitespace, breaking symbol names like
+`util::ToUpper(std::__1::basic_string<char, std::__1::char_traits<char>, ...>)`.
+Now joins all parts after the type field to preserve the full symbol name. This
+fixed the bug where intra-target symbol dependencies (e.g., math.cc → strings.cc
+within //util) were not being detected.
 
 ## ✅ Show visibility in graph (DONE)
 

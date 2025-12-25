@@ -28,6 +28,32 @@ function hideLoadingOverlay() {
     }
 }
 
+// Simplify C++ symbol names by reducing template verbosity
+function simplifySymbol(symbol) {
+    if (!symbol) return symbol;
+
+    // Replace std::__1:: with std:: for brevity
+    let simplified = symbol.replace(/std::__1::/g, 'std::');
+
+    // Simplify common std templates
+    simplified = simplified.replace(/std::basic_string<char,\s*std::char_traits<char>,\s*std::allocator<char>\s*>/g, 'std::string');
+    simplified = simplified.replace(/std::basic_string<char,\s*std::char_traits<char>>/g, 'std::string');
+
+    // Simplify allocator types in templates
+    simplified = simplified.replace(/,\s*std::allocator<[^>]+>\s*>/g, '>');
+
+    // Simplify char_traits in templates
+    simplified = simplified.replace(/,\s*std::char_traits<char>/g, '');
+
+    // Remove extra spaces after commas in templates
+    simplified = simplified.replace(/,\s+/g, ', ');
+
+    // Collapse multiple spaces
+    simplified = simplified.replace(/\s+/g, ' ');
+
+    return simplified.trim();
+}
+
 // Track last update time for watching indicator
 let lastUpdateTime = null;
 let watchingUpdateInterval = null;
@@ -610,7 +636,8 @@ function displayDependencyGraph(graphData) {
 
             // Add symbols if available
             if (symbols && symbols.length > 0) {
-                const symbolList = symbols.slice(0, 10).join(', ');
+                const simplifiedSymbols = symbols.map(s => simplifySymbol(s));
+                const symbolList = simplifiedSymbols.slice(0, 10).join(', ');
                 const more = symbols.length > 10 ? ` ... +${symbols.length - 10} more` : '';
                 tooltipText += `\n\nSymbols (${symbols.length}): ${symbolList}${more}`;
             }
@@ -619,7 +646,8 @@ function displayDependencyGraph(graphData) {
 
             // Add symbols if available
             if (symbols && symbols.length > 0) {
-                const symbolList = symbols.slice(0, 10).join(', ');
+                const simplifiedSymbols = symbols.map(s => simplifySymbol(s));
+                const symbolList = simplifiedSymbols.slice(0, 10).join(', ');
                 const more = symbols.length > 10 ? ` ... +${symbols.length - 10} more` : '';
                 tooltipText += `\n\nSymbols (${symbols.length}): ${symbolList}${more}`;
             }
@@ -637,7 +665,8 @@ function displayDependencyGraph(graphData) {
 
             // Add symbol list for symbol edges
             if (symbols && symbols.length > 0) {
-                const symbolList = symbols.slice(0, 15).join('\n  ');
+                const simplifiedSymbols = symbols.map(s => simplifySymbol(s));
+                const symbolList = simplifiedSymbols.slice(0, 15).join('\n  ');
                 const more = symbols.length > 15 ? `\n  ... and ${symbols.length - 15} more` : '';
                 tooltipText += `\n\nSymbols used (${symbols.length}):\n  ${symbolList}${more}`;
             }
