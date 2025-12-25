@@ -788,6 +788,8 @@ let analysisComplete = false;
 let connectionLost = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 3;
+let lastSuccessfulRequest = Date.now();
+let healthCheckInterval = null;
 
 // Map workspace status state to loading step
 const statusToStep = {
@@ -871,6 +873,55 @@ function attemptReconnect() {
         });
 }
 
+// Wrapper for fetch that detects connection failures
+function monitoredFetch(url, options) {
+    return fetch(url, options)
+        .then(response => {
+            if (response.ok) {
+                lastSuccessfulRequest = Date.now();
+            }
+            return response;
+        })
+        .catch(error => {
+            console.error('Fetch failed:', url, error);
+            // Network error - backend likely down
+            handleConnectionLost('fetch');
+            throw error;
+        });
+}
+
+// Start periodic health check
+function startHealthCheck() {
+    // Check every 5 seconds if we haven't had a successful request in 10 seconds
+    healthCheckInterval = setInterval(() => {
+        const timeSinceLastSuccess = Date.now() - lastSuccessfulRequest;
+
+        // Only check if analysis is complete and it's been a while
+        if (analysisComplete && timeSinceLastSuccess > 10000 && !connectionLost) {
+            console.log('Performing health check...');
+            fetch('/api/module', { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        lastSuccessfulRequest = Date.now();
+                    } else {
+                        handleConnectionLost('health_check');
+                    }
+                })
+                .catch(() => {
+                    handleConnectionLost('health_check');
+                });
+        }
+    }, 5000);
+}
+
+// Stop health check
+function stopHealthCheck() {
+    if (healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+        healthCheckInterval = null;
+    }
+}
+
 // Subscribe to workspace status events
 function subscribeToWorkspaceStatus() {
     console.log('Creating EventSource for workspace_status...');
@@ -932,6 +983,9 @@ function subscribeToWorkspaceStatus() {
                     targetGraphSource.close();
                     targetGraphSource = null;
                 }
+
+                // Start health check to detect backend failures
+                startHealthCheck();
             }
         } catch (e) {
             console.error('Error processing workspace status:', e, 'Raw data:', event.data);
@@ -1037,7 +1091,7 @@ async function loadGraphData() {
     console.log('loadGraphData() called');
     try {
         // Fetch module graph
-        const graphResponse = await fetch('/api/module/graph');
+        const graphResponse = await monitoredFetch('/api/module/graph');
         console.log('Module graph response status:', graphResponse.status);
         if (graphResponse.ok) {
             packageGraph = await graphResponse.json();
@@ -1055,7 +1109,7 @@ async function loadGraphData() {
         }
 
         // Fetch binary data
-        const binariesResponse = await fetch('/api/binaries');
+        const binariesResponse = await monitoredFetch('/api/binaries');
         if (binariesResponse.ok) {
             binaryData = await binariesResponse.json();
             console.log('Loaded binary data:', binaryData);
@@ -1069,7 +1123,7 @@ async function loadGraphData() {
         }
 
         // Fetch module data for tree browser
-        const moduleResponse = await fetch('/api/module');
+        const moduleResponse = await monitoredFetch('/api/module');
         if (moduleResponse.ok) {
             const moduleData = await moduleResponse.json();
             analysisData = {
@@ -1141,7 +1195,7 @@ async function showTargetDetails(targetLabel) {
     try {
         // Encode the target label for URL
         const encodedLabel = encodeURIComponent(targetLabel);
-        const response = await fetch(`/api/target/${encodedLabel}`);
+        const response = await monitoredFetch(`/api/target/${encodedLabel}`);
         
         if (!response.ok) {
             console.error('Failed to fetch target details');
@@ -1404,7 +1458,7 @@ async function toggleExpansion(node, item, type) {
                 // Fetch target details
                 try {
                     const encodedLabel = encodeURIComponent(item.label);
-                    const response = await fetch(`/api/target/${encodedLabel}`);
+                    const response = await monitoredFetch(`/api/target/${encodedLabel}`);
                     if (response.ok) {
                         const details = await response.json();
                         if (details.files && details.files.length > 0) {
@@ -1485,7 +1539,7 @@ async function showBinaryGraphFocused(binaryLabel) {
 
         // For now, show the full binary graph (in the future we could filter by focused binary)
         if (!binaryGraph) {
-            const response = await fetch('/api/binaries/graph');
+            const response = await monitoredFetch('/api/binaries/graph');
             if (!response.ok) {
                 console.error('Failed to fetch binary graph:', response.status);
                 return;
@@ -1581,7 +1635,7 @@ async function showFocusedTargetView(targetLabel) {
         const url = `/api/target/${encodedLabel}/focused`;
         console.log('Fetching from URL:', url);
 
-        const response = await fetch(url);
+        const response = await monitoredFetch(url);
         if (!response.ok) {
             console.error('Failed to fetch focused graph:', response.status, response.statusText);
             return;
@@ -1612,7 +1666,7 @@ async function showFileGraphForTarget(targetLabel) {
         const url = `/api/target/${encodedLabel}/graph`;
         console.log('Fetching from URL:', url);
 
-        const response = await fetch(url);
+        const response = await monitoredFetch(url);
 
         if (!response.ok) {
             console.error('Failed to fetch target graph:', response.status, response.statusText);
@@ -1695,7 +1749,7 @@ async function showBinaryFocusedGraph(binaryLabel) {
 
         // Fetch full binary graph if not already loaded
         if (!binaryGraph) {
-            const response = await fetch('/api/binaries/graph');
+            const response = await monitoredFetch('/api/binaries/graph');
             if (!response.ok) {
                 console.error('Failed to fetch binary graph');
                 return;
