@@ -805,33 +805,21 @@ const statusToStep = {
 
 // Handle connection lost
 function handleConnectionLost(source) {
-    console.log('handleConnectionLost called from:', source, 'connectionLost:', connectionLost);
-
     if (connectionLost) {
-        console.log('Already handling connection loss, ignoring');
         return; // Already handling connection loss
     }
 
     connectionLost = true;
     console.error('Connection lost to backend server (source:', source, ')');
-    console.log('Calling showConnectionLostModal()');
 
     // Show connection lost modal
-    try {
-        showConnectionLostModal();
-    } catch (error) {
-        console.error('Error showing connection lost modal:', error);
-    }
+    showConnectionLostModal();
 }
 
 // Show connection lost modal
 function showConnectionLostModal() {
-    console.log('showConnectionLostModal called');
     const modal = document.getElementById('connectionLostModal');
     const messageEl = document.getElementById('connectionErrorMessage');
-
-    console.log('Modal element:', modal);
-    console.log('Message element:', messageEl);
 
     if (reconnectAttempts > 0) {
         messageEl.textContent = `Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} failed.`;
@@ -839,14 +827,11 @@ function showConnectionLostModal() {
         messageEl.textContent = 'Please check that the backend server is running.';
     }
 
-    console.log('Setting modal display to flex');
     modal.style.display = 'flex';
-    console.log('Modal display style:', modal.style.display);
 
     // Set up button handlers
     document.getElementById('retryConnection').onclick = attemptReconnect;
     document.getElementById('reloadPage').onclick = () => window.location.reload();
-    console.log('Modal should now be visible');
 }
 
 // Hide connection lost modal
@@ -939,52 +924,33 @@ function stopHealthCheck() {
 
 // Check connection on user activity
 function checkConnectionOnActivity() {
-    console.log('Activity check triggered - analysisComplete:', analysisComplete, 'connectionLost:', connectionLost);
-
-    if (!analysisComplete) {
-        console.log('Skipping activity check - analysis not complete yet');
-        return;
-    }
-
-    if (connectionLost) {
-        console.log('Skipping activity check - connection already marked as lost');
+    if (!analysisComplete || connectionLost) {
         return;
     }
 
     // Check if SSE connections are closed
-    const wsState = workspaceStatusSource ? workspaceStatusSource.readyState : 'null';
-    const tgState = targetGraphSource ? targetGraphSource.readyState : 'null';
-    console.log('SSE states - workspace_status:', wsState, 'target_graph:', tgState);
-
     if (workspaceStatusSource && workspaceStatusSource.readyState === 2) {
-        console.log('Detected closed workspace_status connection on activity');
         handleConnectionLost('activity_check');
         return;
     }
 
     if (targetGraphSource && targetGraphSource.readyState === 2) {
-        console.log('Detected closed target_graph connection on activity');
         handleConnectionLost('activity_check');
         return;
     }
 
     // If it's been a while since last successful request, do a quick health check
     const timeSinceLastSuccess = Date.now() - lastSuccessfulRequest;
-    console.log('Time since last successful request:', timeSinceLastSuccess, 'ms');
-
     if (timeSinceLastSuccess > 3000) {
-        console.log('Performing quick health check on activity');
         fetch('/api/module', { method: 'HEAD' })
             .then(response => {
-                console.log('Health check response:', response.ok, response.status);
                 if (response.ok) {
                     lastSuccessfulRequest = Date.now();
                 } else {
                     handleConnectionLost('activity_check');
                 }
             })
-            .catch((error) => {
-                console.log('Health check failed:', error);
+            .catch(() => {
                 handleConnectionLost('activity_check');
             });
     }
