@@ -40,10 +40,12 @@ type Publisher interface {
 
 // WorkspaceStatus represents workspace analysis state
 type WorkspaceStatus struct {
-	State   string `json:"state"`   // initializing, bazel_querying, binaries_ready, targets_ready, ready
-	Message string `json:"message"` // Human-readable status message
-	Step    int    `json:"step"`    // Current step number (1-based)
-	Total   int    `json:"total"`   // Total number of steps
+	State    string `json:"state"`    // initializing, bazel_querying, binaries_ready, targets_ready, ready, watching
+	Message  string `json:"message"`  // Human-readable status message
+	Step     int    `json:"step"`     // Current step number (1-based)
+	Total    int    `json:"total"`    // Total number of steps
+	Watching bool   `json:"watching"` // File watching is active
+	Reason   string `json:"reason"`   // Reason for analysis (e.g., "initial analysis", "BUILD changed")
 }
 
 // TargetGraphData represents partial or complete graph data

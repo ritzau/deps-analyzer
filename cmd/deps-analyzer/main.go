@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -9,10 +10,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ritzau/deps-analyzer/pkg/bazel"
-	"github.com/ritzau/deps-analyzer/pkg/binaries"
-	"github.com/ritzau/deps-analyzer/pkg/deps"
-	"github.com/ritzau/deps-analyzer/pkg/symbols"
+	"github.com/ritzau/deps-analyzer/pkg/analysis"
+	"github.com/ritzau/deps-analyzer/pkg/watcher"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 )
 
@@ -21,11 +20,12 @@ func main() {
 	workspace := flag.String("workspace", ".", "Path to the Bazel workspace root")
 	webMode := flag.Bool("web", false, "Start web server instead of printing to console")
 	port := flag.Int("port", 8080, "Port for web server (only used with --web)")
+	watch := flag.Bool("watch", false, "Watch for file changes and re-analyze automatically")
 	flag.Parse()
 
 	if *webMode {
 		// Start web server and run streamlined analysis
-		startWebServerAsync(*workspace, *port)
+		startWebServerAsync(*workspace, *port, *watch)
 	} else {
 		// TODO: Add CLI mode back with Module-based output
 		// - Show targets, dependencies by type, packages
@@ -36,7 +36,7 @@ func main() {
 	}
 }
 
-func startWebServerAsync(workspace string, port int) {
+func startWebServerAsync(workspace string, port int, watch bool) {
 	// Create server
 	server := web.NewServer()
 
@@ -57,156 +57,107 @@ func startWebServerAsync(workspace string, port int) {
 	fmt.Println("Opening browser...")
 	openBrowser(url)
 
-	// Run streamlined analysis in background
+	// Create analysis runner
+	runner := analysis.NewAnalysisRunner(workspace, server)
+	ctx := context.Background()
+
+	// Run initial analysis in background
 	go func() {
-		// Publish initial state
-		server.PublishWorkspaceStatus("initializing", "Starting analysis...", 0, 6)
-
-		// Query the Module model with all dependency types
-		log.Println("[1/2] Querying Bazel module...")
-		server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 6)
-
-		module, err := bazel.QueryWorkspace(workspace)
+		err := runner.Run(ctx, analysis.AnalysisOptions{
+			FullAnalysis: true,
+			Reason:       "initial analysis",
+		})
 		if err != nil {
-			log.Printf("[1/2] Error: Could not query module: %v", err)
-			server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 6)
+			log.Printf("Initial analysis failed: %v", err)
 			return
 		}
 
-		log.Printf("[1/2] Found %d targets, %d dependencies", len(module.Targets), len(module.Dependencies))
-		server.SetModule(module)
-		server.PublishTargetGraph("partial_data", false)
-
-		// Add compile dependencies from .d files
-		log.Println("[1/2] Adding compile dependencies from .d files...")
-		server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 6)
-
-		// Parse file-level dependencies and store them
-		fileDeps, err := deps.ParseAllDFiles(workspace)
-		if err != nil {
-			log.Printf("[1/2] Warning: Could not parse .d files: %v", err)
-		} else {
-			log.Printf("[1/2] Parsed %d file dependencies from .d files", len(fileDeps))
-			server.SetFileDependencies(fileDeps)
+		// Start file watcher if requested
+		if watch {
+			startFileWatcher(ctx, workspace, runner, server)
 		}
-
-		// Add target-level compile dependencies
-		if err := bazel.AddCompileDependencies(module, workspace); err != nil {
-			log.Printf("[1/2] Warning: Could not add compile dependencies: %v", err)
-		} else {
-			log.Printf("[1/2] Added compile dependencies, now have %d total dependencies", len(module.Dependencies))
-		}
-		server.PublishTargetGraph("partial_data", false)
-
-		// Add symbol dependencies from nm
-		log.Println("[1/2] Adding symbol dependencies from nm analysis...")
-		server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 6)
-
-		// Build file-to-target map for symbol analysis and file dependencies
-		fileToTarget := make(map[string]string)
-		targetToKind := make(map[string]string)
-		for _, target := range module.Targets {
-			targetToKind[target.Label] = string(target.Kind)
-			// Map source files
-			for _, src := range target.Sources {
-				filePath := bazel.NormalizeSourcePath(src)
-				fileToTarget[filePath] = target.Label
-			}
-			// Map header files
-			for _, hdr := range target.Headers {
-				filePath := bazel.NormalizeSourcePath(hdr)
-				fileToTarget[filePath] = target.Label
-			}
-		}
-		server.SetFileToTargetMap(fileToTarget)
-
-		// Discover source files in workspace
-		log.Println("[1/2] Discovering source files in workspace...")
-		server.PublishWorkspaceStatus("discovering_files", "Discovering source files...", 4, 6)
-
-		discovered, err := bazel.DiscoverSourceFiles(workspace)
-		if err != nil {
-			log.Printf("[1/2] Warning: Failed to discover source files: %v", err)
-			discovered = make(map[string]bool)
-		}
-
-		// Find uncovered files
-		uncoveredFiles := bazel.FindUncoveredFiles(discovered, fileToTarget)
-		if len(uncoveredFiles) > 0 {
-			log.Printf("[1/2] Found %d uncovered files not included in any target:", len(uncoveredFiles))
-			for _, file := range uncoveredFiles {
-				log.Printf("[1/2]   - %s", file)
-			}
-		} else {
-			log.Println("[1/2] All source files are covered by targets")
-		}
-
-		// Store for web API
-		server.SetUncoveredFiles(uncoveredFiles)
-
-		// Build symbol graph and store file-level symbol dependencies
-		symbolDeps, err := symbols.BuildSymbolGraph(workspace, fileToTarget, targetToKind)
-		if err != nil {
-			log.Printf("[1/2] Warning: Could not build symbol graph: %v", err)
-		} else {
-			log.Printf("[1/2] Found %d symbol dependencies between files", len(symbolDeps))
-			server.SetSymbolDependencies(symbolDeps)
-		}
-
-		// Add target-level symbol dependencies
-		if err := bazel.AddSymbolDependencies(module, workspace); err != nil {
-			log.Printf("[1/2] Warning: Could not add symbol dependencies: %v", err)
-		} else {
-			log.Printf("[1/2] Module has %d total dependencies", len(module.Dependencies))
-			if len(module.Issues) > 0 {
-				log.Printf("[1/2] ⚠️  Found %d dependency issues", len(module.Issues))
-				for _, issue := range module.Issues {
-					log.Printf("[1/2]   %s: %s -> %s (%v)", issue.Severity, issue.From, issue.To, issue.Types)
-				}
-			}
-		}
-
-		// Store module in server and publish targets ready
-		server.SetModule(module)
-		server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 5, 6)
-		server.PublishTargetGraph("complete", true)
-
-		// Derive binary-level information from the Module (fast, no additional queries)
-		log.Println("[2/2] Deriving binary information from module...")
-		server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 6, 6)
-
-		binaryInfos := binaries.DeriveBinaryInfoFromModule(module)
-		log.Printf("[2/2] Found %d binaries", len(binaryInfos))
-		for _, bin := range binaryInfos {
-			log.Printf("[2/2]   %s (%s)", bin.Label, bin.Kind)
-			if len(bin.DynamicDeps) > 0 {
-				log.Printf("[2/2]     Dynamic deps: %v", bin.DynamicDeps)
-			}
-			if len(bin.DataDeps) > 0 {
-				log.Printf("[2/2]     Data deps: %v", bin.DataDeps)
-			}
-			if len(bin.SystemLibraries) > 0 {
-				log.Printf("[2/2]     System libs: %v", bin.SystemLibraries)
-			}
-			if len(bin.OverlappingDeps) > 0 {
-				log.Printf("[2/2]     ⚠️  Overlapping deps (potential duplicate symbols):")
-				for sharedLib, targets := range bin.OverlappingDeps {
-					log.Printf("[2/2]       %s shares: %v", sharedLib, targets)
-				}
-			}
-		}
-		server.SetBinaries(binaryInfos)
-
-		log.Printf("[2/2] Analysis complete! Module has %d targets, %d dependencies (%d packages)",
-			len(module.Targets), len(module.Dependencies), module.GetPackageCount())
-		log.Println("View results at", url)
-
-		// Publish final ready state
-		server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
 	}()
 
 	// Block forever (server runs in goroutine)
 	select {}
+}
+
+func startFileWatcher(ctx context.Context, workspace string, runner *analysis.AnalysisRunner, server *web.Server) {
+	log.Println("[WATCHER] Starting file watcher...")
+
+	// Notify UI that watching is active
+	server.SetWatching(true)
+	server.PublishWorkspaceStatus("watching", "Watching for changes...", 6, 6)
+
+	// Create watcher
+	fw, err := watcher.NewFileWatcher(workspace)
+	if err != nil {
+		log.Printf("[WATCHER] Failed to create file watcher: %v", err)
+		return
+	}
+
+	// Start watcher
+	if err := fw.Start(ctx); err != nil {
+		log.Printf("[WATCHER] Failed to start file watcher: %v", err)
+		return
+	}
+
+	// Create debouncer
+	debouncer := watcher.NewDebouncer(
+		fw.Events(),
+		1500*time.Millisecond, // quietPeriod
+		10*time.Second,         // maxWait
+	)
+	debouncer.Start(ctx)
+
+	log.Println("[WATCHER] File watcher started - monitoring for changes")
+
+	// Process debounced events
+	go func() {
+		for event := range debouncer.Output() {
+			log.Printf("[WATCHER] File changes detected: %d files changed", len(event.Paths))
+
+			// Analyze what changed
+			changeAnalysis := watcher.AnalyzeChanges(event, workspace)
+
+			// Determine reason for re-analysis
+			reason := formatReason(event)
+			log.Printf("[WATCHER] Triggering re-analysis: %s", reason)
+
+			// Build analysis options
+			opts := analysis.AnalysisOptions{
+				FullAnalysis:    changeAnalysis.NeedFullAnalysis,
+				SkipBazelQuery:  !changeAnalysis.NeedFullAnalysis,
+				SkipCompileDeps: !changeAnalysis.NeedCompileDeps,
+				SkipSymbolDeps:  !changeAnalysis.NeedSymbolDeps,
+				SkipBinaryDeriv: !changeAnalysis.NeedBinaryDeriv,
+				Reason:          reason,
+			}
+
+			// Run re-analysis
+			err := runner.Run(ctx, opts)
+			if err != nil {
+				log.Printf("[WATCHER] Re-analysis failed: %v", err)
+				// Don't crash - just log and continue watching
+			}
+
+			// Restore watching state
+			server.PublishWorkspaceStatus("watching", "Watching for changes...", 6, 6)
+		}
+	}()
+}
+
+func formatReason(event watcher.ChangeEvent) string {
+	switch event.Type {
+	case watcher.ChangeTypeBuildFile:
+		return "BUILD files changed"
+	case watcher.ChangeTypeDFile:
+		return "Compile dependencies changed"
+	case watcher.ChangeTypeOFile:
+		return "Symbol dependencies changed"
+	default:
+		return "Files changed"
+	}
 }
 
 func openBrowser(url string) {

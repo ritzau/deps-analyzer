@@ -28,6 +28,81 @@ function hideLoadingOverlay() {
     }
 }
 
+// Track last update time for watching indicator
+let lastUpdateTime = null;
+let watchingUpdateInterval = null;
+
+// Update watching indicator
+function updateWatchingIndicator(watching) {
+    const statusBar = document.querySelector('.status-bar');
+    let indicator = document.getElementById('watchingIndicator');
+
+    if (watching && !indicator) {
+        lastUpdateTime = Date.now();
+        indicator = document.createElement('div');
+        indicator.id = 'watchingIndicator';
+        indicator.className = 'watching-badge';
+        statusBar.appendChild(indicator);
+
+        // Update immediately
+        updateWatchingText();
+
+        // Start interval to update "time ago" text every 10 seconds
+        if (watchingUpdateInterval) {
+            clearInterval(watchingUpdateInterval);
+        }
+        watchingUpdateInterval = setInterval(updateWatchingText, 10000);
+    } else if (!watching && indicator) {
+        indicator.remove();
+        if (watchingUpdateInterval) {
+            clearInterval(watchingUpdateInterval);
+            watchingUpdateInterval = null;
+        }
+    }
+}
+
+// Update the watching indicator text with time since last update
+function updateWatchingText() {
+    const indicator = document.getElementById('watchingIndicator');
+    if (!indicator || !lastUpdateTime) return;
+
+    const secondsAgo = Math.floor((Date.now() - lastUpdateTime) / 1000);
+    let timeText;
+
+    if (secondsAgo < 10) {
+        timeText = 'just now';
+    } else if (secondsAgo < 60) {
+        timeText = `${secondsAgo}s ago`;
+    } else if (secondsAgo < 3600) {
+        const minutes = Math.floor(secondsAgo / 60);
+        timeText = `${minutes}m ago`;
+    } else {
+        const hours = Math.floor(secondsAgo / 3600);
+        timeText = `${hours}h ago`;
+    }
+
+    indicator.innerHTML = `<span style="opacity: 0.6;">●</span> Watching · Updated ${timeText}`;
+}
+
+// Update last update time when analysis completes
+function markAnalysisUpdate() {
+    lastUpdateTime = Date.now();
+    updateWatchingText();
+}
+
+// Show notification
+function showNotification(message, duration = 3000) {
+    const notif = document.createElement('div');
+    notif.className = 'notification';
+    notif.textContent = message;
+    document.body.appendChild(notif);
+
+    setTimeout(() => {
+        notif.classList.add('fade-out');
+        setTimeout(() => notif.remove(), 300);
+    }, duration);
+}
+
 function displayUncoveredFiles(files) {
     const listEl = document.getElementById('uncoveredList');
     listEl.innerHTML = '';
@@ -1007,6 +1082,14 @@ function subscribeToWorkspaceStatus() {
 
             console.log('Workspace status:', status.state, '-', status.message);
 
+            // Update watching indicator
+            updateWatchingIndicator(status.watching);
+
+            // Show re-analysis notification
+            if (status.reason && status.reason !== 'initial analysis') {
+                showNotification(`Re-analyzing: ${status.reason}`);
+            }
+
             // Update loading progress based on state
             if (status.state === 'bazel_querying') {
                 updateLoadingProgress(null, 1);
@@ -1021,30 +1104,40 @@ function subscribeToWorkspaceStatus() {
                 updateLoadingProgress(4, 5);
             } else if (status.state === 'analyzing_binaries') {
                 updateLoadingProgress(5, 5); // Keep step 5 active during binary analysis
-            } else if (status.state === 'ready') {
+            } else if (status.state === 'ready' || status.state === 'watching') {
                 updateLoadingProgress(5, null); // Mark step 5 complete
                 analysisComplete = true;
 
                 hideLoadingOverlay();
 
-                // Load graph data if we haven't already
-                if (!graphDataLoaded) {
-                    loadGraphData();
-                    graphDataLoaded = true;
+                // Load/reload graph data
+                // For initial analysis or re-analysis, always reload to get latest data
+                loadGraphData();
+                graphDataLoaded = true;
+
+                // Update the "last updated" timestamp in watching indicator
+                if (status.watching) {
+                    markAnalysisUpdate();
                 }
 
-                // Close SSE connections when done
-                if (workspaceStatusSource) {
-                    workspaceStatusSource.close();
-                    workspaceStatusSource = null;
-                }
-                if (targetGraphSource) {
-                    targetGraphSource.close();
-                    targetGraphSource = null;
+                // Don't close SSE connections if we're in watch mode
+                // Keep them open to receive re-analysis notifications
+                if (!status.watching) {
+                    // Close SSE connections when done (non-watch mode)
+                    if (workspaceStatusSource) {
+                        workspaceStatusSource.close();
+                        workspaceStatusSource = null;
+                    }
+                    if (targetGraphSource) {
+                        targetGraphSource.close();
+                        targetGraphSource = null;
+                    }
                 }
 
                 // Start health check to detect backend failures
-                startHealthCheck();
+                if (!healthCheckInterval) {
+                    startHealthCheck();
+                }
             }
         } catch (e) {
             console.error('Error processing workspace status:', e, 'Raw data:', event.data);
@@ -1870,103 +1963,58 @@ function buildBinaryFocusedGraphData(focusedBinary) {
     const internalTargetSet = new Set(focusedBinary.internalTargets || []);
     console.log('Internal targets for', focusedBinary.label, ':', Array.from(internalTargetSet));
 
-    if (packagesCollapsed && packageGraph) {
-        // Show as packages - but only packages that contain our internal targets
-        const collapsedPkg = buildCollapsedPackageGraph(packageGraph);
+    // Show individual targets - but only our internal (static) targets
+    const allTargets = packageGraph ? packageGraph.nodes : [];
 
-        // Find which packages contain our internal targets
-        const relevantPackages = new Set();
-        internalTargetSet.forEach(targetLabel => {
-            const packageName = targetLabel.split(':')[0];
-            relevantPackages.add(packageName);
+    // Collect all overlapping target labels
+    const overlappingTargetSet = new Set();
+    if (focusedBinary.overlappingDeps) {
+        console.log('Overlapping deps for', focusedBinary.label, ':', focusedBinary.overlappingDeps);
+        Object.values(focusedBinary.overlappingDeps).forEach(targets => {
+            targets.forEach(target => overlappingTargetSet.add(target));
         });
+        console.log('Overlapping target set:', Array.from(overlappingTargetSet));
+    }
 
-        console.log('Relevant packages:', Array.from(relevantPackages));
+    allTargets.forEach(target => {
+        const targetLabel = target.label || target.id;
+        if (internalTargetSet.has(targetLabel)) {
+            const isOverlapping = overlappingTargetSet.has(targetLabel);
+            graphData.nodes.push({
+                ...target,
+                parent: 'internal-group',
+                hasOverlap: isOverlapping,
+                overlappingWith: isOverlapping ?
+                    Object.keys(focusedBinary.overlappingDeps || {}).filter(sharedLib =>
+                        focusedBinary.overlappingDeps[sharedLib].includes(targetLabel)
+                    ) : []
+            });
+        }
+    });
 
-        collapsedPkg.nodes.forEach(node => {
-            if (relevantPackages.has(node.id)) {
-                graphData.nodes.push({
-                    ...node,
-                    parent: 'internal-group'
-                });
-            }
-        });
-
-        // Add edges only between our relevant packages
-        collapsedPkg.edges.forEach(edge => {
-            if (relevantPackages.has(edge.source) && relevantPackages.has(edge.target)) {
+    // Add edges only between our internal targets
+    if (packageGraph && packageGraph.edges) {
+        packageGraph.edges.forEach(edge => {
+            if (internalTargetSet.has(edge.source) && internalTargetSet.has(edge.target)) {
                 graphData.edges.push(edge);
             }
         });
+    }
 
-        // Add edges from the binary to packages containing its direct dependencies
-        if (focusedBinary.regularDeps) {
-            focusedBinary.regularDeps.forEach(depLabel => {
-                const packageName = depLabel.split(':')[0];
-                if (relevantPackages.has(packageName)) {
-                    graphData.edges.push({
-                        source: focusedBinary.label,
-                        target: packageName,
-                        type: 'static',
-                        symbols: []
-                    });
-                }
-            });
-        }
-    } else {
-        // Show individual targets - but only our internal (static) targets
-        const allTargets = packageGraph ? packageGraph.nodes : [];
-
-        // Collect all overlapping target labels
-        const overlappingTargetSet = new Set();
-        if (focusedBinary.overlappingDeps) {
-            console.log('Overlapping deps for', focusedBinary.label, ':', focusedBinary.overlappingDeps);
-            Object.values(focusedBinary.overlappingDeps).forEach(targets => {
-                targets.forEach(target => overlappingTargetSet.add(target));
-            });
-            console.log('Overlapping target set:', Array.from(overlappingTargetSet));
-        }
-
-        allTargets.forEach(target => {
-            const targetLabel = target.label || target.id;
-            if (internalTargetSet.has(targetLabel)) {
-                const isOverlapping = overlappingTargetSet.has(targetLabel);
-                graphData.nodes.push({
-                    ...target,
-                    parent: 'internal-group',
-                    hasOverlap: isOverlapping,
-                    overlappingWith: isOverlapping ?
-                        Object.keys(focusedBinary.overlappingDeps || {}).filter(sharedLib =>
-                            focusedBinary.overlappingDeps[sharedLib].includes(targetLabel)
-                        ) : []
+    // Add edges from the binary to its direct dependencies
+    if (focusedBinary.regularDeps) {
+        focusedBinary.regularDeps.forEach(depLabel => {
+            if (internalTargetSet.has(depLabel)) {
+                const isOverlapping = overlappingTargetSet.has(depLabel);
+                graphData.edges.push({
+                    source: focusedBinary.label,
+                    target: depLabel,
+                    type: 'static',
+                    symbols: [],
+                    isOverlapping: isOverlapping
                 });
             }
         });
-
-        // Add edges only between our internal targets
-        if (packageGraph && packageGraph.edges) {
-            packageGraph.edges.forEach(edge => {
-                if (internalTargetSet.has(edge.source) && internalTargetSet.has(edge.target)) {
-                    graphData.edges.push(edge);
-                }
-            });
-        }
-
-        // Add edges from the binary to its direct dependencies
-        if (focusedBinary.regularDeps) {
-            focusedBinary.regularDeps.forEach(depLabel => {
-                if (internalTargetSet.has(depLabel)) {
-                    const isOverlapping = overlappingTargetSet.has(depLabel);
-                    graphData.edges.push({
-                        source: focusedBinary.label,
-                        target: depLabel,
-                        type: 'static',
-                        symbols: [],
-                        isOverlapping: isOverlapping
-                    });
-                }
-            });
-        }
     }
 
     // Add external binaries this binary depends on

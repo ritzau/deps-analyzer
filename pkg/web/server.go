@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
@@ -57,6 +58,8 @@ type Server struct {
 	symbolDeps     []symbols.SymbolDependency   // Link-time symbol dependencies from nm
 	fileToTarget   map[string]string            // Maps file paths to target labels
 	uncoveredFiles []string                     // Files not included in any target
+	watching       bool                         // File watching active
+	mu             sync.RWMutex                 // Protect all state from concurrent access
 }
 
 // NewServer creates a new web server
@@ -86,41 +89,90 @@ func NewServer() *Server {
 
 // SetBinaries stores binary-level information
 func (s *Server) SetBinaries(bins []*binaries.BinaryInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.binaries = bins
 }
 
 // SetModule stores the new Module data model
 func (s *Server) SetModule(m *model.Module) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.module = m
+}
+
+// GetModule retrieves the current Module data model
+func (s *Server) GetModule() *model.Module {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.module
 }
 
 // SetFileDependencies stores file-level compile dependencies from .d files
 func (s *Server) SetFileDependencies(fileDeps []*deps.FileDependency) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.fileDeps = fileDeps
 }
 
 // SetSymbolDependencies stores file-level symbol dependencies from nm analysis
 func (s *Server) SetSymbolDependencies(symbolDeps []symbols.SymbolDependency) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.symbolDeps = symbolDeps
 }
 
 // SetFileToTargetMap stores the mapping from file paths to target labels
 func (s *Server) SetFileToTargetMap(fileToTarget map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.fileToTarget = fileToTarget
 }
 
 // SetUncoveredFiles stores files that are not included in any target
 func (s *Server) SetUncoveredFiles(files []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.uncoveredFiles = files
+}
+
+// SetWatching sets the file watching state
+func (s *Server) SetWatching(watching bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.watching = watching
 }
 
 // PublishWorkspaceStatus publishes a workspace status event
 func (s *Server) PublishWorkspaceStatus(state, message string, step, total int) error {
+	s.mu.RLock()
+	watching := s.watching
+	s.mu.RUnlock()
+
 	status := pubsub.WorkspaceStatus{
-		State:   state,
-		Message: message,
-		Step:    step,
-		Total:   total,
+		State:    state,
+		Message:  message,
+		Step:     step,
+		Total:    total,
+		Watching: watching,
+		Reason:   "",
+	}
+	return s.publisher.Publish("workspace_status", state, status)
+}
+
+// PublishWorkspaceStatusWithReason publishes a workspace status event with a reason
+func (s *Server) PublishWorkspaceStatusWithReason(state, message, reason string, step, total int) error {
+	s.mu.RLock()
+	watching := s.watching
+	s.mu.RUnlock()
+
+	status := pubsub.WorkspaceStatus{
+		State:    state,
+		Message:  message,
+		Step:     step,
+		Total:    total,
+		Watching: watching,
+		Reason:   reason,
 	}
 	return s.publisher.Publish("workspace_status", state, status)
 }
