@@ -540,10 +540,10 @@ function displayDependencyGraph(graphData) {
             {
                 selector: 'edge[type = "dynamic"]',
                 style: {
-                    'line-color': '#c586c0',
-                    'target-arrow-color': '#c586c0',
-                    'width': 2.5,
-                    'line-style': 'solid'
+                    'line-color': '#4ec9b0',
+                    'target-arrow-color': '#4ec9b0',
+                    'width': 2,
+                    'line-style': 'dashed'
                 }
             },
             // Overlapping dependencies - MUST be after type-specific selectors to override
