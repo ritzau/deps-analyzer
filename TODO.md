@@ -49,11 +49,30 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ Horizontal sidebar resize (DONE)
+
+Implemented drag-to-resize functionality for the navigation sidebar. Users can
+now adjust the sidebar width by dragging the resize handle between the sidebar
+and graph area.
+
+Features:
+- Visual resize handle with hover effects (orange highlight)
+- Smooth dragging with min/max width constraints (200px - 600px)
+- Prevents text selection during drag operation
+- Automatically updates Cytoscape canvas size and refits graph
+- Active state indicator during resize
+
+Implementation details:
+- Added resize handle HTML element in [index.html:67](pkg/web/static/index.html#L67)
+- Added resize handle styles in [styles.css:149-162](pkg/web/static/styles.css#L149-L162)
+- Implemented mouse event handlers in [app.js:2219-2274](pkg/web/static/app.js#L2219-L2274)
+
 ## ✅ Target label simplification (DONE)
 
-Implemented client-side label simplification to reduce visual clutter.
-The `simplifyLabel()` function removes redundant target names when they match
-the package name:
+Implemented client-side label simplification to reduce visual clutter. The
+`simplifyLabel()` function removes redundant target names when they match the
+package name:
+
 - `//foo:foo` → `//foo`
 - `//bar/baz:baz` → `//bar/baz`
 - `//util:util` → `//util`
@@ -63,14 +82,18 @@ and modal dialogs. Internal lookups and API calls still use full labels.
 
 ## ✅ Symbol name simplification (DONE)
 
-Added client-side symbol simplification to improve readability in tooltips.
-The `simplifySymbol()` function reduces C++ template verbosity by:
+Added client-side symbol simplification to improve readability in tooltips. The
+`simplifySymbol()` function reduces C++ template verbosity by:
+
 - Replacing `std::__1::` with `std::` (implementation detail)
-- Converting `std::basic_string<char, std::char_traits<char>, std::allocator<char>>` to `std::string`
+- Converting
+  `std::basic_string<char, std::char_traits<char>, std::allocator<char>>` to
+  `std::string`
 - Removing verbose allocator and char_traits template parameters
 - Cleaning up spacing
 
-Example: `util::ToUpper(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&)`
+Example:
+`util::ToUpper(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&)`
 becomes: `util::ToUpper(std::string const&)`
 
 ## ✅ Symbol dependency parsing fix (DONE)

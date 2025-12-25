@@ -2215,3 +2215,60 @@ window.addEventListener('resize', function() {
         }
     }, 150);
 });
+
+// Handle horizontal resize of sidebar
+(function() {
+    const resizeHandle = document.getElementById('resizeHandle');
+    const treeBrowser = document.getElementById('treeBrowser');
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    if (!resizeHandle || !treeBrowser) return;
+
+    resizeHandle.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = treeBrowser.offsetWidth;
+        resizeHandle.classList.add('active');
+
+        // Prevent text selection during drag
+        e.preventDefault();
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'ew-resize';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+
+        const delta = e.clientX - startX;
+        const newWidth = startWidth + delta;
+
+        // Respect min and max width constraints
+        const minWidth = 200;
+        const maxWidth = 600;
+        const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+        treeBrowser.style.width = constrainedWidth + 'px';
+
+        // Update Cytoscape canvas size if it exists
+        if (cy) {
+            updateCytoscapeSize();
+        }
+    });
+
+    document.addEventListener('mouseup', function() {
+        if (isResizing) {
+            isResizing = false;
+            resizeHandle.classList.remove('active');
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+
+            // Final update to Cytoscape
+            if (cy) {
+                updateCytoscapeSize();
+                cy.fit(undefined, 50);
+            }
+        }
+    });
+})();
