@@ -891,10 +891,17 @@ function updateCytoscapeSize() {
     const container = document.getElementById('cy');
     if (!container) return;
 
+    // Clear any explicit dimensions to allow flex to work
+    container.style.width = '';
+    container.style.height = '';
+
+    // Force a reflow by reading offsetHeight
+    void container.offsetHeight;
+
     // Get the actual computed size of the flex container
     const rect = container.getBoundingClientRect();
 
-    // Set explicit pixel dimensions
+    // Set explicit pixel dimensions based on current size
     container.style.width = rect.width + 'px';
     container.style.height = rect.height + 'px';
 
