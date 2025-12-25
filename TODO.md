@@ -2,11 +2,11 @@
 
 ## Prioritized backlog
 
-1. Detect eliminated symbols: Analyze the built artifacts to see which symbols
-   made it into the final binary.
+1. BUG: Project name shows "." when using current directory. Should detect and
+   use the actual directory name (or is there a module name?).
 
-2. BUG: Project name shows "." when using current directory. Should detect and
-   use the actual directory name.
+2. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+   made it into the final binary.
 
 3. Ensure consistent logging in backend and frontend.
 
@@ -15,10 +15,6 @@
 5. External packages: May require support of .a files.
 
 6. Collect styles in the CSS (if possible with the graph library).
-
-7. Simplify legend:
-   - Dependencies: 1 color, static are solid, dynamic are dashed, and data are
-     dotted. Compile time needs something else though. Anything else?
 
 ---
 
@@ -50,6 +46,30 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Legend simplification (DONE)
+
+Simplified the dependency types legend for better clarity and visual consistency:
+
+**Dependencies section**:
+- Unified color scheme: single teal color (#4ec9b0) for most dependencies
+- Differentiated by line style:
+  - Solid: Static dependencies (deps)
+  - Dashed: Dynamic dependencies (shared libs)
+  - Dotted: Data dependencies (runtime files)
+- Compile dependencies: blue (#4fc1ff) solid line to distinguish from runtime deps
+- Shorter, clearer labels
+
+**Visibility section**:
+- Changed public visibility indicator from dashed to solid gold border
+- Updated both graph visualization and legend
+- Simplified labels from "Public visibility" to "Public"
+
+Implementation:
+- Updated legend HTML in [index.html:134-152](pkg/web/static/index.html#L134-L152)
+- Changed public border style in [app.js:579](pkg/web/static/app.js#L579)
+- Removed unused wavy line CSS
+
 ## ✅ System library filtering (DONE)
 
 Fixed system libraries incorrectly appearing in the targets navigation sidebar.
@@ -58,10 +78,10 @@ and are not actual Bazel targets, so they should not be listed alongside real
 targets in the navigation.
 
 Implementation:
+
 - Added filter in app.js:2204 to exclude nodes with type 'system_library'
 - System libraries still appear correctly in graph visualizations
 - Only affects the clickable targets list in the navigation sidebar
-
 
 ## ✅ Horizontal sidebar resize (DONE)
 
