@@ -148,7 +148,7 @@ func (s *Server) setupRoutes() {
 
 	// API routes - more specific routes must come first
 	s.router.HandleFunc("/api/analysis", s.handleAnalysis).Methods("GET") // Legacy endpoint for UI polling
-	s.router.HandleFunc("/api/module", s.handleModule).Methods("GET")
+	s.router.HandleFunc("/api/module", s.handleModule).Methods("GET", "HEAD") // HEAD for health checks
 	s.router.HandleFunc("/api/module/graph", s.handleModuleGraph).Methods("GET")
 	s.router.HandleFunc("/api/module/packages", s.handlePackages).Methods("GET")
 	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
