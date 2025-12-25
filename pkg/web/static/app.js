@@ -805,12 +805,16 @@ const statusToStep = {
 
 // Handle connection lost
 function handleConnectionLost(source) {
+    console.log('handleConnectionLost called from:', source, 'connectionLost:', connectionLost);
+
     if (connectionLost) {
+        console.log('Already handling connection loss, ignoring');
         return; // Already handling connection loss
     }
 
     connectionLost = true;
     console.error('Connection lost to backend server (source:', source, ')');
+    console.log('Calling showConnectionLostModal()');
 
     // Show connection lost modal
     showConnectionLostModal();
@@ -818,8 +822,12 @@ function handleConnectionLost(source) {
 
 // Show connection lost modal
 function showConnectionLostModal() {
+    console.log('showConnectionLostModal called');
     const modal = document.getElementById('connectionLostModal');
     const messageEl = document.getElementById('connectionErrorMessage');
+
+    console.log('Modal element:', modal);
+    console.log('Message element:', messageEl);
 
     if (reconnectAttempts > 0) {
         messageEl.textContent = `Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} failed.`;
@@ -827,11 +835,14 @@ function showConnectionLostModal() {
         messageEl.textContent = 'Please check that the backend server is running.';
     }
 
+    console.log('Setting modal display to flex');
     modal.style.display = 'flex';
+    console.log('Modal display style:', modal.style.display);
 
     // Set up button handlers
     document.getElementById('retryConnection').onclick = attemptReconnect;
     document.getElementById('reloadPage').onclick = () => window.location.reload();
+    console.log('Modal should now be visible');
 }
 
 // Hide connection lost modal
