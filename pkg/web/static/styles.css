@@ -834,3 +834,124 @@ header h1 {
     background: var(--bg-secondary);
     border-color: var(--orange-primary);
 }
+
+/* ===== Lens-Based Visualization Styles ===== */
+
+/* Tab Header */
+.tab-header {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.tab-button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.tab-button:hover {
+    background: var(--hover-bg);
+}
+
+.tab-button.active {
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--orange-primary);
+    font-weight: 500;
+}
+
+/* Tab Content */
+.tab-content {
+    overflow-y: auto;
+    height: calc(100% - 45px);
+}
+
+.tab-pane {
+    display: none;
+    padding: 15px;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* Focus Mode Toggle */
+.focus-mode-toggle {
+    padding: 10px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.focus-mode-toggle label {
+    margin-right: 15px;
+    cursor: pointer;
+}
+
+/* Reset Controls */
+.reset-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.reset-button {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+
+.reset-button:hover {
+    background: var(--hover-bg);
+    border-color: var(--orange-primary);
+}
+
+.reset-button:active {
+    transform: scale(0.95);
+}
+
+/* Config Controls */
+#defaultTab h4,
+#focusTab h4 {
+    margin-top: 15px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+#defaultTab select,
+#focusTab select {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 4px;
+}
+
+#defaultTab label,
+#focusTab label {
+    display: block;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: 15px;
+}

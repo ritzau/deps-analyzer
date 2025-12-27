@@ -222,12 +222,10 @@ function displayDependencyGraph(graphData) {
                 parent: node.parent // For compound nodes (grouping)
             };
 
-            // Mark the currently focused target-group with a special attribute
-            if (node.type === 'target-group') {
-                const targetLabel = node.id.replace('parent-', '');
-                if ((currentView === 'file' || currentView === 'focused') && targetLabel === currentTarget) {
-                    nodeData.focused = true;
-                }
+            // Mark focused nodes
+            const focusedNodes = viewStateManager.getState().focusedNodes;
+            if (focusedNodes.has(node.id) || focusedNodes.has(node.label)) {
+                nodeData.focused = true;
             }
 
             // Only set hasOverlap if it's true (don't set it at all if false)
@@ -510,7 +508,7 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'edge[type = "data_dependency"]',
+                selector: 'edge[type = "data"]',
                 style: {
                     'line-color': '#4ec9b0',
                     'target-arrow-color': '#4ec9b0',
@@ -587,6 +585,15 @@ function displayDependencyGraph(graphData) {
                     'border-style': 'solid',
                     'border-width': '3px',
                     'border-color': '#ffd700'
+                }
+            },
+            // Focused node styling - MUST come after isPublic to override it
+            {
+                selector: 'node[focused]',
+                style: {
+                    'border-width': '4px',
+                    'border-color': '#ff8c00',
+                    'border-style': 'solid'
                 }
             }
         ],
@@ -804,77 +811,35 @@ function displayDependencyGraph(graphData) {
         tooltip.style.display = 'none';
     });
 
-    // Click on graph background to zoom out one level
+    // Click on graph background to clear focus
     cy.on('tap', function(evt) {
         // Check if we clicked on the background (not a node or edge)
         if (evt.target === cy) {
-            console.log('Background clicked - zooming out');
-            zoomOutOneLevel();
+            console.log('Background clicked - clearing focus');
+            viewStateManager.clearFocus();
         }
     });
 
-    // Click on nodes to select them in the tree or navigate
+    // Single-click on nodes to focus them
     cy.on('tap', 'node', function(evt) {
         const node = evt.target;
         const nodeId = node.data('id');
-        const nodeType = node.data('type');
+        console.log('Node clicked (focus):', nodeId);
+        viewStateManager.updateFocus(nodeId);
+    });
 
-        console.log('Node clicked:', nodeId, 'Type:', nodeType);
+    // Double-click on nodes to toggle manual collapse
+    cy.on('dbltap', 'node', function(evt) {
+        const node = evt.target;
+        const nodeId = node.data('id');
+        console.log('Node double-clicked (toggle collapse):', nodeId);
 
-        if (currentView === 'package') {
-            // At package level, clicking a target should go into focused mode
-            // Check if this is a target node (not a package)
-            if (!nodeType.includes('package') && !nodeType.includes('system')) {
-                console.log('Target node clicked in package view, entering focused mode');
-                showFocusedTargetView(nodeId);
-            }
-        } else if (currentView === 'focused') {
-            // In focused mode, clicking a target-group or different target switches focus
-            if (nodeType === 'target-group') {
-                // Clicked a target group container - extract target label
-                const targetLabel = nodeId.replace('parent-', '');
-                console.log('Target group clicked, switching focus to:', targetLabel);
-                showFocusedTargetView(targetLabel);
-            } else if (nodeType.includes('_incoming') || nodeType.includes('_outgoing')) {
-                // Clicked a file within an incoming/outgoing target - switch to that target
-                // File node ID format: "//target:name:file:..." - extract the target part
-                const targetLabel = nodeId.split(':file:')[0];
-                console.log('File clicked, switching focus to parent target:', targetLabel);
-                showFocusedTargetView(targetLabel);
-            }
-        } else if (currentView === 'file') {
-            // At file level, check what type of node was clicked
-            if (nodeType === 'target-group') {
-                // Clicked a target group - switch to that target's file view
-                // Extract target label from parent node ID (format: "parent-//target:name")
-                const targetLabel = nodeId.replace('parent-', '');
+        const currentState = viewStateManager.getState();
+        const manual = currentState.manualOverrides.get(nodeId);
 
-                // Check if we're already viewing this target - if so, do nothing
-                if (targetLabel === currentTarget) {
-                    console.log('Already viewing target:', targetLabel);
-                    return;
-                }
-
-                console.log('Target group clicked, switching to:', targetLabel);
-
-                // Find and click the corresponding target in the tree
-                const targetNodes = document.querySelectorAll('.tree-node[data-type="target"]');
-                for (const treeNode of targetNodes) {
-                    if (treeNode.dataset.id === targetLabel) {
-                        console.log('Match found! Clicking tree node for:', targetLabel);
-                        const label = treeNode.querySelector('.tree-label');
-                        if (label) {
-                            label.click();
-                            return;
-                        }
-                    }
-                }
-                console.log('No matching tree node found for:', targetLabel);
-            } else {
-                // Clicked a file node - could highlight it in the tree
-                console.log('File node clicked:', nodeId);
-            }
-        }
+        // Toggle: if manually collapsed, expand; if manually expanded or using lens, collapse
+        const newCollapsed = manual?.collapsed === true ? false : true;
+        viewStateManager.setManualOverride(nodeId, newCollapsed);
     });
 
     // Set explicit dimensions based on flex container size
@@ -1358,6 +1323,18 @@ async function loadGraphData() {
             if (packageGraph && packageGraph.nodes) {
                 populateTreeBrowser(analysisData);
             }
+
+            // Initialize lens controls (after DOM is ready and data is loaded)
+            initializeLensControls();
+
+            // Populate binary selector for lens controls
+            if (binaryData && binaryData.length > 0) {
+                populateBinarySelector(binaryData);
+            }
+
+            // Trigger initial render with lens system
+            const renderedGraph = lensRenderer.renderGraph(viewStateManager.getState(), packageGraph);
+            displayDependencyGraph(renderedGraph);
         }
     } catch (e) {
         console.error('Error loading graph data:', e);
@@ -1531,663 +1508,159 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================================
 
 let treeData = null;
-let selectedNode = null;
 let analysisData = null; // Store full analysis data
 let packageGraph = null; // Store the original package-level graph
 let binaryGraph = null; // Store the binary-level graph
 let binaryData = null; // Store binary information
 let cy = null; // Store the Cytoscape instance
-let currentView = 'package'; // Track current view: 'package', 'file', 'binary', or 'focused'
-let currentTarget = null; // Track which target we're viewing at file or focused level
-let currentBinary = null; // Track which binary we're viewing at binary level
+// ===== Lens-Based Visualization System =====
+// Replaced currentView, currentTarget, currentBinary with lens system
 
-// Build tree structure from analysis data
-function buildTreeData(data) {
-    const tree = {
-        binaries: [],
-        targets: [],
-        uncoveredFiles: data.uncoveredFiles || []
-    };
+// Initialize lens renderer
+const lensRenderer = new LensRenderer();
 
-    // Build binaries section if available
-    if (binaryData && binaryData.length > 0) {
-        for (const binary of binaryData) {
-            tree.binaries.push({
-                label: binary.label,
-                type: 'binary',
-                kind: binary.kind,
-                id: binary.label
-            });
-        }
+/**
+ * Get the appropriate raw graph based on baseSet configuration
+ * @param {Object} baseSet - Base set configuration
+ * @returns {Promise<Object>} Raw graph data
+ */
+async function getRawGraphForBaseSet(baseSet) {
+  console.log('[App] Getting raw graph for baseSet:', baseSet);
+
+  if (baseSet.type === 'full-graph') {
+    // Use package-level graph
+    return packageGraph;
+  } else if (baseSet.type === 'reachable-from-binary') {
+    // Use package graph and filter to nodes reachable from the binary
+    // This shows all target-level dependencies of the binary
+    if (baseSet.binaryLabel && packageGraph) {
+      console.log('[App] Filtering package graph to nodes reachable from:', baseSet.binaryLabel);
+      return filterReachableFromBinary(packageGraph, baseSet.binaryLabel);
     }
 
-    // Build targets section with their files
-    if (data.graph && data.graph.nodes) {
-        for (const node of data.graph.nodes) {
-            tree.targets.push({
-                label: node.label,
-                type: 'target',
-                id: node.id,
-                files: [] // Will be populated when fetched
-            });
-        }
-    }
+    return packageGraph;
+  } else if (baseSet.type === 'package-level') {
+    // Use package-level graph (same as full-graph for now)
+    return packageGraph;
+  }
 
-    return tree;
+  return packageGraph; // Default fallback
 }
 
-// Create a tree node element
-function createTreeNode(item, type) {
-    const node = document.createElement('div');
-    node.className = 'tree-node';
-    node.dataset.type = type;
-    node.dataset.id = item.label || item.path || item;
+/**
+ * Filter graph to only nodes reachable from a specific binary
+ * @param {Object} graph - Full graph
+ * @param {string} binaryLabel - Binary label to start from
+ * @returns {Object} Filtered graph
+ */
+function filterReachableFromBinary(graph, binaryLabel) {
+  console.log('[App] Filtering graph to nodes reachable from:', binaryLabel);
+  console.log('[App] Full graph has', graph.nodes?.length, 'nodes and', graph.edges?.length, 'edges');
 
-    const content = document.createElement('div');
-    content.className = 'tree-node-content';
+  // Check if the binary exists in the graph
+  const binaryNode = graph.nodes.find(n => n.id === binaryLabel || n.label === binaryLabel);
+  if (!binaryNode) {
+    console.error('[App] Binary node not found in graph:', binaryLabel);
+    console.log('[App] Available node IDs:', graph.nodes.slice(0, 5).map(n => n.id || n.label));
+    return { nodes: [], edges: [] };
+  }
 
-    // Toggle arrow for expandable nodes
-    const toggle = document.createElement('span');
-    toggle.className = 'tree-toggle';
-    if (type === 'binary' || type === 'target') {
-        toggle.textContent = '▶';
-        node.classList.add('collapsed');
-    } else {
-        toggle.classList.add('empty');
-    }
-    content.appendChild(toggle);
+  // Use the node's ID for traversal
+  const startNodeId = binaryNode.id || binaryNode.label;
+  console.log('[App] Starting BFS from node:', startNodeId);
 
-    // Icon and label
-    const label = document.createElement('span');
-    label.className = 'tree-label';
+  // Find all nodes reachable from the binary using BFS (forward-only)
+  const reachable = new Set();
+  const queue = [startNodeId];
+  reachable.add(startNodeId);
 
-    if (type === 'binary') {
-        const icon = item.kind === 'cc_binary' ? '🔧' : '📚';
-        label.textContent = `${icon} ${simplifyLabel(item.label)}`;
-    } else if (type === 'target') {
-        label.textContent = `📦 ${simplifyLabel(item.label)}`;
-    } else if (type === 'file') {
-        const fileName = item.path ? item.path.split('/').pop() : item.split('/').pop();
-        const icon = item.path && item.path.endsWith('.h') ? '📄' : '📝';
-        label.textContent = `${icon} ${fileName}`;
-        label.title = item.path || item; // Show full path on hover
-    } else if (type === 'uncovered') {
-        const filePath = item.Path || item;
-        const fileName = filePath.split('/').pop();
-        label.textContent = `⚠️ ${fileName}`;
-        label.title = filePath; // Show full path on hover
-    }
+  // Build adjacency list (forward direction only: source -> target)
+  // This means we follow dependencies OUT from the binary
+  const adjacency = new Map();
+  console.log('[App] Sample edges:', graph.edges.slice(0, 3).map(e => ({source: e.source, target: e.target})));
 
-    content.appendChild(label);
-    node.appendChild(content);
+  graph.edges.forEach(edge => {
+    if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
+    adjacency.get(edge.source).push(edge.target);
+  });
 
-    // Add children container for binaries and targets
-    if (type === 'binary' || type === 'target') {
-        const children = document.createElement('div');
-        children.className = 'tree-children';
-        node.appendChild(children);
+  console.log('[App] Built adjacency list with', adjacency.size, 'nodes');
+  console.log('[App] Adjacency keys:', Array.from(adjacency.keys()));
+  console.log('[App] Binary has', adjacency.get(startNodeId)?.length || 0, 'outgoing edges');
 
-        // Click on arrow to toggle expansion only
-        toggle.addEventListener('click', async (e) => {
-            console.log('Toggle arrow clicked');
-            e.stopPropagation();
-            try {
-                await toggleExpansion(node, item, type);
-            } catch (error) {
-                console.error('Error in toggleExpansion:', error);
-            }
-        });
+  // BFS to find all reachable nodes (following edges forward only)
+  let iterations = 0;
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const neighbors = adjacency.get(current) || [];
 
-        // Click on label to always select/zoom (regardless of expansion)
-        label.addEventListener('click', async (e) => {
-            console.log(`${type} label clicked:`, item.label);
-            e.stopPropagation();
-            try {
-                await selectTreeNode(node, item, type);
-            } catch (error) {
-                console.error('Error in selectTreeNode:', error);
-            }
-        });
-    } else {
-        // Click handler for files
-        content.addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectTreeNode(node, item, type);
-        });
+    if (iterations < 5) {
+      console.log('[App] BFS iteration', iterations, '- current:', current, 'neighbors:', neighbors.length);
     }
 
-    return node;
+    for (const neighbor of neighbors) {
+      if (!reachable.has(neighbor)) {
+        reachable.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+    iterations++;
+  }
+
+  console.log('[App] BFS completed in', iterations, 'iterations');
+  console.log('[App] Found', reachable.size, 'nodes reachable from', binaryLabel);
+  console.log('[App] Reachable node IDs:', Array.from(reachable));
+
+  // Filter nodes and edges
+  const filteredNodes = graph.nodes.filter(node =>
+    reachable.has(node.id) || reachable.has(node.label)
+  );
+
+  const filteredEdges = graph.edges.filter(edge =>
+    reachable.has(edge.source) && reachable.has(edge.target)
+  );
+
+  console.log('[App] Filtered to', filteredNodes.length, 'nodes and', filteredEdges.length, 'edges');
+  console.log('[App] Filtered node labels:', filteredNodes.map(n => n.label || n.id));
+  console.log('[App] Edge types in filtered graph:', [...new Set(filteredEdges.map(e => e.type))]);
+  console.log('[App] Edges from test_app:', filteredEdges.filter(e => e.source.includes('test_app')).map(e => `${e.source} -> ${e.target} (${e.type})`));
+
+  return {
+    nodes: filteredNodes,
+    edges: filteredEdges
+  };
 }
 
-// Toggle tree node expansion (without selecting)
-async function toggleExpansion(node, item, type) {
-    const toggle = node.querySelector('.tree-toggle');
-    const children = node.querySelector('.tree-children');
-
-    if (node.classList.contains('collapsed')) {
-        // Expand: load children if not already loaded
-        node.classList.remove('collapsed');
-        toggle.textContent = '▼';
-
-        if (children.children.length === 0 && item.label) {
-            if (type === 'binary') {
-                // For binaries, show dependency info (not expandable to children for now)
-                // We'll just show a message - the graph will show the dependencies
-                const infoMsg = document.createElement('div');
-                infoMsg.className = 'tree-label';
-                infoMsg.style.color = '#999';
-                infoMsg.style.fontStyle = 'italic';
-                infoMsg.style.marginLeft = '20px';
-                infoMsg.textContent = 'Click to view dependencies in graph';
-                children.appendChild(infoMsg);
-            } else if (type === 'target') {
-                // Fetch target details
-                try {
-                    const encodedLabel = encodeURIComponent(item.label);
-                    const response = await monitoredFetch(`/api/target/${encodedLabel}`);
-                    if (response.ok) {
-                        const details = await response.json();
-                        if (details.files && details.files.length > 0) {
-                            details.files.forEach(file => {
-                                const fileNode = createTreeNode(file, 'file');
-                                children.appendChild(fileNode);
-                            });
-                        } else {
-                            const emptyMsg = document.createElement('div');
-                            emptyMsg.className = 'tree-label';
-                            emptyMsg.style.color = '#999';
-                            emptyMsg.style.fontStyle = 'italic';
-                            emptyMsg.textContent = 'No files found';
-                            children.appendChild(emptyMsg);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to load target files:', error);
-                }
-            }
-        }
-    } else {
-        // Collapse
-        node.classList.add('collapsed');
-        toggle.textContent = '▶';
-    }
-}
-
-// Select a tree node and update the view
-async function selectTreeNode(node, item, type) {
-    // Remove previous selection
-    document.querySelectorAll('.tree-node.selected').forEach(n => {
-        n.classList.remove('selected');
-    });
-
-    // Add selection to this node
-    node.classList.add('selected');
-    selectedNode = { node, item, type };
-
-    // Update the main view based on selection
-    if (type === 'project') {
-        // Show package-level graph (the default view)
-        console.log('Selected project - showing package graph');
-        currentView = 'package';
-        currentTarget = null;
-        currentBinary = null;
-        if (packageGraph) {
-            displayDependencyGraph(packageGraph);
-        }
-    } else if (type === 'binary') {
-        // Show binary-level graph focused on this binary
-        console.log('Selected binary:', item.label);
-        currentView = 'binary';
-        currentBinary = item.label;
-        currentTarget = null;
-        await showBinaryGraphFocused(item.label);
-    } else if (type === 'target') {
-        // Show file-level graph for this target
-        console.log('Selected target:', item.label);
-        currentView = 'file';
-        currentTarget = item.label;
-        currentBinary = null;
-        await showFileGraphForTarget(item.label);
-    } else if (type === 'file') {
-        // Keep showing the current target's file graph
-        console.log('Selected file:', item.path);
-        // File is already shown in the current graph
-    } else if (type === 'uncovered') {
-        // Show uncovered file (maybe highlight in uncovered section?)
-        console.log('Selected uncovered file:', item);
-    }
-}
-
-// Show binary-level graph focused on a specific binary
-async function showBinaryGraphFocused(binaryLabel) {
-    try {
-        console.log('Fetching binary graph focused on:', binaryLabel);
-
-        // For now, show the full binary graph (in the future we could filter by focused binary)
-        if (!binaryGraph) {
-            const response = await monitoredFetch('/api/binaries/graph');
-            if (!response.ok) {
-                console.error('Failed to fetch binary graph:', response.status);
-                return;
-            }
-            binaryGraph = await response.json();
-        }
-
-        console.log('Received binary graph data:', binaryGraph);
-
-        // Display the binary-level graph
-        if (binaryGraph && binaryGraph.nodes) {
-            // TODO: In the future, we could filter/highlight the focused binary
-            displayDependencyGraph(binaryGraph);
-        } else {
-            console.error('Invalid binary graph data received:', binaryGraph);
-        }
-    } catch (error) {
-        console.error('Error fetching binary graph:', error);
-    }
-}
-
-// Zoom out one level in the graph hierarchy
-function zoomOutOneLevel() {
-    if (currentView === 'focused') {
-        // We're in focused view, zoom out to package level
-        console.log('Zooming out from focused view to package view');
-        currentView = 'package';
-        currentTarget = null;
-        currentBinary = null;
-
-        // Clear list selection
-        document.querySelectorAll('.nav-item.selected').forEach(el => {
-            el.classList.remove('selected');
-        });
-
-        if (packageGraph) {
-            displayDependencyGraph(packageGraph);
-        }
-    } else if (currentView === 'file') {
-        // We're at file level, zoom out to package level
-        console.log('Zooming out from file view to package view');
-
-        // Find and click the project node in the tree
-        const projectNode = document.querySelector('.tree-node.project-node .tree-node-content');
-        if (projectNode) {
-            projectNode.click();
-        } else {
-            // Fallback: directly show package graph
-            currentView = 'package';
-            currentTarget = null;
-            currentBinary = null;
-            if (packageGraph) {
-                displayDependencyGraph(packageGraph);
-            }
-        }
-    } else if (currentView === 'binary') {
-        // We're at binary level, zoom out to package level
-        console.log('Zooming out from binary view to package view');
-
-        const projectNode = document.querySelector('.tree-node.project-node .tree-node-content');
-        if (projectNode) {
-            projectNode.click();
-        } else {
-            // Fallback: directly show package graph
-            currentView = 'package';
-            currentTarget = null;
-            currentBinary = null;
-            if (packageGraph) {
-                displayDependencyGraph(packageGraph);
-            }
-        }
-    } else {
-        // Already at package level, can't zoom out further
-        console.log('Already at top level (package view)');
-    }
-}
-
-// Show focused view for a target (all dependencies touching this target)
-async function showFocusedTargetView(targetLabel) {
-    try {
-        console.log('Showing focused view for target:', targetLabel);
-
-        // Update state
-        currentView = 'focused';
-        currentTarget = targetLabel;
-        currentBinary = null;
-
-        // Sync selection in the list
-        syncListSelection(targetLabel);
-
-        // Fetch focused graph data from API
-        const encodedLabel = encodeURIComponent(targetLabel);
-        const url = `/api/target/${encodedLabel}/focused`;
-        console.log('Fetching from URL:', url);
-
-        const response = await monitoredFetch(url);
-        if (!response.ok) {
-            console.error('Failed to fetch focused graph:', response.status, response.statusText);
-            return;
-        }
-
-        const graphData = await response.json();
-        console.log('Received focused graph data:', graphData);
-        console.log('Nodes:', graphData.nodes?.length, 'Edges:', graphData.edges?.length);
-
-        // Display the focused graph
-        if (graphData && graphData.nodes) {
-            displayDependencyGraph(graphData);
-        } else {
-            console.error('Invalid graph data received:', graphData);
-        }
-    } catch (error) {
-        console.error('Error showing focused target view:', error);
-    }
-}
-
-// Show file-level graph for a target
-async function showFileGraphForTarget(targetLabel) {
-    try {
-        console.log('Fetching file graph for target:', targetLabel);
-
-        // Encode the target label for URL (strip leading // for the path)
-        const encodedLabel = targetLabel.startsWith('//') ? targetLabel.substring(2) : targetLabel;
-        const url = `/api/target/${encodedLabel}/graph`;
-        console.log('Fetching from URL:', url);
-
-        const response = await monitoredFetch(url);
-
-        if (!response.ok) {
-            console.error('Failed to fetch target graph:', response.status, response.statusText);
-            const text = await response.text();
-            console.error('Response body:', text);
-            return;
-        }
-
-        const graphData = await response.json();
-        console.log('Received file graph data:', graphData);
-        console.log('Nodes:', graphData.nodes?.length, 'Edges:', graphData.edges?.length);
-
-        // Display the file-level graph
-        if (graphData && graphData.nodes) {
-            displayDependencyGraph(graphData);
-        } else {
-            console.error('Invalid graph data received:', graphData);
-        }
-    } catch (error) {
-        console.error('Error fetching target graph:', error);
-    }
-}
-
-// Select a binary and show its focused graph
-function selectBinary(binaryLabel, itemElement) {
-    console.log('Selected binary:', binaryLabel);
-
-    // Update UI selection
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('selected'));
-    if (itemElement) itemElement.classList.add('selected');
-
-    // Update state
-    currentView = 'binary';
-    currentBinary = binaryLabel;
-    currentTarget = null;
-
-    // Show binary-focused graph
-    showBinaryFocusedGraph(binaryLabel);
-}
-
-// Sync list selection to match the given target label
-function syncListSelection(targetLabel) {
-    // Clear all selections
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('selected'));
-
-    // Find and select the matching item in the targets list
-    const targetsItems = document.getElementById('targetsItems');
-    if (targetsItems) {
-        const items = targetsItems.querySelectorAll('.nav-item');
-        for (const item of items) {
-            if (item.textContent.includes(targetLabel)) {
-                item.classList.add('selected');
-                break;
-            }
-        }
-    }
-}
-
-// Select a target and show its focused graph
-function selectTarget(targetLabel, itemElement) {
-    console.log('Selected target:', targetLabel);
-
-    // Update UI selection
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('selected'));
-    if (itemElement) itemElement.classList.add('selected');
-
-    // Update state
-    currentView = 'focused';
-    currentTarget = targetLabel;
-    currentBinary = null;
-
-    // Show focused view for this target
-    showFocusedTargetView(targetLabel);
-}
-
-// Show binary-focused graph: internal targets/packages + external binaries
-async function showBinaryFocusedGraph(binaryLabel) {
-    try {
-        console.log('Building binary-focused graph for:', binaryLabel);
-
-        // Fetch full binary graph if not already loaded
-        if (!binaryGraph) {
-            const response = await monitoredFetch('/api/binaries/graph');
-            if (!response.ok) {
-                console.error('Failed to fetch binary graph');
-                return;
-            }
-            binaryGraph = await response.json();
-        }
-
-        // Find the focused binary's info
-        const focusedBinary = binaryData.find(b => b.label === binaryLabel);
-        if (!focusedBinary) {
-            console.error('Binary not found:', binaryLabel);
-            return;
-        }
-
-        // Build graph showing:
-        // 1. Internal targets/packages (from packageGraph)
-        // 2. External binaries (as binary-level nodes)
-        // 3. System libraries
-
-        const graphData = buildBinaryFocusedGraphData(focusedBinary);
-        displayDependencyGraph(graphData);
-
-    } catch (error) {
-        console.error('Error showing binary-focused graph:', error);
-    }
-}
-
-// Build graph data for a focused binary
-function buildBinaryFocusedGraphData(focusedBinary) {
-    const graphData = {
-        nodes: [],
-        edges: []
-    };
-
-    console.log('Building focused graph for binary:', focusedBinary.label);
-    console.log('Dynamic deps:', focusedBinary.dynamicDeps);
-    console.log('Data deps:', focusedBinary.dataDeps);
-    console.log('System libs:', focusedBinary.systemLibraries);
-
-    // Add compound parent node for internal (static) dependencies
-    graphData.nodes.push({
-        id: 'internal-group',
-        label: focusedBinary.label,
-        type: 'target-group'
-    });
-
-    // Add the binary itself as a node inside the internal group
-    graphData.nodes.push({
-        id: focusedBinary.label,
-        label: focusedBinary.label,
-        type: focusedBinary.kind,
-        parent: 'internal-group'
-    });
-
-    // Filter to only include cc_library targets this binary depends on (static deps)
-    const internalTargetSet = new Set(focusedBinary.internalTargets || []);
-    console.log('Internal targets for', focusedBinary.label, ':', Array.from(internalTargetSet));
-
-    // Show individual targets - but only our internal (static) targets
-    const allTargets = packageGraph ? packageGraph.nodes : [];
-
-    // Collect all overlapping target labels
-    const overlappingTargetSet = new Set();
-    if (focusedBinary.overlappingDeps) {
-        console.log('Overlapping deps for', focusedBinary.label, ':', focusedBinary.overlappingDeps);
-        Object.values(focusedBinary.overlappingDeps).forEach(targets => {
-            targets.forEach(target => overlappingTargetSet.add(target));
-        });
-        console.log('Overlapping target set:', Array.from(overlappingTargetSet));
-    }
-
-    allTargets.forEach(target => {
-        const targetLabel = target.label || target.id;
-        if (internalTargetSet.has(targetLabel)) {
-            const isOverlapping = overlappingTargetSet.has(targetLabel);
-            graphData.nodes.push({
-                ...target,
-                parent: 'internal-group',
-                hasOverlap: isOverlapping,
-                overlappingWith: isOverlapping ?
-                    Object.keys(focusedBinary.overlappingDeps || {}).filter(sharedLib =>
-                        focusedBinary.overlappingDeps[sharedLib].includes(targetLabel)
-                    ) : []
-            });
-        }
-    });
-
-    // Add edges only between our internal targets
-    if (packageGraph && packageGraph.edges) {
-        packageGraph.edges.forEach(edge => {
-            if (internalTargetSet.has(edge.source) && internalTargetSet.has(edge.target)) {
-                graphData.edges.push(edge);
-            }
-        });
-    }
-
-    // Add edges from the binary to its direct dependencies
-    if (focusedBinary.regularDeps) {
-        focusedBinary.regularDeps.forEach(depLabel => {
-            if (internalTargetSet.has(depLabel)) {
-                const isOverlapping = overlappingTargetSet.has(depLabel);
-                graphData.edges.push({
-                    source: focusedBinary.label,
-                    target: depLabel,
-                    type: 'static',
-                    symbols: [],
-                    isOverlapping: isOverlapping
-                });
-            }
-        });
-    }
-
-    // Add external binaries this binary depends on
-    if (focusedBinary.dynamicDeps) {
-        focusedBinary.dynamicDeps.forEach(depLabel => {
-            const depBinary = binaryData.find(b => b.label === depLabel);
-            if (depBinary) {
-                // Check if this dependency has overlapping symbols
-                const hasOverlap = focusedBinary.overlappingDeps &&
-                                   focusedBinary.overlappingDeps[depLabel] &&
-                                   focusedBinary.overlappingDeps[depLabel].length > 0;
-
-                graphData.nodes.push({
-                    id: depLabel,
-                    label: depLabel,
-                    type: depBinary.kind, // cc_binary or cc_shared_library
-                    external: true,
-                    hasOverlap: hasOverlap,
-                    overlappingTargets: hasOverlap ? focusedBinary.overlappingDeps[depLabel] : []
-                });
-            }
-        });
-    }
-
-    if (focusedBinary.dataDeps) {
-        focusedBinary.dataDeps.forEach(depLabel => {
-            const depBinary = binaryData.find(b => b.label === depLabel);
-            if (depBinary) {
-                graphData.nodes.push({
-                    id: depLabel,
-                    label: depLabel,
-                    type: depBinary.kind,
-                    external: true
-                });
-            }
-        });
-    }
-
-    // Add system libraries
-    if (focusedBinary.systemLibraries) {
-        focusedBinary.systemLibraries.forEach(sysLib => {
-            graphData.nodes.push({
-                id: 'system:' + sysLib,
-                label: sysLib,
-                type: 'system_library',
-                external: true
-            });
-        });
-    }
-
-    // Add edges connecting to external dependencies
-    // We need to find which internal target actually uses these external binaries
-    // For now, create edges from main:test_app (the focused binary's main target)
-
-    const mainTarget = focusedBinary.label; // e.g., "//main:test_app"
-
-    // Check if this target exists in the graph
-    const hasMainTarget = graphData.nodes.some(n => n.id === mainTarget || n.label === mainTarget);
-
-    if (hasMainTarget) {
-        // Add edges for dynamic dependencies
-        if (focusedBinary.dynamicDeps) {
-            focusedBinary.dynamicDeps.forEach(depLabel => {
-                graphData.edges.push({
-                    source: mainTarget,
-                    target: depLabel,
-                    type: 'dynamic_link',
-                    linkage: 'dynamic',
-                    symbols: []
-                });
-            });
-        }
-
-        // Add edges for data dependencies
-        if (focusedBinary.dataDeps) {
-            focusedBinary.dataDeps.forEach(depLabel => {
-                graphData.edges.push({
-                    source: mainTarget,
-                    target: depLabel,
-                    type: 'data_dependency',
-                    linkage: 'data',
-                    symbols: []
-                });
-            });
-        }
-
-        // Add edges for system libraries
-        if (focusedBinary.systemLibraries) {
-            focusedBinary.systemLibraries.forEach(sysLib => {
-                graphData.edges.push({
-                    source: mainTarget,
-                    target: 'system:' + sysLib,
-                    type: 'system_link',
-                    linkage: 'system',
-                    symbols: []
-                });
-            });
-        }
-    }
-
-    return graphData;
-}
+// Listen for state changes and re-render graph
+viewStateManager.addListener(async (newState) => {
+  if (!packageGraph) return; // Wait for initial load
+
+  console.log('[App] State changed, re-rendering with baseSet:', newState.defaultLens.baseSet);
+
+  // Get the appropriate raw graph for this baseSet
+  const rawGraph = await getRawGraphForBaseSet(newState.defaultLens.baseSet);
+
+  if (rawGraph) {
+    const renderedGraph = lensRenderer.renderGraph(newState, rawGraph);
+    displayDependencyGraph(renderedGraph);
+  }
+});
+
+// NOTE: Old tree-building functions removed
+// buildTreeData(), createTreeNode(), toggleExpansion() are no longer needed
+// The navigation now uses simple flat lists populated by populateTreeBrowser()
+
+// NOTE: Old view-switching functions removed - now handled by lens system
+// The following functions have been replaced by the lens-based visualization:
+// - selectTreeNode() -> use viewStateManager.updateFocus()
+// - showBinaryGraphFocused() -> handled by lens renderer
+// - zoomOutOneLevel() -> use viewStateManager.clearFocus()
+// - showFocusedTargetView() -> handled by lens renderer
+// - showFileGraphForTarget() -> handled by lens renderer
+// - selectBinary() -> use viewStateManager.updateFocus()
+// - selectTarget() -> use viewStateManager.updateFocus()
+// - showBinaryFocusedGraph() -> handled by lens renderer
+// - buildBinaryFocusedGraphData() -> handled by lens renderer
 
 // Populate the tree browser
 function populateTreeBrowser(data) {
@@ -2202,7 +1675,15 @@ function populateTreeBrowser(data) {
             item.className = 'nav-item';
             const icon = binary.kind === 'cc_binary' ? '🔧' : '📚';
             item.textContent = `${icon} ${simplifyLabel(binary.label)}`;
-            item.onclick = () => selectBinary(binary.label, item);
+
+            // Click focuses on this binary
+            item.onclick = () => {
+                viewStateManager.updateFocus(binary.label);
+                // Highlight in tree
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+            };
+
             binariesItems.appendChild(item);
         });
     }
@@ -2217,7 +1698,15 @@ function populateTreeBrowser(data) {
                 const item = document.createElement('div');
                 item.className = 'nav-item';
                 item.textContent = `📦 ${simplifyLabel(node.label)}`;
-                item.onclick = () => selectTarget(node.label, item);
+
+                // Click focuses on this target
+                item.onclick = () => {
+                    viewStateManager.updateFocus(node.label);
+                    // Highlight in tree
+                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('selected'));
+                    item.classList.add('selected');
+                };
+
                 targetsItems.appendChild(item);
             });
     }

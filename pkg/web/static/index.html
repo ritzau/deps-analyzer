@@ -46,19 +46,113 @@
         <div id="error" class="error" style="display: none;"></div>
 
         <div class="main-layout">
-            <!-- Tree Browser (Left Panel) -->
+            <!-- Tree Browser (Left Panel) with Tabs -->
             <div id="treeBrowser" class="tree-browser">
-                <div class="tree-header">
-                    <h3>📁 Navigation</h3>
+                <!-- Tab Headers -->
+                <div class="tab-header">
+                    <button class="tab-button active" data-tab="tree">Tree</button>
+                    <button class="tab-button" data-tab="default">Default</button>
+                    <button class="tab-button" data-tab="focus">Focus</button>
                 </div>
-                <div class="list-content">
-                    <div id="binariesList" class="nav-section">
-                        <div class="nav-section-title">🔧 Binaries</div>
-                        <div id="binariesItems" class="nav-items"></div>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Tree Tab -->
+                    <div id="treeTab" class="tab-pane active">
+                        <!-- Focus Mode Toggle -->
+                        <div class="focus-mode-toggle">
+                            <label>
+                                <input type="radio" name="focusMode" value="single" checked> Single
+                            </label>
+                            <label>
+                                <input type="radio" name="focusMode" value="multi-select"> Multi
+                            </label>
+                        </div>
+
+                        <!-- Reset Controls -->
+                        <div class="reset-controls">
+                            <button id="resetFocus" class="reset-button">Clear Focus</button>
+                            <button id="resetManual" class="reset-button">Reset Manual</button>
+                            <button id="resetAll" class="reset-button">Reset All</button>
+                        </div>
+
+                        <!-- Navigation Lists -->
+                        <div id="binariesList" class="nav-section">
+                            <div class="nav-section-title">🔧 Binaries</div>
+                            <div id="binariesItems" class="nav-items"></div>
+                        </div>
+                        <div id="targetsList" class="nav-section">
+                            <div class="nav-section-title">📦 Targets</div>
+                            <div id="targetsItems" class="nav-items"></div>
+                        </div>
+
+                        <p class="hint">💡 Double-click nodes to manually collapse/expand</p>
                     </div>
-                    <div id="targetsList" class="nav-section">
-                        <div class="nav-section-title">📦 Targets</div>
-                        <div id="targetsItems" class="nav-items"></div>
+
+                    <!-- Default Config Tab -->
+                    <div id="defaultTab" class="tab-pane">
+                        <h4>Base Set</h4>
+                        <select id="baseSetType">
+                            <option value="full-graph">Full Graph</option>
+                            <option value="package-level">Package Level</option>
+                            <option value="reachable-from-binary">Reachable from Binary</option>
+                        </select>
+
+                        <div id="binarySelector" style="display: none;">
+                            <select id="baseSetBinary"></select>
+                        </div>
+
+                        <h4>Global Filters</h4>
+                        <label>
+                            <input type="checkbox" id="hideExternal"> Hide External
+                        </label>
+                        <label>
+                            <input type="checkbox" id="hideUncovered"> Hide Uncovered
+                        </label>
+                        <label>
+                            <input type="checkbox" id="hideSystemLibs"> Hide System Libraries
+                        </label>
+
+                        <h4>Edge Types</h4>
+                        <label>
+                            <input type="checkbox" id="showStatic" checked> Static
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showDynamic" checked> Dynamic
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showData" checked> Data
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showCompile" checked> Compile
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showSymbol"> Symbol
+                        </label>
+                    </div>
+
+                    <!-- Focus Config Tab -->
+                    <div id="focusTab" class="tab-pane">
+                        <p class="hint">Configure what to show when nodes are focused</p>
+
+                        <h4>Distance 0 (Focused)</h4>
+                        <select id="focusD0Files">
+                            <option value="all" selected>All Files</option>
+                            <option value="none">No Files</option>
+                        </select>
+
+                        <h4>Distance 1 (Neighbors)</h4>
+                        <select id="focusD1Files">
+                            <option value="all">All Files</option>
+                            <option value="none" selected>No Files</option>
+                        </select>
+
+                        <h4>Distance 2+ (Rest)</h4>
+                        <select id="focusInfiniteView">
+                            <option value="hide">Hide Completely</option>
+                            <option value="collapsed" selected>Show Collapsed</option>
+                            <option value="default">Same as Default</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -212,6 +306,12 @@
             </div>
         </div>
     </div>
+
+    <!-- Lens-based visualization system -->
+    <script src="/lens-config.js"></script>
+    <script src="/lens-renderer.js"></script>
+    <script src="/view-state.js"></script>
+    <script src="/lens-controls.js"></script>
 
     <script src="/app.js"></script>
 </body>
