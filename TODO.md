@@ -17,10 +17,15 @@
    - Added `/api/module/graph/lens` POST endpoint ([server.go:206](pkg/web/server.go#L206))
    - Endpoint accepts lens configurations and returns filtered graph
 
-   **Frontend integration - TODO**:
-   - Update frontend to call `/api/module/graph/lens` instead of doing local rendering
-   - Remove lens-renderer.js transformation logic (keep only API call glue)
-   - Implement diff-based incremental updates (optional optimization)
+   **Frontend integration - COMPLETED ✅**:
+   - Updated viewStateManager listener to call `/api/module/graph/lens` ([app.js:1783-1807](pkg/web/static/app.js#L1783-L1807))
+   - Added fetchRenderedGraphFromBackend() function with proper serialization ([app.js:1743-1781](pkg/web/static/app.js#L1743-L1781))
+   - Includes fallback to client-side rendering if backend fails
+   - Kept lens-renderer.js for backward compatibility and fallback
+
+   **Future optimizations - TODO**:
+   - Remove lens-renderer.js client-side transformation logic (after sufficient testing)
+   - Implement diff-based incremental updates (optional)
    - Position caching with Dagre animation for smooth transitions
 
    **Known issues**:
