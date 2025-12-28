@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
+	"github.com/ritzau/deps-analyzer/pkg/lens"
 	"github.com/ritzau/deps-analyzer/pkg/model"
 	"github.com/ritzau/deps-analyzer/pkg/pubsub"
 	"github.com/ritzau/deps-analyzer/pkg/symbols"
@@ -202,6 +203,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/analysis", s.handleAnalysis).Methods("GET") // Legacy endpoint for UI polling
 	s.router.HandleFunc("/api/module", s.handleModule).Methods("GET", "HEAD") // HEAD for health checks
 	s.router.HandleFunc("/api/module/graph", s.handleModuleGraph).Methods("GET")
+	s.router.HandleFunc("/api/module/graph/lens", s.handleModuleGraphWithLens).Methods("POST")
 	s.router.HandleFunc("/api/module/packages", s.handlePackages).Methods("GET")
 	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
 	s.router.HandleFunc("/api/binaries/graph", s.handleBinaryGraph).Methods("GET")
@@ -355,6 +357,62 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 	// Build target-level graph from module with file-level details
 	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 	json.NewEncoder(w).Encode(graphData)
+}
+
+// LensRenderRequest represents the request body for lens rendering
+type LensRenderRequest struct {
+	DefaultLens    *lens.LensConfig          `json:"defaultLens"`
+	FocusLens      *lens.LensConfig          `json:"focusLens"`
+	FocusedNodes   []string                  `json:"focusedNodes"`
+	ManualOverrides map[string]lens.ManualOverride `json:"manualOverrides"`
+}
+
+func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.module == nil {
+		json.NewEncoder(w).Encode(&GraphData{
+			Nodes: []GraphNode{},
+			Edges: []GraphEdge{},
+		})
+		return
+	}
+
+	// Parse lens configuration from request body
+	var req LensRenderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Validate that we have lens configurations
+	if req.DefaultLens == nil || req.FocusLens == nil {
+		http.Error(w, "Missing required lens configurations", http.StatusBadRequest)
+		return
+	}
+
+	// Build raw graph data
+	rawGraphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
+
+	// Convert web.GraphData to lens.GraphData
+	lensGraphData := convertToLensGraphData(rawGraphData)
+
+	// Apply lens rendering
+	manualOverrides := req.ManualOverrides
+	if manualOverrides == nil {
+		manualOverrides = make(map[string]lens.ManualOverride)
+	}
+
+	renderedGraph, err := lens.RenderGraph(lensGraphData, req.DefaultLens, req.FocusLens, req.FocusedNodes, manualOverrides)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Lens rendering failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert lens.GraphData back to web.GraphData
+	resultGraphData := convertFromLensGraphData(renderedGraph, rawGraphData)
+
+	json.NewEncoder(w).Encode(resultGraphData)
 }
 
 func (s *Server) handlePackages(w http.ResponseWriter, r *http.Request) {
@@ -1119,6 +1177,96 @@ func getFileName(path string) string {
 		return parts[len(parts)-1]
 	}
 	return path
+}
+
+// convertToLensGraphData converts web.GraphData to lens.GraphData
+func convertToLensGraphData(webGraph *GraphData) *lens.GraphData {
+	lensNodes := make([]lens.GraphNode, len(webGraph.Nodes))
+	for i, node := range webGraph.Nodes {
+		lensNodes[i] = lens.GraphNode{
+			ID:     node.ID,
+			Label:  node.Label,
+			Type:   node.Type,
+			Parent: node.Parent,
+		}
+	}
+
+	lensEdges := make([]lens.GraphEdge, len(webGraph.Edges))
+	for i, edge := range webGraph.Edges {
+		lensEdges[i] = lens.GraphEdge{
+			Source: edge.Source,
+			Target: edge.Target,
+			Type:   edge.Type,
+		}
+	}
+
+	return &lens.GraphData{
+		Nodes: lensNodes,
+		Edges: lensEdges,
+	}
+}
+
+// convertFromLensGraphData converts lens.GraphData back to web.GraphData
+// It enriches the lens-rendered graph with metadata from the original raw graph
+func convertFromLensGraphData(lensGraph *lens.GraphData, rawGraph *GraphData) *GraphData {
+	// Create lookup map for raw graph nodes to get additional metadata
+	rawNodeMap := make(map[string]GraphNode)
+	for _, node := range rawGraph.Nodes {
+		rawNodeMap[node.ID] = node
+	}
+
+	// Create lookup map for raw graph edges to get additional metadata
+	type edgeKey struct {
+		source string
+		target string
+		edgeType string
+	}
+	rawEdgeMap := make(map[edgeKey]GraphEdge)
+	for _, edge := range rawGraph.Edges {
+		key := edgeKey{edge.Source, edge.Target, edge.Type}
+		rawEdgeMap[key] = edge
+	}
+
+	// Convert nodes, preserving metadata
+	webNodes := make([]GraphNode, len(lensGraph.Nodes))
+	for i, node := range lensGraph.Nodes {
+		webNodes[i] = GraphNode{
+			ID:     node.ID,
+			Label:  node.Label,
+			Type:   node.Type,
+			Parent: node.Parent,
+		}
+
+		// Copy additional metadata from raw graph if available
+		if rawNode, exists := rawNodeMap[node.ID]; exists {
+			webNodes[i].IsPublic = rawNode.IsPublic
+		}
+	}
+
+	// Convert edges, preserving metadata
+	webEdges := make([]GraphEdge, len(lensGraph.Edges))
+	for i, edge := range lensGraph.Edges {
+		webEdges[i] = GraphEdge{
+			Source: edge.Source,
+			Target: edge.Target,
+			Type:   edge.Type,
+		}
+
+		// Copy additional metadata from raw graph if available
+		key := edgeKey{edge.Source, edge.Target, edge.Type}
+		if rawEdge, exists := rawEdgeMap[key]; exists {
+			webEdges[i].Linkage = rawEdge.Linkage
+			webEdges[i].Symbols = rawEdge.Symbols
+			webEdges[i].SourceLabel = rawEdge.SourceLabel
+			webEdges[i].TargetLabel = rawEdge.TargetLabel
+			webEdges[i].FileDetails = rawEdge.FileDetails
+		}
+	}
+
+	return &GraphData{
+		Nodes: webNodes,
+		Edges: webEdges,
+	}
 }
 
 // Start starts the web server on the specified port

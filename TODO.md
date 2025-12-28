@@ -2,26 +2,43 @@
 
 ## Prioritized backlog
 
-1. **[IN PROGRESS]** Implement lens-based visualization system. Replace fixed views
-   (package/file/focused/binary) with flexible lens system featuring:
-   - Three-layer architecture: Default lens, Focus lens, Manual overrides
-   - Tabbed UI (Tree | Default Config | Focus Config)
-   - Hierarchical collapse levels (signed int: positive=top-down, negative=bottom-up)
-   - Focus selection (single/multi-select modes)
-   - Reset controls for each layer
+1. **[IN PROGRESS]** Move lens rendering to backend for better performance and simpler frontend architecture:
+
+   **Backend implementation - COMPLETED ✅**:
+   - Created `pkg/lens/` package with Go lens rendering logic
+   - Ported lens configuration structs from JavaScript to Go ([lens/lens.go](pkg/lens/lens.go))
+   - Implemented BFS distance computation ([lens/distance.go](pkg/lens/distance.go))
+   - Ported complete lens rendering pipeline to Go ([lens/renderer.go](pkg/lens/renderer.go)):
+     - Distance computation and lens assignment
+     - Visibility filtering based on node types and distance rules
+     - Hierarchy building (package/target/file levels)
+     - Collapse filtering based on collapse levels
+     - Edge aggregation for collapsed nodes
+   - Added `/api/module/graph/lens` POST endpoint ([server.go:206](pkg/web/server.go#L206))
+   - Endpoint accepts lens configurations and returns filtered graph
+
+   **Frontend integration - TODO**:
+   - Update frontend to call `/api/module/graph/lens` instead of doing local rendering
+   - Remove lens-renderer.js transformation logic (keep only API call glue)
+   - Implement diff-based incremental updates (optional optimization)
+   - Position caching with Dagre animation for smooth transitions
 
    **Known issues**:
-   - Hiding indirect neighbors (distance > 1) doesn't work properly. The focus lens
-     only has rules for distance 0, 1, and infinite. Nodes at distance 2, 3, etc.
-     fall back to the "infinite" rule instead of being hidden. Need to either:
-     a) Add a catch-all rule to hide nodes beyond a certain distance, OR
+   - Hiding indirect neighbors (distance > 1) doesn't work properly. The focus
+     lens only has rules for distance 0, 1, and infinite. Nodes at distance 2,
+     3, etc. fall back to the "infinite" rule instead of being hidden. Need to
+     either: a) Add a catch-all rule to hide nodes beyond a certain distance, OR
      b) Change the fallback behavior in findDistanceRule() to hide by default
 
-2. Improve symbol dependency analysis and presentation. Better distinguish
+2. BUG: Some tooltips (need a better name for these) get stuck. We should track
+   all created tooltips and clear them when layout changes, when the window
+   loses focus, and other times when appropriate.
+
+3. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-3. Add collapsible external dependencies in focused view. Give users control
+4. Add collapsible external dependencies in focused view. Give users control
    over detail level:
 
    - Level 1: Hide external dependencies completely (only show files within
@@ -29,26 +46,26 @@
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-4. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+5. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-5. Ensure consistent logging in backend and frontend.
+6. Ensure consistent logging in backend and frontend.
 
-6. Make sure docs are up to date.
+7. Make sure docs are up to date.
 
-7. External packages: May require support of .a files.
+8. External packages: May require support of .a files.
 
-8. Collect styles in the CSS (if possible with the graph library).
+9. Collect styles in the CSS (if possible with the graph library).
 
-9. **Uncovered files hierarchical expansion edge case**: When starting at
-   "Targets (hide files)" hierarchy level, manually expanding a target doesn't
-   show uncovered files because uncovered files are children of packages, not
-   targets. User must collapse and re-expand the parent package to see them.
-   This is technically correct behavior (uncovered files aren't part of
-   targets), but UX could be improved by either:
-   - Showing uncovered files when any sibling target is expanded
-   - Adding visual indication that package has uncovered files
-   - Auto-expanding package when last target is manually expanded
+10. **Uncovered files hierarchical expansion edge case**: When starting at
+    "Targets (hide files)" hierarchy level, manually expanding a target doesn't
+    show uncovered files because uncovered files are children of packages, not
+    targets. User must collapse and re-expand the parent package to see them.
+    This is technically correct behavior (uncovered files aren't part of
+    targets), but UX could be improved by either:
+    - Showing uncovered files when any sibling target is expanded
+    - Adding visual indication that package has uncovered files
+    - Auto-expanding package when last target is manually expanded
 
 ---
 
