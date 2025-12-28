@@ -64,19 +64,19 @@ const DEFAULT_PACKAGE_LENS = {
       distance: 'infinite',
       nodeVisibility: {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
-        fileTypes: ['none'],
+        fileTypes: ['all'],  // Show all files
         showUncovered: false,
         showExternal: false,
         showSystemLibraries: true
       },
-      collapseLevel: 2,  // Show down to target level (hide files)
+      collapseLevel: 3,  // Show down to file level
       showEdges: true,
-      edgeTypes: ['static', 'dynamic', 'system_link', 'data']
+      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
     }
   ],
   globalFilters: {},
   edgeRules: {
-    types: new Set(['static', 'dynamic', 'system_link', 'data']),
+    types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
     aggregateCollapsed: true
   }
 };
@@ -94,19 +94,19 @@ const DEFAULT_FOCUS_LENS = {
       distance: 'infinite',  // Apply same rules to all distances for now
       nodeVisibility: {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
-        fileTypes: ['none'],  // No files - keep it simple
+        fileTypes: ['all'],  // Show all files
         showUncovered: false,
         showExternal: false,
         showSystemLibraries: true
       },
-      collapseLevel: 2,  // Show down to target level (same as default)
+      collapseLevel: 3,  // Show down to file level (same as default)
       showEdges: true,
-      edgeTypes: ['static', 'dynamic', 'system_link', 'data']
+      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
     }
   ],
   globalFilters: {},
   edgeRules: {
-    types: new Set(['static', 'dynamic', 'system_link', 'data']),
+    types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
     aggregateCollapsed: true
   }
 };

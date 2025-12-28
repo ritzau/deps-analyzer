@@ -303,6 +303,24 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
+                selector: ':parent',
+                style: {
+                    'text-valign': 'top',
+                    'text-halign': 'center',
+                    'padding-top': '30px',
+                    'padding-left': '20px',
+                    'padding-right': '20px',
+                    'padding-bottom': '20px',
+                    'background-opacity': 0.1,
+                    'border-width': '2px',
+                    'border-color': '#666666',
+                    'border-opacity': 0.5,
+                    'compound-sizing-wrt-labels': 'include',
+                    'min-width': '100px',
+                    'min-height': '100px'
+                }
+            },
+            {
                 selector: 'node[type = "cc_binary"]',
                 style: {
                     'background-color': '#ff8c00',
@@ -820,25 +838,80 @@ function displayDependencyGraph(graphData) {
         }
     });
 
-    // Single-click on nodes to focus them
+    // Track click timing to distinguish single from double clicks
+    let clickTimeout = null;
+
+    // Single-click on nodes to focus them (with delay to check for double-click)
     cy.on('tap', 'node', function(evt) {
         const node = evt.target;
         const nodeId = node.data('id');
-        console.log('Node clicked (focus):', nodeId);
-        viewStateManager.updateFocus(nodeId);
+
+        // Clear any existing timeout
+        if (clickTimeout) {
+            clearTimeout(clickTimeout);
+            clickTimeout = null;
+        }
+
+        // Set a timeout to handle single click
+        clickTimeout = setTimeout(function() {
+            console.log('Node clicked (focus):', nodeId);
+            viewStateManager.updateFocus(nodeId);
+        }, 250); // 250ms delay to check for double-click
     });
 
     // Double-click on nodes to toggle manual collapse
     cy.on('dbltap', 'node', function(evt) {
         const node = evt.target;
         const nodeId = node.data('id');
-        console.log('Node double-clicked (toggle collapse):', nodeId);
+        const nodeType = node.data('type');
+
+        // Cancel the single-click timeout
+        if (clickTimeout) {
+            clearTimeout(clickTimeout);
+            clickTimeout = null;
+        }
+
+        console.log('Node double-clicked (toggle collapse):', nodeId, 'type:', nodeType);
 
         const currentState = viewStateManager.getState();
         const manual = currentState.manualOverrides.get(nodeId);
 
-        // Toggle: if manually collapsed, expand; if manually expanded or using lens, collapse
-        const newCollapsed = manual?.collapsed === true ? false : true;
+        // Determine current collapse state:
+        // 1. If there's a manual override, use that
+        // 2. Otherwise, use the default from lens collapseLevel
+        let currentCollapsed;
+        if (manual !== undefined && manual.collapsed !== null && manual.collapsed !== undefined) {
+            currentCollapsed = manual.collapsed;
+        } else {
+            // Use the lens's collapseLevel to determine default state
+            const collapseLevel = currentState.defaultLens.distanceRules[0]?.collapseLevel || 3;
+
+            // Determine node level
+            let nodeLevel = 0;
+            if (nodeType === 'package') {
+                nodeLevel = 1;
+            } else if (nodeType === 'cc_binary' || nodeType === 'cc_library' || nodeType === 'cc_shared_library') {
+                nodeLevel = 2;
+            } else if (nodeType === 'source_file' || nodeType === 'header_file') {
+                nodeLevel = 3;
+            }
+
+            // Check if this node should be collapsed based on collapseLevel
+            if (nodeLevel === 2 && collapseLevel < 3) {
+                currentCollapsed = true; // Collapse targets when we don't want to see files
+            } else if (nodeLevel === 1 && collapseLevel < 2) {
+                currentCollapsed = true; // Collapse packages when we don't want to see targets
+            } else {
+                currentCollapsed = false;
+            }
+        }
+
+        console.log('Current collapse state:', currentCollapsed, 'Manual override:', manual?.collapsed);
+
+        // Toggle: flip the current state
+        const newCollapsed = !currentCollapsed;
+        console.log('Setting new collapse state:', newCollapsed);
+
         viewStateManager.setManualOverride(nodeId, newCollapsed);
     });
 
@@ -851,11 +924,38 @@ function displayDependencyGraph(graphData) {
         setTimeout(function() {
             // Notify cytoscape that container dimensions are finalized
             cy.resize();
+
             // Center on all elements (the entire graph)
             cy.center(cy.elements());
             // Then fit to viewport with padding
             cy.fit(cy.elements(), 50);
         }, 10);
+    });
+}
+
+/**
+ * Apply collapse states to parent nodes in the graph
+ * Collapsed parent nodes will have their children hidden
+ */
+function applyCollapseStates(nodeStates) {
+    if (!cy || !nodeStates) return;
+
+    console.log('[CollapseStates] Applying collapse states to graph');
+
+    // First, show all nodes (reset state)
+    cy.nodes().show();
+
+    // Then hide descendants of collapsed parent nodes
+    cy.nodes(':parent').forEach(parentNode => {
+        const parentId = parentNode.data('id');
+        const state = nodeStates.get(parentId);
+
+        if (state && state.collapsed) {
+            // Hide all descendants (children and their children recursively)
+            const descendants = parentNode.descendants();
+            descendants.hide();
+            console.log(`[CollapseStates] Collapsed ${parentId}, hiding ${descendants.length} descendants`);
+        }
     });
 }
 
@@ -1282,10 +1382,12 @@ async function loadGraphData() {
             packageGraph = await graphResponse.json();
             console.log('Loaded graph with', packageGraph.nodes?.length, 'nodes');
 
-            // Display the graph
+            // Render through the lens system to ensure proper hierarchy and collapse states
             if (packageGraph && packageGraph.nodes && packageGraph.nodes.length > 0) {
-                console.log('Calling displayDependencyGraph with', packageGraph.nodes.length, 'nodes');
-                displayDependencyGraph(packageGraph);
+                console.log('Graph loaded, rendering through lens system');
+                const currentState = viewStateManager.getState();
+                const renderedGraph = lensRenderer.renderGraph(currentState, packageGraph);
+                displayDependencyGraph(renderedGraph);
             } else {
                 console.warn('Package graph has no nodes or is invalid:', packageGraph);
             }

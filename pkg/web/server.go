@@ -496,6 +496,116 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 			Type:     string(target.Kind),
 			IsPublic: target.IsPublic(),
 		})
+
+		// Create file nodes as children of this target
+		// Build a set of all files from this target (for later edge matching)
+		allFiles := make(map[string]bool)
+		for _, source := range target.Sources {
+			allFiles[source] = true
+		}
+		for _, header := range target.Headers {
+			allFiles[header] = true
+		}
+	}
+
+	// Create file nodes using the file-to-target mapping to ensure consistent IDs
+	// This ensures file node IDs match what's used in edges
+	createdFileNodes := make(map[string]bool)
+	if fileToTarget != nil {
+		for filePath, targetLabel := range fileToTarget {
+			fileID := targetLabel + ":" + filePath
+
+			// Skip if already created
+			if createdFileNodes[fileID] {
+				continue
+			}
+			createdFileNodes[fileID] = true
+
+			// Extract just the filename for display
+			filename := filePath
+			// Remove package prefix if present (e.g., "graphics:" from "graphics:renderer.cc")
+			if idx := strings.LastIndex(filename, ":"); idx >= 0 {
+				filename = filename[idx+1:]
+			}
+			// Remove directory path
+			if idx := strings.LastIndex(filename, "/"); idx >= 0 {
+				filename = filename[idx+1:]
+			}
+
+			// Determine file type
+			fileType := "source_file"
+			if strings.HasSuffix(filePath, ".h") || strings.HasSuffix(filePath, ".hpp") {
+				fileType = "header_file"
+			}
+
+			graphData.Nodes = append(graphData.Nodes, GraphNode{
+				ID:     fileID,
+				Label:  filename,
+				Type:   fileType,
+				Parent: targetLabel,
+			})
+		}
+	}
+
+	// Create file-to-file edges for compile dependencies (header includes)
+	if fileDeps != nil && fileToTarget != nil {
+		for _, fileDep := range fileDeps {
+			sourceTarget, sourceOK := fileToTarget[fileDep.SourceFile]
+			if !sourceOK {
+				continue
+			}
+
+			sourceFileID := sourceTarget + ":" + fileDep.SourceFile
+			sourceFileName := getFileName(fileDep.SourceFile)
+
+			for _, depFile := range fileDep.Dependencies {
+				targetTarget, targetOK := fileToTarget[depFile]
+				if !targetOK {
+					continue
+				}
+
+				targetFileID := targetTarget + ":" + depFile
+				targetFileName := getFileName(depFile)
+
+				// Create edge from source file to dependency file
+				graphData.Edges = append(graphData.Edges, GraphEdge{
+					Source: sourceFileID,
+					Target: targetFileID,
+					Type:   string(model.DependencyCompile),
+					FileDetails: map[string]string{
+						sourceFileName: targetFileName,
+					},
+				})
+			}
+		}
+	}
+
+	// Create file-to-file edges for symbol dependencies
+	if symbolDeps != nil {
+		// Group symbol deps by file pair
+		type fileEdgeKey struct {
+			sourceFile string
+			targetFile string
+		}
+		symbolsByFilePair := make(map[fileEdgeKey][]string)
+
+		for _, symDep := range symbolDeps {
+			key := fileEdgeKey{
+				sourceFile: symDep.SourceTarget + ":" + symDep.SourceFile,
+				targetFile: symDep.TargetTarget + ":" + symDep.TargetFile,
+			}
+			symbolsByFilePair[key] = append(symbolsByFilePair[key], symDep.Symbol)
+		}
+
+		// Create edges with aggregated symbols
+		for key, symbols := range symbolsByFilePair {
+			graphData.Edges = append(graphData.Edges, GraphEdge{
+				Source:  key.sourceFile,
+				Target:  key.targetFile,
+				Type:    string(model.DependencySymbol),
+				Symbols: symbols,
+			})
+		}
 	}
 
 	// Track system libraries to avoid duplicates

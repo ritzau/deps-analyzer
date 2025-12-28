@@ -158,6 +158,37 @@ function setupDefaultLensControls() {
       });
     }
   });
+
+  // Collapse level radio buttons
+  const collapseLevelRadios = document.querySelectorAll('input[name="collapseLevel"]');
+  collapseLevelRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        const level = parseInt(e.target.value);
+        console.log('[LensControls] Collapse level changed to:', level);
+        const currentLens = cloneLens(viewStateManager.getState().defaultLens);
+
+        // Update the collapse level in the distance rule
+        const rule = currentLens.distanceRules[0];
+        if (rule) {
+          rule.collapseLevel = level;
+
+          // Also update file visibility to match
+          if (level >= 3) {
+            rule.nodeVisibility.fileTypes = ['all'];
+          } else {
+            rule.nodeVisibility.fileTypes = ['none'];
+          }
+        }
+
+        // Clear all manual fold/unfold overrides since they were based on the previous collapse level
+        viewStateManager.resetManualOverrides();
+        console.log('[LensControls] Cleared manual overrides due to collapse level change');
+
+        viewStateManager.updateDefaultLens(currentLens);
+      }
+    });
+  });
 }
 
 /**
