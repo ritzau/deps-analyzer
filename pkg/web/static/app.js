@@ -1633,6 +1633,12 @@ let cy = null; // Store the Cytoscape instance
 // Replaced currentView, currentTarget, currentBinary with lens system
 // All lens rendering now happens server-side via /api/module/graph/lens
 
+// Current graph state hash (for diff-based updates)
+let currentGraphHash = null;
+
+// Current graph data (for applying diffs)
+let currentGraphData = null;
+
 /**
  * Fetch rendered graph from backend lens API
  * @param {Object} viewState - Current view state with lens configurations
@@ -1654,7 +1660,8 @@ async function fetchRenderedGraphFromBackend(viewState) {
     defaultLens: serializeLens(viewState.defaultLens),
     focusLens: serializeLens(viewState.focusLens),
     focusedNodes: Array.from(viewState.focusedNodes),
-    manualOverrides: Object.fromEntries(viewState.manualOverrides)
+    manualOverrides: Object.fromEntries(viewState.manualOverrides),
+    previousHash: currentGraphHash  // Send previous hash for diff-based updates
   };
 
   console.log('[App] Request body:', JSON.stringify(requestBody, null, 2));
@@ -1672,10 +1679,77 @@ async function fetchRenderedGraphFromBackend(viewState) {
     throw new Error(`Backend lens rendering failed: ${response.statusText} - ${errorText}`);
   }
 
-  const renderedGraph = await response.json();
-  console.log('[App] Received rendered graph from backend:', renderedGraph.nodes?.length, 'nodes,', renderedGraph.edges?.length, 'edges');
+  const responseData = await response.json();
+
+  // Update current hash
+  currentGraphHash = responseData.hash;
+
+  // Handle diff vs full graph response
+  let renderedGraph;
+  if (responseData.fullGraph) {
+    console.log('[App] Received full graph from backend:', responseData.fullGraph.nodes?.length, 'nodes,', responseData.fullGraph.edges?.length, 'edges');
+    renderedGraph = responseData.fullGraph;
+    currentGraphData = renderedGraph;
+  } else if (responseData.diff) {
+    console.log('[App] Received diff from backend:',
+      responseData.diff.addedNodes?.length || 0, 'added nodes,',
+      responseData.diff.removedNodes?.length || 0, 'removed nodes,',
+      responseData.diff.addedEdges?.length || 0, 'added edges,',
+      responseData.diff.removedEdges?.length || 0, 'removed edges');
+    renderedGraph = applyGraphDiff(currentGraphData, responseData.diff);
+    currentGraphData = renderedGraph;
+  } else {
+    throw new Error('Invalid response: neither fullGraph nor diff provided');
+  }
 
   return renderedGraph;
+}
+
+/**
+ * Apply a graph diff to the current graph data
+ * @param {Object} currentGraph - Current graph data
+ * @param {Object} diff - Diff to apply
+ * @returns {Object} Updated graph data
+ */
+function applyGraphDiff(currentGraph, diff) {
+  if (!currentGraph) {
+    throw new Error('Cannot apply diff: no current graph');
+  }
+
+  // Create maps for efficient lookup
+  const nodeMap = new Map(currentGraph.nodes.map(n => [n.id, n]));
+  const edgeMap = new Map(currentGraph.edges.map(e => [`${e.source}|${e.target}|${e.type}`, e]));
+
+  // Apply node changes
+  if (diff.removedNodes) {
+    diff.removedNodes.forEach(nodeId => nodeMap.delete(nodeId));
+  }
+
+  if (diff.addedNodes) {
+    diff.addedNodes.forEach(node => nodeMap.set(node.id, node));
+  }
+
+  if (diff.modifiedNodes) {
+    diff.modifiedNodes.forEach(node => nodeMap.set(node.id, node));
+  }
+
+  // Apply edge changes
+  if (diff.removedEdges) {
+    diff.removedEdges.forEach(edgeKey => edgeMap.delete(edgeKey));
+  }
+
+  if (diff.addedEdges) {
+    diff.addedEdges.forEach(edge => {
+      const key = `${edge.source}|${edge.target}|${edge.type}`;
+      edgeMap.set(key, edge);
+    });
+  }
+
+  // Convert maps back to arrays
+  return {
+    nodes: Array.from(nodeMap.values()),
+    edges: Array.from(edgeMap.values())
+  };
 }
 
 // Listen for state changes and re-render graph

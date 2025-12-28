@@ -60,6 +60,7 @@ type Server struct {
 	fileToTarget   map[string]string            // Maps file paths to target labels
 	uncoveredFiles []string                     // Files not included in any target
 	watching       bool                         // File watching active
+	lensCache      map[string]*lens.GraphSnapshot // Cache of rendered graphs by request hash
 	mu             sync.RWMutex                 // Protect all state from concurrent access
 }
 
@@ -83,6 +84,7 @@ func NewServer() *Server {
 	s := &Server{
 		router:    mux.NewRouter(),
 		publisher: ssePublisher,
+		lensCache: make(map[string]*lens.GraphSnapshot),
 	}
 	s.setupRoutes()
 	return s
@@ -320,19 +322,36 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 
 // LensRenderRequest represents the request body for lens rendering
 type LensRenderRequest struct {
-	DefaultLens    *lens.LensConfig          `json:"defaultLens"`
-	FocusLens      *lens.LensConfig          `json:"focusLens"`
-	FocusedNodes   []string                  `json:"focusedNodes"`
+	DefaultLens     *lens.LensConfig               `json:"defaultLens"`
+	FocusLens       *lens.LensConfig               `json:"focusLens"`
+	FocusedNodes    []string                       `json:"focusedNodes"`
 	ManualOverrides map[string]lens.ManualOverride `json:"manualOverrides"`
+	PreviousHash    string                         `json:"previousHash,omitempty"` // Hash of previous graph for diffing
+}
+
+// LensRenderResponse represents the response from lens rendering
+type LensRenderResponse struct {
+	Hash         string      `json:"hash"`                   // Hash of this graph state
+	FullGraph    *GraphData  `json:"fullGraph,omitempty"`    // Complete graph (if no previousHash or diff too large)
+	Diff         *GraphDiff  `json:"diff,omitempty"`         // Incremental changes (if previousHash provided)
+}
+
+// GraphDiff represents incremental changes to a graph
+type GraphDiff struct {
+	AddedNodes    []GraphNode `json:"addedNodes,omitempty"`
+	RemovedNodes  []string    `json:"removedNodes,omitempty"`  // Node IDs
+	ModifiedNodes []GraphNode `json:"modifiedNodes,omitempty"`
+	AddedEdges    []GraphEdge `json:"addedEdges,omitempty"`
+	RemovedEdges  []string    `json:"removedEdges,omitempty"`  // Edge keys (source|target|type)
 }
 
 func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if s.module == nil {
-		json.NewEncoder(w).Encode(&GraphData{
-			Nodes: []GraphNode{},
-			Edges: []GraphEdge{},
+		json.NewEncoder(w).Encode(&LensRenderResponse{
+			Hash:      "",
+			FullGraph: &GraphData{Nodes: []GraphNode{}, Edges: []GraphEdge{}},
 		})
 		return
 	}
@@ -350,6 +369,13 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Compute request hash for cache lookup
+	manualOverrides := req.ManualOverrides
+	if manualOverrides == nil {
+		manualOverrides = make(map[string]lens.ManualOverride)
+	}
+	requestHash := lens.ComputeHash(req.DefaultLens, req.FocusLens, req.FocusedNodes, manualOverrides)
+
 	// Build raw graph data
 	rawGraphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 
@@ -357,11 +383,6 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	lensGraphData := convertToLensGraphData(rawGraphData)
 
 	// Apply lens rendering
-	manualOverrides := req.ManualOverrides
-	if manualOverrides == nil {
-		manualOverrides = make(map[string]lens.ManualOverride)
-	}
-
 	renderedGraph, err := lens.RenderGraph(lensGraphData, req.DefaultLens, req.FocusLens, req.FocusedNodes, manualOverrides)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Lens rendering failed: %v", err), http.StatusInternalServerError)
@@ -371,7 +392,66 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	// Convert lens.GraphData back to web.GraphData
 	resultGraphData := convertFromLensGraphData(renderedGraph, rawGraphData)
 
-	json.NewEncoder(w).Encode(resultGraphData)
+	// Create snapshot of new graph
+	newSnapshot := lens.CreateSnapshot(convertToLensGraphData(resultGraphData))
+
+	// Lock for cache access
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Get previous snapshot from cache (if it exists)
+	var previousSnapshot *lens.GraphSnapshot
+	if cachedSnapshot, exists := s.lensCache[requestHash]; exists {
+		previousSnapshot = cachedSnapshot
+		log.Printf("[LensAPI] Found cached snapshot for request, will compute diff")
+	}
+
+	// Store new snapshot in cache
+	s.lensCache[requestHash] = newSnapshot
+
+	// Compute diff if we have a previous snapshot
+	if previousSnapshot != nil {
+		lensDiff := lens.ComputeDiff(previousSnapshot, convertToLensGraphData(resultGraphData))
+
+		// Convert lens diff to web diff
+		webDiff := &GraphDiff{
+			AddedNodes:    convertLensNodesToWeb(lensDiff.AddedNodes, rawGraphData),
+			RemovedNodes:  lensDiff.RemovedNodes,
+			ModifiedNodes: convertLensNodesToWeb(lensDiff.ModifiedNodes, rawGraphData),
+			AddedEdges:    convertLensEdgesToWeb(lensDiff.AddedEdges, rawGraphData),
+			RemovedEdges:  lensDiff.RemovedEdges,
+		}
+
+		// Calculate diff size
+		diffSize := len(webDiff.AddedNodes) + len(webDiff.RemovedNodes) + len(webDiff.ModifiedNodes) +
+		            len(webDiff.AddedEdges) + len(webDiff.RemovedEdges)
+		fullSize := len(resultGraphData.Nodes) + len(resultGraphData.Edges)
+
+		// If diff is larger than 50% of full graph, send full graph instead
+		if diffSize > fullSize/2 {
+			log.Printf("[LensAPI] Diff too large (%d changes vs %d total), sending full graph", diffSize, fullSize)
+			json.NewEncoder(w).Encode(&LensRenderResponse{
+				Hash:      newSnapshot.Hash,
+				FullGraph: resultGraphData,
+			})
+		} else {
+			log.Printf("[LensAPI] Sending diff: %d added, %d removed, %d modified nodes; %d added, %d removed edges",
+				len(webDiff.AddedNodes), len(webDiff.RemovedNodes), len(webDiff.ModifiedNodes),
+				len(webDiff.AddedEdges), len(webDiff.RemovedEdges))
+			json.NewEncoder(w).Encode(&LensRenderResponse{
+				Hash: newSnapshot.Hash,
+				Diff: webDiff,
+			})
+		}
+	} else {
+		// No previous snapshot, send full graph
+		log.Printf("[LensAPI] No previous snapshot, sending full graph (%d nodes, %d edges)",
+			len(resultGraphData.Nodes), len(resultGraphData.Edges))
+		json.NewEncoder(w).Encode(&LensRenderResponse{
+			Hash:      newSnapshot.Hash,
+			FullGraph: resultGraphData,
+		})
+	}
 }
 
 func (s *Server) handleTargetFocused(w http.ResponseWriter, r *http.Request) {
@@ -1213,6 +1293,72 @@ func convertFromLensGraphData(lensGraph *lens.GraphData, rawGraph *GraphData) *G
 		Nodes: webNodes,
 		Edges: webEdges,
 	}
+}
+
+// convertLensNodesToWeb converts a slice of lens.GraphNode to web GraphNode
+// It enriches the nodes with metadata from the original raw graph
+func convertLensNodesToWeb(lensNodes []lens.GraphNode, rawGraph *GraphData) []GraphNode {
+	// Create lookup map for raw graph nodes to get additional metadata
+	rawNodeMap := make(map[string]GraphNode)
+	for _, node := range rawGraph.Nodes {
+		rawNodeMap[node.ID] = node
+	}
+
+	// Convert nodes, preserving metadata
+	webNodes := make([]GraphNode, len(lensNodes))
+	for i, node := range lensNodes {
+		webNodes[i] = GraphNode{
+			ID:     node.ID,
+			Label:  node.Label,
+			Type:   node.Type,
+			Parent: node.Parent,
+		}
+
+		// Copy additional metadata from raw graph if available
+		if rawNode, exists := rawNodeMap[node.ID]; exists {
+			webNodes[i].IsPublic = rawNode.IsPublic
+		}
+	}
+
+	return webNodes
+}
+
+// convertLensEdgesToWeb converts a slice of lens.GraphEdge to web GraphEdge
+// It enriches the edges with metadata from the original raw graph
+func convertLensEdgesToWeb(lensEdges []lens.GraphEdge, rawGraph *GraphData) []GraphEdge {
+	// Create lookup map for raw graph edges to get additional metadata
+	type edgeKey struct {
+		source   string
+		target   string
+		edgeType string
+	}
+	rawEdgeMap := make(map[edgeKey]GraphEdge)
+	for _, edge := range rawGraph.Edges {
+		key := edgeKey{edge.Source, edge.Target, edge.Type}
+		rawEdgeMap[key] = edge
+	}
+
+	// Convert edges, preserving metadata
+	webEdges := make([]GraphEdge, len(lensEdges))
+	for i, edge := range lensEdges {
+		webEdges[i] = GraphEdge{
+			Source: edge.Source,
+			Target: edge.Target,
+			Type:   edge.Type,
+		}
+
+		// Copy additional metadata from raw graph if available
+		key := edgeKey{edge.Source, edge.Target, edge.Type}
+		if rawEdge, exists := rawEdgeMap[key]; exists {
+			webEdges[i].Linkage = rawEdge.Linkage
+			webEdges[i].Symbols = rawEdge.Symbols
+			webEdges[i].SourceLabel = rawEdge.SourceLabel
+			webEdges[i].TargetLabel = rawEdge.TargetLabel
+			webEdges[i].FileDetails = rawEdge.FileDetails
+		}
+	}
+
+	return webEdges
 }
 
 // Start starts the web server on the specified port

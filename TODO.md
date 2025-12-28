@@ -24,9 +24,25 @@
    - Removed client-side lens-renderer.js (1,149 lines deleted)
    - Removed fallback to client-side rendering - backend failures are now fatal errors
    - Removed filterReachableFromBinary() helper (83 lines) - backend handles all graph transformations
+   - Removed unused backend endpoints: `/api/analysis`, `/api/binaries/graph`, `/api/module/packages` (50 lines)
+
+   **Diff-based incremental updates - COMPLETED ✅**:
+   - Created `pkg/lens/diff.go` with diff computation logic:
+     - `ComputeHash()` - SHA256 hash of lens config for cache keys
+     - `CreateSnapshot()` - Indexed graph representation for efficient diffing
+     - `ComputeDiff()` - Computes added/removed/modified nodes and edges
+   - Updated backend API to support incremental updates:
+     - Added `lensCache` map to Server for caching rendered graphs by request hash
+     - Modified `/api/module/graph/lens` to return `{hash, fullGraph?, diff?}` format
+     - Sends diff when graph changes are <50% of total, otherwise sends full graph
+     - Created helper functions `convertLensNodesToWeb()` and `convertLensEdgesToWeb()`
+   - Updated frontend to handle diff responses:
+     - Added `currentGraphHash` and `currentGraphData` state tracking
+     - Modified `fetchRenderedGraphFromBackend()` to send `previousHash` parameter
+     - Added `applyGraphDiff()` function to apply incremental changes to graph
+     - Handles both full graph and diff responses transparently
 
    **Future enhancements - TODO**:
-   - Implement diff-based incremental updates (optional)
    - Position caching with Dagre animation for smooth transitions
 
    **Known issues**:
