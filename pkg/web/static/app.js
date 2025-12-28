@@ -675,20 +675,28 @@ function displayDependencyGraph(graphData) {
 
         cy.endBatch();
 
-        // Run layout with animation and no viewport reset
-        cy.layout({
-            name: 'dagre',
-            rankDir: 'TB',
-            ranker: 'network-simplex',
-            nodeSep: 80,
-            edgeSep: 20,
-            rankSep: 120,
-            fit: false,          // Don't reset viewport/zoom
-            animate: true,       // Smooth transitions
-            animationDuration: 1000,  // Slow animation for debugging
-            animationEasing: 'ease-out',
-            padding: 50
-        }).run();
+        // Only run layout if nodes were added/removed
+        // If only edges changed, nodes keep their positions (no movement!)
+        const nodesChanged = nodesToRemove.length > 0 || elementsToAdd.some(e => !e.data.source);
+
+        if (nodesChanged) {
+            console.log('[Cytoscape] Running layout because nodes changed');
+            cy.layout({
+                name: 'dagre',
+                rankDir: 'TB',
+                ranker: 'network-simplex',
+                nodeSep: 80,
+                edgeSep: 20,
+                rankSep: 120,
+                fit: false,          // Don't reset viewport/zoom
+                animate: true,       // Smooth transitions
+                animationDuration: 250,
+                animationEasing: 'ease-out',
+                padding: 50
+            }).run();
+        } else {
+            console.log('[Cytoscape] Skipping layout - only edges changed, nodes stay in place');
+        }
     }
 }
 

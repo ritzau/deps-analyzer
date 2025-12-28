@@ -3,6 +3,7 @@ package lens
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 )
 
@@ -97,6 +98,11 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 
 	// 12. Aggregate edges for collapsed nodes
 	visibleEdges := aggregateEdgesForCollapsedNodes(rawGraph, nodeStates, defaultLens, focusLens, nodeLensMap, includedNodeIds, childToParentMap)
+
+	// 13. Sort nodes for deterministic ordering (Dagre layout stability)
+	sort.Slice(finalNodes, func(i, j int) bool {
+		return finalNodes[i].ID < finalNodes[j].ID
+	})
 
 	log.Printf("[LensRenderer] Final result: %d nodes, %d edges", len(finalNodes), len(visibleEdges))
 
@@ -520,10 +526,23 @@ func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]
 		// The web layer will restore metadata (symbols, file details) from the raw graph
 	}
 
-	// Convert map to slice
+	// Convert map to slice and sort for deterministic order
+	// This is critical for Dagre layout stability - if edges arrive in different
+	// orders, Dagre may place nodes differently even with the same graph structure
 	for _, edge := range edgeMap {
 		visibleEdges = append(visibleEdges, *edge)
 	}
+
+	// Sort edges by source, then target, then type for canonical ordering
+	sort.Slice(visibleEdges, func(i, j int) bool {
+		if visibleEdges[i].Source != visibleEdges[j].Source {
+			return visibleEdges[i].Source < visibleEdges[j].Source
+		}
+		if visibleEdges[i].Target != visibleEdges[j].Target {
+			return visibleEdges[i].Target < visibleEdges[j].Target
+		}
+		return visibleEdges[i].Type < visibleEdges[j].Type
+	})
 
 	return visibleEdges
 }
