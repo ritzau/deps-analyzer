@@ -1854,8 +1854,15 @@ viewStateManager.addListener(async (newState) => {
     clearPositionCache();
   }
 
-  // Update previous state
-  previousViewState = newState;
+  // Deep clone the state to avoid reference issues
+  // (Maps need special handling)
+  previousViewState = {
+    ...newState,
+    focusedNodes: new Set(newState.focusedNodes),
+    manualOverrides: new Map(newState.manualOverrides),
+    defaultLens: JSON.parse(JSON.stringify(newState.defaultLens)),
+    focusLens: JSON.parse(JSON.stringify(newState.focusLens))
+  };
 
   try {
     // Fetch rendered graph from backend
