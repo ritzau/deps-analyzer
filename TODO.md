@@ -10,6 +10,13 @@
    - Focus selection (single/multi-select modes)
    - Reset controls for each layer
 
+   **Known issues**:
+   - Hiding indirect neighbors (distance > 1) doesn't work properly. The focus lens
+     only has rules for distance 0, 1, and infinite. Nodes at distance 2, 3, etc.
+     fall back to the "infinite" rule instead of being hidden. Need to either:
+     a) Add a catch-all rule to hide nodes beyond a certain distance, OR
+     b) Change the fallback behavior in findDistanceRule() to hide by default
+
 2. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
