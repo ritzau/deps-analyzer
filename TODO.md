@@ -2,7 +2,7 @@
 
 ## Prioritized backlog
 
-1. **[IN PROGRESS]** Move lens rendering to backend for better performance and simpler frontend architecture:
+1. **[COMPLETED ✅]** Move lens rendering to backend for better performance and simpler frontend architecture:
 
    **Backend implementation - COMPLETED ✅**:
    - Created `pkg/lens/` package with Go lens rendering logic
@@ -18,13 +18,18 @@
    - Endpoint accepts lens configurations and returns filtered graph
 
    **Frontend integration - COMPLETED ✅**:
-   - Updated viewStateManager listener to call `/api/module/graph/lens` ([app.js:1783-1807](pkg/web/static/app.js#L1783-L1807))
+   - Updated viewStateManager listener to call `/api/module/graph/lens` ([app.js:1805](pkg/web/static/app.js#L1805))
+   - Updated initial page load (loadGraphData) to use backend API ([app.js:1390,1415,1450](pkg/web/static/app.js#L1390))
    - Added fetchRenderedGraphFromBackend() function with proper serialization ([app.js:1743-1781](pkg/web/static/app.js#L1743-L1781))
-   - Includes fallback to client-side rendering if backend fails
-   - Kept lens-renderer.js for backward compatibility and fallback
+   - Includes fallback to client-side rendering if backend fails ([app.js:1815](pkg/web/static/app.js#L1815))
+   - Kept lens-renderer.js (1,149 lines) for fallback only
 
-   **Future optimizations - TODO**:
-   - Remove lens-renderer.js client-side transformation logic (after sufficient testing)
+   **Potential cleanup - OPTIONAL**:
+   - Consider removing lens-renderer.js and fallback path after sufficient production testing
+   - This would save 1,149 lines of client-side code
+   - Current usage: Only used in error fallback path ([app.js:1636,1815](pkg/web/static/app.js#L1636))
+
+   **Future enhancements - TODO**:
    - Implement diff-based incremental updates (optional)
    - Position caching with Dagre animation for smooth transitions
 

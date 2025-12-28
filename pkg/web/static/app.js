@@ -1382,12 +1382,16 @@ async function loadGraphData() {
             packageGraph = await graphResponse.json();
             console.log('Loaded graph with', packageGraph.nodes?.length, 'nodes');
 
-            // Render through the lens system to ensure proper hierarchy and collapse states
+            // Render through backend lens API to ensure proper hierarchy and collapse states
             if (packageGraph && packageGraph.nodes && packageGraph.nodes.length > 0) {
-                console.log('Graph loaded, rendering through lens system');
-                const currentState = viewStateManager.getState();
-                const renderedGraph = lensRenderer.renderGraph(currentState, packageGraph);
-                displayDependencyGraph(renderedGraph);
+                console.log('Graph loaded, rendering through backend lens API');
+                try {
+                    const currentState = viewStateManager.getState();
+                    const renderedGraph = await fetchRenderedGraphFromBackend(currentState);
+                    displayDependencyGraph(renderedGraph);
+                } catch (error) {
+                    console.error('Error rendering graph via backend:', error);
+                }
             } else {
                 console.warn('Package graph has no nodes or is invalid:', packageGraph);
             }
@@ -1404,10 +1408,14 @@ async function loadGraphData() {
             // Enrich the displayed graph with overlapping dependency information
             if (packageGraph && packageGraph.nodes) {
                 enrichGraphWithOverlappingInfo(packageGraph, binaryData);
-                // Redisplay the graph with overlapping info through lens system
-                const currentState = viewStateManager.getState();
-                const renderedGraph = lensRenderer.renderGraph(currentState, packageGraph);
-                displayDependencyGraph(renderedGraph);
+                // Redisplay the graph with overlapping info through backend lens API
+                try {
+                    const currentState = viewStateManager.getState();
+                    const renderedGraph = await fetchRenderedGraphFromBackend(currentState);
+                    displayDependencyGraph(renderedGraph);
+                } catch (error) {
+                    console.error('Error rendering graph via backend:', error);
+                }
             }
         }
 
@@ -1436,9 +1444,13 @@ async function loadGraphData() {
                 populateBinarySelector(binaryData);
             }
 
-            // Trigger initial render with lens system
-            const renderedGraph = lensRenderer.renderGraph(viewStateManager.getState(), packageGraph);
-            displayDependencyGraph(renderedGraph);
+            // Trigger initial render with backend lens API
+            try {
+                const renderedGraph = await fetchRenderedGraphFromBackend(viewStateManager.getState());
+                displayDependencyGraph(renderedGraph);
+            } catch (error) {
+                console.error('Error rendering graph via backend:', error);
+            }
         }
     } catch (e) {
         console.error('Error loading graph data:', e);
