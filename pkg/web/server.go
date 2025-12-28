@@ -200,13 +200,10 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/subscribe/target_graph", s.handleSubscribeTargetGraph).Methods("GET")
 
 	// API routes - more specific routes must come first
-	s.router.HandleFunc("/api/analysis", s.handleAnalysis).Methods("GET") // Legacy endpoint for UI polling
 	s.router.HandleFunc("/api/module", s.handleModule).Methods("GET", "HEAD") // HEAD for health checks
 	s.router.HandleFunc("/api/module/graph", s.handleModuleGraph).Methods("GET")
 	s.router.HandleFunc("/api/module/graph/lens", s.handleModuleGraphWithLens).Methods("POST")
-	s.router.HandleFunc("/api/module/packages", s.handlePackages).Methods("GET")
 	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
-	s.router.HandleFunc("/api/binaries/graph", s.handleBinaryGraph).Methods("GET")
 	s.router.HandleFunc("/api/target/{label}/focused", s.handleTargetFocused).Methods("GET")
 
 	// Serve static files
@@ -294,44 +291,6 @@ func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(s.binaries)
 }
 
-func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Legacy endpoint for UI polling - returns Module data in expected format
-	// Since we now do analysis in one go, we always report as complete (step 4)
-	response := map[string]interface{}{
-		"analysisStep":     4, // Always complete
-		"graph":            &GraphData{Nodes: []GraphNode{}, Edges: []GraphEdge{}},
-		"crossPackageDeps": []interface{}{},
-		"fileCycles":       []interface{}{},
-	}
-
-	if s.module != nil {
-		// Convert Module to graph format with file-level details
-		response["graph"] = buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
-		// Convert package dependencies
-		response["crossPackageDeps"] = s.module.GetAllPackageDependencies()
-	}
-
-	json.NewEncoder(w).Encode(response)
-}
-
-func (s *Server) handleBinaryGraph(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if s.binaries == nil {
-		json.NewEncoder(w).Encode(&GraphData{
-			Nodes: []GraphNode{},
-			Edges: []GraphEdge{},
-		})
-		return
-	}
-
-	// Build binary-level graph
-	graphData := buildBinaryGraphData(s.binaries)
-	json.NewEncoder(w).Encode(graphData)
-}
-
 func (s *Server) handleModule(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -413,19 +372,6 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	resultGraphData := convertFromLensGraphData(renderedGraph, rawGraphData)
 
 	json.NewEncoder(w).Encode(resultGraphData)
-}
-
-func (s *Server) handlePackages(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if s.module == nil {
-		json.NewEncoder(w).Encode([]model.PackageDependency{})
-		return
-	}
-
-	// Get all package dependencies
-	pkgDeps := s.module.GetAllPackageDependencies()
-	json.NewEncoder(w).Encode(pkgDeps)
 }
 
 func (s *Server) handleTargetFocused(w http.ResponseWriter, r *http.Request) {
