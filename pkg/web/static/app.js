@@ -1631,121 +1631,7 @@ let binaryData = null; // Store binary information
 let cy = null; // Store the Cytoscape instance
 // ===== Lens-Based Visualization System =====
 // Replaced currentView, currentTarget, currentBinary with lens system
-
-// Initialize lens renderer
-const lensRenderer = new LensRenderer();
-
-/**
- * Get the appropriate raw graph based on baseSet configuration
- * @param {Object} baseSet - Base set configuration
- * @returns {Promise<Object>} Raw graph data
- */
-async function getRawGraphForBaseSet(baseSet) {
-  console.log('[App] Getting raw graph for baseSet:', baseSet);
-
-  if (baseSet.type === 'full-graph') {
-    // Use package-level graph
-    return packageGraph;
-  } else if (baseSet.type === 'reachable-from-binary') {
-    // Use package graph and filter to nodes reachable from the binary
-    // This shows all target-level dependencies of the binary
-    if (baseSet.binaryLabel && packageGraph) {
-      console.log('[App] Filtering package graph to nodes reachable from:', baseSet.binaryLabel);
-      return filterReachableFromBinary(packageGraph, baseSet.binaryLabel);
-    }
-
-    return packageGraph;
-  } else if (baseSet.type === 'package-level') {
-    // Use package-level graph (same as full-graph for now)
-    return packageGraph;
-  }
-
-  return packageGraph; // Default fallback
-}
-
-/**
- * Filter graph to only nodes reachable from a specific binary
- * @param {Object} graph - Full graph
- * @param {string} binaryLabel - Binary label to start from
- * @returns {Object} Filtered graph
- */
-function filterReachableFromBinary(graph, binaryLabel) {
-  console.log('[App] Filtering graph to nodes reachable from:', binaryLabel);
-  console.log('[App] Full graph has', graph.nodes?.length, 'nodes and', graph.edges?.length, 'edges');
-
-  // Check if the binary exists in the graph
-  const binaryNode = graph.nodes.find(n => n.id === binaryLabel || n.label === binaryLabel);
-  if (!binaryNode) {
-    console.error('[App] Binary node not found in graph:', binaryLabel);
-    console.log('[App] Available node IDs:', graph.nodes.slice(0, 5).map(n => n.id || n.label));
-    return { nodes: [], edges: [] };
-  }
-
-  // Use the node's ID for traversal
-  const startNodeId = binaryNode.id || binaryNode.label;
-  console.log('[App] Starting BFS from node:', startNodeId);
-
-  // Find all nodes reachable from the binary using BFS (forward-only)
-  const reachable = new Set();
-  const queue = [startNodeId];
-  reachable.add(startNodeId);
-
-  // Build adjacency list (forward direction only: source -> target)
-  // This means we follow dependencies OUT from the binary
-  const adjacency = new Map();
-  console.log('[App] Sample edges:', graph.edges.slice(0, 3).map(e => ({source: e.source, target: e.target})));
-
-  graph.edges.forEach(edge => {
-    if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
-    adjacency.get(edge.source).push(edge.target);
-  });
-
-  console.log('[App] Built adjacency list with', adjacency.size, 'nodes');
-  console.log('[App] Adjacency keys:', Array.from(adjacency.keys()));
-  console.log('[App] Binary has', adjacency.get(startNodeId)?.length || 0, 'outgoing edges');
-
-  // BFS to find all reachable nodes (following edges forward only)
-  let iterations = 0;
-  while (queue.length > 0) {
-    const current = queue.shift();
-    const neighbors = adjacency.get(current) || [];
-
-    if (iterations < 5) {
-      console.log('[App] BFS iteration', iterations, '- current:', current, 'neighbors:', neighbors.length);
-    }
-
-    for (const neighbor of neighbors) {
-      if (!reachable.has(neighbor)) {
-        reachable.add(neighbor);
-        queue.push(neighbor);
-      }
-    }
-    iterations++;
-  }
-
-  console.log('[App] BFS completed in', iterations, 'iterations');
-  console.log('[App] Found', reachable.size, 'nodes reachable from', binaryLabel);
-  console.log('[App] Reachable node IDs:', Array.from(reachable));
-
-  // Filter nodes and edges
-  const filteredNodes = graph.nodes.filter(node =>
-    reachable.has(node.id) || reachable.has(node.label)
-  );
-
-  const filteredEdges = graph.edges.filter(edge =>
-    reachable.has(edge.source) && reachable.has(edge.target)
-  );
-
-  console.log('[App] Filtered to', filteredNodes.length, 'nodes and', filteredEdges.length, 'edges');
-  console.log('[App] Filtered node labels:', filteredNodes.map(n => n.label || n.id));
-  console.log('[App] Edge types in filtered graph:', [...new Set(filteredEdges.map(e => e.type))]);
-  console.log('[App] Edges from test_app:', filteredEdges.filter(e => e.source.includes('test_app')).map(e => `${e.source} -> ${e.target} (${e.type})`));
-
-  return {
-    nodes: filteredNodes,
-    edges: filteredEdges
-  };
-}
+// All lens rendering now happens server-side via /api/module/graph/lens
 
 /**
  * Fetch rendered graph from backend lens API
@@ -1808,13 +1694,7 @@ viewStateManager.addListener(async (newState) => {
     displayDependencyGraph(renderedGraph);
   } catch (error) {
     console.error('[App] Error fetching rendered graph from backend:', error);
-    // Fallback to client-side rendering if backend fails
-    console.warn('[App] Falling back to client-side lens rendering');
-    const rawGraph = await getRawGraphForBaseSet(newState.defaultLens.baseSet);
-    if (rawGraph) {
-      const renderedGraph = lensRenderer.renderGraph(newState, rawGraph);
-      displayDependencyGraph(renderedGraph);
-    }
+    console.error('[App] Backend lens rendering failed - this is a fatal error');
   }
 });
 

@@ -18,16 +18,12 @@
    - Endpoint accepts lens configurations and returns filtered graph
 
    **Frontend integration - COMPLETED ✅**:
-   - Updated viewStateManager listener to call `/api/module/graph/lens` ([app.js:1805](pkg/web/static/app.js#L1805))
+   - Updated viewStateManager listener to call `/api/module/graph/lens` ([app.js:1691](pkg/web/static/app.js#L1691))
    - Updated initial page load (loadGraphData) to use backend API ([app.js:1390,1415,1450](pkg/web/static/app.js#L1390))
-   - Added fetchRenderedGraphFromBackend() function with proper serialization ([app.js:1743-1781](pkg/web/static/app.js#L1743-L1781))
-   - Includes fallback to client-side rendering if backend fails ([app.js:1815](pkg/web/static/app.js#L1815))
-   - Kept lens-renderer.js (1,149 lines) for fallback only
-
-   **Potential cleanup - OPTIONAL**:
-   - Consider removing lens-renderer.js and fallback path after sufficient production testing
-   - This would save 1,149 lines of client-side code
-   - Current usage: Only used in error fallback path ([app.js:1636,1815](pkg/web/static/app.js#L1636))
+   - Added fetchRenderedGraphFromBackend() function with proper serialization ([app.js:1641-1667](pkg/web/static/app.js#L1641-L1667))
+   - Removed client-side lens-renderer.js (1,149 lines deleted)
+   - Removed fallback to client-side rendering - backend failures are now fatal errors
+   - Removed filterReachableFromBinary() helper (83 lines) - backend handles all graph transformations
 
    **Future enhancements - TODO**:
    - Implement diff-based incremental updates (optional)
