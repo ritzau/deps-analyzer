@@ -235,6 +235,14 @@ class ViewStateManager {
       return true;
     }
 
+    // Check if manual overrides changed (collapse/expand changes graph structure)
+    const oldOverrides = JSON.stringify(Array.from(oldState.manualOverrides.entries()).sort());
+    const newOverrides = JSON.stringify(Array.from(newState.manualOverrides.entries()).sort());
+    if (oldOverrides !== newOverrides) {
+      console.log('[ViewState] Full re-layout: manual overrides changed (collapse/expand)');
+      return true;
+    }
+
     // Changes to collapse levels, edge types, or visibility settings do NOT require full re-layout
     // These are visual changes that can use cached positions
     console.log('[ViewState] No full re-layout needed - visual change only');
