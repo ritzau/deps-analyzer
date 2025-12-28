@@ -705,8 +705,6 @@ function displayDependencyGraph(graphData) {
             padding: 50
         }).run();
     }
-
-    updateStats(graphData);
 }
 
 /**
