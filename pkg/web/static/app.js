@@ -1735,18 +1735,74 @@ function filterReachableFromBinary(graph, binaryLabel) {
   };
 }
 
+/**
+ * Fetch rendered graph from backend lens API
+ * @param {Object} viewState - Current view state with lens configurations
+ * @returns {Promise<Object>} Rendered graph from backend
+ */
+async function fetchRenderedGraphFromBackend(viewState) {
+  console.log('[App] Fetching rendered graph from backend lens API');
+
+  // Convert edgeRules.types from Set to Array for JSON serialization
+  const serializeLens = (lens) => ({
+    ...lens,
+    edgeRules: {
+      ...lens.edgeRules,
+      types: Array.from(lens.edgeRules.types)
+    }
+  });
+
+  const requestBody = {
+    defaultLens: serializeLens(viewState.defaultLens),
+    focusLens: serializeLens(viewState.focusLens),
+    focusedNodes: Array.from(viewState.focusedNodes),
+    manualOverrides: Object.fromEntries(viewState.manualOverrides)
+  };
+
+  console.log('[App] Request body:', JSON.stringify(requestBody, null, 2));
+
+  const response = await fetch('/api/module/graph/lens', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Backend lens rendering failed: ${response.statusText} - ${errorText}`);
+  }
+
+  const renderedGraph = await response.json();
+  console.log('[App] Received rendered graph from backend:', renderedGraph.nodes?.length, 'nodes,', renderedGraph.edges?.length, 'edges');
+
+  return renderedGraph;
+}
+
 // Listen for state changes and re-render graph
 viewStateManager.addListener(async (newState) => {
   if (!packageGraph) return; // Wait for initial load
 
-  console.log('[App] State changed, re-rendering with baseSet:', newState.defaultLens.baseSet);
+  console.log('[App] State changed, rendering with backend API');
+  console.log('[App] BaseSet:', newState.defaultLens.baseSet);
+  console.log('[App] Focused nodes:', Array.from(newState.focusedNodes));
 
-  // Get the appropriate raw graph for this baseSet
-  const rawGraph = await getRawGraphForBaseSet(newState.defaultLens.baseSet);
+  try {
+    // Fetch rendered graph from backend
+    const renderedGraph = await fetchRenderedGraphFromBackend(newState);
 
-  if (rawGraph) {
-    const renderedGraph = lensRenderer.renderGraph(newState, rawGraph);
+    // Display the pre-rendered graph from backend
     displayDependencyGraph(renderedGraph);
+  } catch (error) {
+    console.error('[App] Error fetching rendered graph from backend:', error);
+    // Fallback to client-side rendering if backend fails
+    console.warn('[App] Falling back to client-side lens rendering');
+    const rawGraph = await getRawGraphForBaseSet(newState.defaultLens.baseSet);
+    if (rawGraph) {
+      const renderedGraph = lensRenderer.renderGraph(newState, rawGraph);
+      displayDependencyGraph(renderedGraph);
+    }
   }
 });
 

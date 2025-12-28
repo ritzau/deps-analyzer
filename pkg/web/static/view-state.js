@@ -198,6 +198,50 @@ class ViewStateManager {
   }
 
   /**
+   * Determine if a state change requires clearing cached positions (full re-layout)
+   * This is needed when the graph topology actually changes, not just visual properties.
+   *
+   * @param {Object} oldState - Previous state
+   * @param {Object} newState - New state
+   * @returns {boolean} True if positions should be cleared
+   */
+  needsFullRelayout(oldState, newState) {
+    if (!oldState) return true;  // Initial load always needs layout
+
+    // Check if base set changed (different graph structure)
+    const oldBase = oldState.defaultLens.baseSet;
+    const newBase = newState.defaultLens.baseSet;
+
+    if (oldBase.type !== newBase.type) {
+      console.log('[ViewState] Full re-layout: baseSet type changed');
+      return true;
+    }
+
+    if (oldBase.binaryLabel !== newBase.binaryLabel) {
+      console.log('[ViewState] Full re-layout: binaryLabel changed');
+      return true;
+    }
+
+    if (oldBase.packagePath !== newBase.packagePath) {
+      console.log('[ViewState] Full re-layout: packagePath changed');
+      return true;
+    }
+
+    // Check if focused nodes changed (different graph structure)
+    const oldFocus = Array.from(oldState.focusedNodes).sort().join(',');
+    const newFocus = Array.from(newState.focusedNodes).sort().join(',');
+    if (oldFocus !== newFocus) {
+      console.log('[ViewState] Full re-layout: focused nodes changed');
+      return true;
+    }
+
+    // Changes to collapse levels, edge types, or visibility settings do NOT require full re-layout
+    // These are visual changes that can use cached positions
+    console.log('[ViewState] No full re-layout needed - visual change only');
+    return false;
+  }
+
+  /**
    * Get debug info about current state
    * @returns {Object} Debug information
    */
