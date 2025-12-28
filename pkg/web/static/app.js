@@ -189,6 +189,47 @@ function displayUncoveredFiles(files) {
     });
 }
 
+// Position cache for smooth layout transitions
+const nodePositions = new Map();
+
+/**
+ * Cache current node positions for layout stability
+ */
+function cacheNodePositions() {
+    if (!cy) return;
+    cy.nodes().forEach(node => {
+        nodePositions.set(node.id(), {
+            x: node.position('x'),
+            y: node.position('y')
+        });
+    });
+    console.log(`[LayoutCache] Cached positions for ${nodePositions.size} nodes`);
+}
+
+/**
+ * Restore cached node positions
+ */
+function restoreNodePositions() {
+    if (!cy) return;
+    let restored = 0;
+    cy.nodes().forEach(node => {
+        const cached = nodePositions.get(node.id());
+        if (cached) {
+            node.position(cached);
+            restored++;
+        }
+    });
+    console.log(`[LayoutCache] Restored positions for ${restored} nodes`);
+}
+
+/**
+ * Clear position cache (for full re-layouts)
+ */
+function clearPositionCache() {
+    nodePositions.clear();
+    console.log('[LayoutCache] Cleared position cache');
+}
+
 function displayDependencyGraph(graphData) {
     console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
 
@@ -204,11 +245,10 @@ function displayDependencyGraph(graphData) {
         graphLoading.style.display = 'none';
     }
 
-    // If we already have a cytoscape instance, destroy it first
-    if (cy) {
-        console.log('Destroying existing cytoscape instance');
-        cy.destroy();
-        cy = null;
+    // Cache positions before any changes (for incremental updates)
+    const isInitialLoad = !cy;
+    if (!isInitialLoad) {
+        cacheNodePositions();
     }
 
     // Create elements array
@@ -268,19 +308,14 @@ function displayDependencyGraph(graphData) {
         })
     ];
 
-    console.log('Creating new cytoscape instance with', elements.length, 'elements');
-
     // Debug: Log overlapping flags
     const overlappingNodes = elements.filter(e => e.data.hasOverlap === true);
     const overlappingEdges = elements.filter(e => e.data.isOverlapping === true);
     console.log('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.label || n.data.id));
     console.log('Edges with isOverlapping=true:', overlappingEdges.map(e => `${e.data.source} -> ${e.data.target}`));
 
-    cy = cytoscape({
-        container: document.getElementById('cy'),
-        elements: elements,
-
-        style: [
+    // Cytoscape stylesheet (shared between initial and incremental updates)
+    const cytoscapeStylesheet = [
             {
                 selector: 'node',
                 style: {
@@ -614,19 +649,72 @@ function displayDependencyGraph(graphData) {
                     'border-style': 'solid'
                 }
             }
-        ],
+    ];
 
-        layout: {
+    if (isInitialLoad) {
+        // Initial creation - create new cytoscape instance
+        console.log('Creating new cytoscape instance with', elements.length, 'elements');
+
+        cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements: elements,
+            style: cytoscapeStylesheet,
+            layout: {
+                name: 'dagre',
+                rankDir: 'TB',
+                ranker: 'network-simplex',
+                nodeSep: 80,
+                edgeSep: 20,
+                rankSep: 120,
+                animate: false,
+                padding: 50
+            }
+        });
+
+        // Setup event handlers (only on initial load)
+        setupEventHandlers();
+    } else {
+        // Incremental update - replace elements but keep instance
+        console.log('Incrementally updating cytoscape with', elements.length, 'elements');
+
+        cy.startBatch();
+
+        // Remove all existing elements
+        cy.elements().remove();
+
+        // Add new elements
+        cy.add(elements);
+
+        cy.endBatch();
+
+        // Restore cached positions
+        restoreNodePositions();
+
+        // Run layout with animation and no viewport reset
+        cy.layout({
             name: 'dagre',
-            rankDir: 'TB',           // Top-to-bottom layout (use 'LR' for left-to-right)
-            ranker: 'network-simplex', // Algorithm: 'network-simplex', 'tight-tree', or 'longest-path'
-            nodeSep: 80,             // Horizontal spacing between nodes
-            edgeSep: 20,             // Spacing between edges
-            rankSep: 120,            // Vertical spacing between ranks/layers
-            animate: false,
+            rankDir: 'TB',
+            ranker: 'network-simplex',
+            nodeSep: 80,
+            edgeSep: 20,
+            rankSep: 120,
+            fit: false,          // Don't reset viewport/zoom
+            animate: true,       // Smooth transitions
+            animationDuration: 250,
+            animationEasing: 'ease-out',
             padding: 50
-        }
-    });
+        }).run();
+    }
+
+    updateStats(graphData);
+}
+
+/**
+ * Setup all event handlers for the cytoscape instance
+ * Only called once during initial graph creation
+ */
+function setupEventHandlers() {
+    if (!cy) return;
 
     // Add tooltip for edges and nodes
     const tooltip = document.createElement('div');
@@ -1752,6 +1840,9 @@ function applyGraphDiff(currentGraph, diff) {
   };
 }
 
+// Track previous state for detecting when full re-layout is needed
+let previousViewState = null;
+
 // Listen for state changes and re-render graph
 viewStateManager.addListener(async (newState) => {
   if (!packageGraph) return; // Wait for initial load
@@ -1759,6 +1850,14 @@ viewStateManager.addListener(async (newState) => {
   console.log('[App] State changed, rendering with backend API');
   console.log('[App] BaseSet:', newState.defaultLens.baseSet);
   console.log('[App] Focused nodes:', Array.from(newState.focusedNodes));
+
+  // Check if we need to clear position cache (full re-layout)
+  if (viewStateManager.needsFullRelayout(previousViewState, newState)) {
+    clearPositionCache();
+  }
+
+  // Update previous state
+  previousViewState = newState;
 
   try {
     // Fetch rendered graph from backend

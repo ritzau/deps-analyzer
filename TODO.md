@@ -42,8 +42,20 @@
      - Added `applyGraphDiff()` function to apply incremental changes to graph
      - Handles both full graph and diff responses transparently
 
-   **Future enhancements - TODO**:
-   - Position caching with Dagre animation for smooth transitions
+   **Position caching and smooth transitions - COMPLETED ✅**:
+   - Added position caching infrastructure:
+     - `cacheNodePositions()` - Stores x,y coordinates of all nodes
+     - `restoreNodePositions()` - Restores cached positions before re-layout
+     - `clearPositionCache()` - Clears cache for full re-layouts
+   - Replaced destroy/recreate pattern with incremental updates:
+     - Initial load: Creates new Cytoscape instance with event handlers
+     - Subsequent updates: Removes elements, adds new ones, restores positions
+     - Runs Dagre layout with `fit: false` to preserve viewport
+   - Added smooth 250ms animations for layout transitions
+   - Integrated with `viewStateManager.needsFullRelayout()`:
+     - Clears position cache when base set or focused nodes change
+     - Preserves positions for visual-only changes (edge types, collapse levels)
+   - Moved event handlers into `setupEventHandlers()` function (called once)
 
    **Known issues**:
    - Hiding indirect neighbors (distance > 1) doesn't work properly. The focus
