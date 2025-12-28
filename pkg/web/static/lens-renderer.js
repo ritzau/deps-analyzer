@@ -23,6 +23,18 @@ class LensRenderer {
     console.log('[LensRenderer] Rendering graph with', rawGraphData.nodes.length, 'nodes');
     console.log('[LensRenderer] Focused nodes:', Array.from(state.focusedNodes));
 
+    // Debug: Check if focused node exists in raw graph
+    if (state.focusedNodes.size > 0) {
+      state.focusedNodes.forEach(focusedId => {
+        const focusedNode = rawGraphData.nodes.find(n => (n.id || n.label) === focusedId);
+        if (focusedNode) {
+          console.log(`[LensRenderer] Found focused node in raw graph: ${focusedId}, type: ${focusedNode.type}`);
+        } else {
+          console.log(`[LensRenderer] WARNING: Focused node ${focusedId} NOT FOUND in raw graph!`);
+        }
+      });
+    }
+
     // 1. Compute distances from focused nodes using BFS
     const distances = this.computeDistances(rawGraphData, state.focusedNodes);
 
@@ -68,16 +80,28 @@ class LensRenderer {
     const allPackageNodes = this.extractPackageNodes(rawGraphData);
 
     // Add states for synthetic package nodes
-    const rule = state.defaultLens.distanceRules[0];
     allPackageNodes.forEach(node => {
       if (!nodeStates.has(node.id)) {
+        // Check if this package should use focus lens (e.g., contains a focused target)
+        const lensType = nodeLensMap.get(node.id) || 'default';
+        const lens = lensType === 'focus' ? state.focusLens : state.defaultLens;
+
+        // For packages, use distance 0 if assigned focus lens (contains focused target)
+        // Otherwise use infinite
+        const distance = lensType === 'focus' ? 0 : 'infinite';
+        const rule = this.findDistanceRule(lens, distance);
+
         nodeStates.set(node.id, {
           visible: true,
           collapsed: this.shouldNodeBeCollapsed(node, rule, state.manualOverrides),
-          distance: 'infinite',
-          appliedLens: 'default',
+          distance: distance,
+          appliedLens: lensType,
           rule: rule
         });
+
+        if (lensType === 'focus') {
+          console.log(`[LensRenderer] Package ${node.id} using focus lens with distance ${distance}, collapsed: ${nodeStates.get(node.id).collapsed}`);
+        }
       }
     });
 
@@ -86,6 +110,13 @@ class LensRenderer {
       { nodes: [...rawGraphData.nodes, ...allPackageNodes], edges: rawGraphData.edges },
       nodeStates
     );
+
+    // Debug: Check which focused targets survived filtering
+    const focusedTargets = visibleNodes.filter(n =>
+      (n.type === 'cc_library' || n.type === 'cc_binary' || n.type === 'cc_shared_library') &&
+      state.focusedNodes.has(n.id || n.label)
+    );
+    console.log('[LensRenderer] Focused targets after filterVisibleNodes:', focusedTargets.length, focusedTargets.map(n => n.id || n.label));
 
     // Debug: Check if uncovered files survived filtering
     const uncoveredVisible = visibleNodes.filter(n => n.type === 'uncovered_source' || n.type === 'uncovered_header');
@@ -157,6 +188,7 @@ class LensRenderer {
     focusedNodes.forEach(nodeId => {
       distances.set(nodeId, 0);
       queue.push({ nodeId, dist: 0 });
+      console.log(`[computeDistances] Set focused node ${nodeId} to distance 0`);
     });
 
     // BFS to compute distances
@@ -172,11 +204,53 @@ class LensRenderer {
       }
     }
 
-    // Nodes not reached are at infinite distance
+    // Helper function to recursively get distance from parent hierarchy
+    const getDistanceRecursive = (nodeId) => {
+      // If we already have a distance for this node, return it
+      if (distances.has(nodeId)) {
+        return distances.get(nodeId);
+      }
+
+      // Try to find parent and inherit its distance
+      // File nodes have IDs like: //package:target:filepath
+      if (nodeId.startsWith('//') && nodeId.includes(':')) {
+        const parts = nodeId.substring(2).split(':');
+        if (parts.length >= 3) {
+          // This is a file node - extract parent target and recurse
+          const parentTargetId = '//' + parts[0] + ':' + parts[1];
+          const parentDistance = getDistanceRecursive(parentTargetId);
+          console.log(`[LensRenderer] File ${nodeId} inherits distance ${parentDistance} from parent ${parentTargetId}`);
+          return parentDistance;
+        } else if (parts.length === 2) {
+          // This is a target node - extract parent package and recurse
+          const parentPackageId = '//' + parts[0];
+          const parentDistance = getDistanceRecursive(parentPackageId);
+          console.log(`[LensRenderer] Target ${nodeId} inherits distance ${parentDistance} from parent ${parentPackageId}`);
+          return parentDistance;
+        }
+      }
+      // Special handling for uncovered files: inherit distance from parent target
+      else if (nodeId.startsWith('uncovered:')) {
+        // Extract package path from uncovered file
+        // Format: uncovered:util/orphaned.cc -> //util:util (parent target)
+        const filePath = nodeId.substring('uncovered:'.length);
+        const packagePath = filePath.split('/')[0];
+        const parentTargetId = `//${packagePath}:${packagePath}`;
+        const parentDistance = getDistanceRecursive(parentTargetId);
+        console.log(`[LensRenderer] Uncovered file ${nodeId} inherits distance ${parentDistance} from parent ${parentTargetId}`);
+        return parentDistance;
+      }
+
+      // No parent found, return infinite
+      return 'infinite';
+    };
+
+    // Nodes not reached by BFS need to inherit distance from parent hierarchy
     graph.nodes.forEach(node => {
       const nodeId = node.id || node.label;
       if (!distances.has(nodeId)) {
-        distances.set(nodeId, 'infinite');
+        const inheritedDistance = getDistanceRecursive(nodeId);
+        distances.set(nodeId, inheritedDistance);
       }
     });
 
@@ -216,6 +290,7 @@ class LensRenderer {
   /**
    * Determine which lens applies to each node
    * Nodes at distance 0 or 1 from focus use focus lens, others use default
+   * Package nodes containing focused nodes also use focus lens to ensure they expand
    *
    * @param {Object} state - View state
    * @param {Map} distances - Distance map
@@ -232,6 +307,22 @@ class LensRenderer {
     distances.forEach((distance, nodeId) => {
       if (distance === 0 || distance === 1) {
         nodeLensMap.set(nodeId, 'focus');
+      }
+    });
+
+    // Also assign focus lens to package nodes that contain focused targets
+    // This ensures packages expand when their targets are focused
+    distances.forEach((distance, nodeId) => {
+      if (distance === 0) {
+        // If this is a target (//package:target), also assign focus lens to its package
+        if (nodeId.startsWith('//') && nodeId.includes(':')) {
+          const parts = nodeId.substring(2).split(':');
+          if (parts.length >= 2) {
+            const packageId = '//' + parts[0];
+            nodeLensMap.set(packageId, 'focus');
+            console.log(`[LensRenderer] Assigning focus lens to package ${packageId} because target ${nodeId} is focused`);
+          }
+        }
       }
     });
 
@@ -252,11 +343,39 @@ class LensRenderer {
   applyLensRules(graph, nodeLensMap, distances, defaultLens, focusLens, manualOverrides) {
     const nodeStates = new Map();
 
+    // Debug: Check if //util:util is in the graph
+    const utilTarget = graph.nodes.find(n => (n.id || n.label) === '//util:util');
+    if (utilTarget) {
+      console.log(`[applyLensRules] Found //util:util in graph.nodes, type: ${utilTarget.type}, id: ${utilTarget.id}, label: ${utilTarget.label}`);
+    } else {
+      console.log(`[applyLensRules] WARNING: //util:util NOT FOUND in graph.nodes!`);
+      console.log(`[applyLensRules] graph.nodes length: ${graph.nodes.length}`);
+      const targetTypes = graph.nodes.filter(n => n.type === 'cc_library' || n.type === 'cc_binary' || n.type === 'cc_shared_library').map(n => ({ id: n.id, label: n.label, type: n.type }));
+      console.log(`[applyLensRules] Target nodes in graph:`, targetTypes);
+    }
+
     graph.nodes.forEach(node => {
       const nodeId = node.id || node.label;
       const lensType = nodeLensMap.get(nodeId) || 'default';
       const lens = lensType === 'focus' ? focusLens : defaultLens;
-      const distance = distances.get(nodeId) || 'infinite';
+      const distance = distances.has(nodeId) ? distances.get(nodeId) : 'infinite';
+
+      // Debug: Check if this is //util:util and why distance lookup fails
+      if (nodeId === '//util:util') {
+        console.log(`[applyLensRules] //util:util distance lookup:`, {
+          nodeId,
+          'node.id': node.id,
+          'node.label': node.label,
+          'distances.has(nodeId)': distances.has(nodeId),
+          'distances.has(node.id)': distances.has(node.id),
+          'distances.has(node.label)': distances.has(node.label),
+          distance,
+          'lensType': lensType
+        });
+        // List all keys in distances map that contain 'util'
+        const utilKeys = Array.from(distances.keys()).filter(k => k.includes('util'));
+        console.log(`[applyLensRules] Distance map keys containing 'util':`, utilKeys);
+      }
 
       // Find matching distance rule
       const rule = this.findDistanceRule(lens, distance);
@@ -274,6 +393,27 @@ class LensRenderer {
         appliedLens: lensType,
         rule
       });
+
+      // Debug focused targets - BEFORE checking distance to see ALL target processing
+      if (node.type === 'cc_library' || node.type === 'cc_binary' || node.type === 'cc_shared_library') {
+        if (nodeId === '//util:util' || distance === 0) {
+          console.log(`[applyLensRules] Target ${nodeId}: distance=${distance}, visible=${visible}, collapsed=${collapsed}, lens=${lensType}, collapseLevel=${rule.collapseLevel}, targetTypes=${JSON.stringify(rule.nodeVisibility.targetTypes)}`);
+        }
+      }
+
+      // Debug: Check files belonging to //util:util
+      if ((node.type === 'source_file' || node.type === 'header_file') && nodeId.startsWith('//util:util:')) {
+        const actualDistance = distances.get(nodeId);
+        console.log(`[applyLensRules] File ${nodeId}:`, {
+          distance,
+          actualDistance,
+          'distances.has(nodeId)': distances.has(nodeId),
+          visible,
+          collapsed,
+          lensType,
+          fileTypes: rule.nodeVisibility.fileTypes
+        });
+      }
     });
 
     return nodeStates;
@@ -416,10 +556,26 @@ class LensRenderer {
    * @returns {boolean} Whether node should be visible
    */
   isNodeVisible(node, rule, globalFilters) {
+    const nodeId = node.id || node.label;
+    const debugThis = nodeId === '//util:util';
+
+    if (debugThis) {
+      console.log(`[isNodeVisible] Checking //util:util, type=${node.type}, collapseLevel=${rule.collapseLevel}`);
+    }
+
     // Apply global filters first
-    if (globalFilters.hideExternal && node.external) return false;
-    if (globalFilters.hideUncovered && node.uncovered) return false;
-    if (globalFilters.hideSystemLibs && node.type === 'system_library') return false;
+    if (globalFilters.hideExternal && node.external) {
+      if (debugThis) console.log(`[isNodeVisible] //util:util: HIDDEN by hideExternal`);
+      return false;
+    }
+    if (globalFilters.hideUncovered && node.uncovered) {
+      if (debugThis) console.log(`[isNodeVisible] //util:util: HIDDEN by hideUncovered`);
+      return false;
+    }
+    if (globalFilters.hideSystemLibs && node.type === 'system_library') {
+      if (debugThis) console.log(`[isNodeVisible] //util:util: HIDDEN by hideSystemLibs`);
+      return false;
+    }
 
     // System libraries have special visibility rules
     if (node.type === 'system_library') {
@@ -456,6 +612,7 @@ class LensRenderer {
       // Targets should be hidden when collapseLevel < 2
       // Manual overrides will make them visible if parent is expanded
       if (collapseLevel < 2) {
+        if (debugThis) console.log(`[isNodeVisible] //util:util: HIDDEN by collapseLevel < 2 (collapseLevel=${collapseLevel})`);
         return false;
       }
     }
@@ -463,9 +620,11 @@ class LensRenderer {
     // Check if this target type should be shown
     const targetTypes = rule.nodeVisibility.targetTypes || [];
     if (!targetTypes.includes(node.type)) {
+      if (debugThis) console.log(`[isNodeVisible] //util:util: HIDDEN because type ${node.type} not in targetTypes ${JSON.stringify(targetTypes)}`);
       return false;
     }
 
+    if (debugThis) console.log(`[isNodeVisible] //util:util: VISIBLE`);
     return true;
   }
 
