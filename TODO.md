@@ -2,27 +2,46 @@
 
 ## Prioritized backlog
 
-1. Improve symbol dependency analysis and presentation. Better distinguish
+1. **[IN PROGRESS]** Implement lens-based visualization system. Replace fixed views
+   (package/file/focused/binary) with flexible lens system featuring:
+   - Three-layer architecture: Default lens, Focus lens, Manual overrides
+   - Tabbed UI (Tree | Default Config | Focus Config)
+   - Hierarchical collapse levels (signed int: positive=top-down, negative=bottom-up)
+   - Focus selection (single/multi-select modes)
+   - Reset controls for each layer
+
+2. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-2. Add collapsible external dependencies in focused view. Give users control
+3. Add collapsible external dependencies in focused view. Give users control
    over detail level:
+
    - Level 1: Hide external dependencies completely (only show files within
      focused target)
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-3. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+4. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-4. Ensure consistent logging in backend and frontend.
+5. Ensure consistent logging in backend and frontend.
 
-5. Make sure docs are up to date.
+6. Make sure docs are up to date.
 
-6. External packages: May require support of .a files.
+7. External packages: May require support of .a files.
 
-7. Collect styles in the CSS (if possible with the graph library).
+8. Collect styles in the CSS (if possible with the graph library).
+
+9. **Uncovered files hierarchical expansion edge case**: When starting at
+   "Targets (hide files)" hierarchy level, manually expanding a target doesn't
+   show uncovered files because uncovered files are children of packages, not
+   targets. User must collapse and re-expand the parent package to see them.
+   This is technically correct behavior (uncovered files aren't part of
+   targets), but UX could be improved by either:
+   - Showing uncovered files when any sibling target is expanded
+   - Adding visual indication that package has uncovered files
+   - Auto-expanding package when last target is manually expanded
 
 ---
 
@@ -57,40 +76,50 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 ## ✅ Project name display fix (DONE)
 
-Fixed the bug where the project name showed "." when using the current directory.
+Fixed the bug where the project name showed "." when using the current
+directory.
 
 **Implementation**:
+
 - Created `pkg/bazel/workspace.go` with `GetWorkspaceName()` function
 - Extracts module name from `bazel mod graph` output (for bzlmod workspaces)
 - Falls back to directory name if bazel command fails
 - Added `Name` field to `model.Module` struct
-- Updated UI to display module name in subtitle via `updateModuleName()` function
+- Updated UI to display module name in subtitle via `updateModuleName()`
+  function
 - Module name replaces the static "Coverage Analysis" text
 
 **Example**:
+
 - Before: Subtitle showed "Coverage Analysis"
 - After: Subtitle shows "bazel_test_workspace" (from MODULE.bazel)
 
 ## ✅ Legend simplification (DONE)
 
-Simplified the dependency types legend for better clarity and visual consistency:
+Simplified the dependency types legend for better clarity and visual
+consistency:
 
 **Dependencies section**:
+
 - Unified color scheme: single teal color (#4ec9b0) for most dependencies
 - Differentiated by line style:
   - Solid: Static dependencies (deps)
   - Dashed: Dynamic dependencies (shared libs)
   - Dotted: Data dependencies (runtime files)
-- Compile dependencies: blue (#4fc1ff) solid line to distinguish from runtime deps
+- Compile dependencies: blue (#4fc1ff) solid line to distinguish from runtime
+  deps
 - Shorter, clearer labels
 
 **Visibility section**:
+
 - Changed public visibility indicator from dashed to solid gold border
 - Updated both graph visualization and legend
 - Simplified labels from "Public visibility" to "Public"
 
 Implementation:
-- Updated legend HTML in [index.html:134-152](pkg/web/static/index.html#L134-L152)
+
+- Updated legend HTML in
+  [index.html:134-152](pkg/web/static/index.html#L134-L152)
 - Changed public border style in [app.js:450](pkg/web/static/app.js#L450)
 - Updated all edge styles across target and focused graph views:
   - System library edges: teal dashed [app.js:514](pkg/web/static/app.js#L514)

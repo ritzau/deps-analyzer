@@ -1404,8 +1404,10 @@ async function loadGraphData() {
             // Enrich the displayed graph with overlapping dependency information
             if (packageGraph && packageGraph.nodes) {
                 enrichGraphWithOverlappingInfo(packageGraph, binaryData);
-                // Redisplay the graph with overlapping info
-                displayDependencyGraph(packageGraph);
+                // Redisplay the graph with overlapping info through lens system
+                const currentState = viewStateManager.getState();
+                const renderedGraph = lensRenderer.renderGraph(currentState, packageGraph);
+                displayDependencyGraph(renderedGraph);
             }
         }
 

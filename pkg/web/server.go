@@ -306,7 +306,7 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	if s.module != nil {
 		// Convert Module to graph format with file-level details
-		response["graph"] = buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget)
+		response["graph"] = buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 		// Convert package dependencies
 		response["crossPackageDeps"] = s.module.GetAllPackageDependencies()
 	}
@@ -353,7 +353,7 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build target-level graph from module with file-level details
-	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget)
+	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 	json.NewEncoder(w).Encode(graphData)
 }
 
@@ -482,7 +482,7 @@ func buildBinaryGraphData(binaryInfos []*binaries.BinaryInfo) *GraphData {
 // This would show files within a target and their compile-time dependencies to other targets
 
 // buildModuleGraphData creates a graph visualization from the Module model
-func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string) *GraphData {
+func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string, uncoveredFiles []string) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
@@ -730,6 +730,37 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 					}
 				}
 			}
+		}
+	}
+
+	// Add uncovered files as nodes (files not in any target)
+	if uncoveredFiles != nil && len(uncoveredFiles) > 0 {
+		for _, uncoveredFile := range uncoveredFiles {
+			// Determine if source or header
+			nodeType := "uncovered_source"
+			if strings.HasSuffix(uncoveredFile, ".h") || strings.HasSuffix(uncoveredFile, ".hpp") {
+				nodeType = "uncovered_header"
+			}
+
+			// Extract package from file path (e.g., "core/engine.cc" -> "core")
+			packagePath := ""
+			if idx := strings.LastIndex(uncoveredFile, "/"); idx >= 0 {
+				packagePath = uncoveredFile[:idx]
+			}
+
+			// Create node ID and determine parent package
+			fileID := "uncovered:" + uncoveredFile
+			parentPackage := ""
+			if packagePath != "" {
+				parentPackage = "//" + packagePath
+			}
+
+			graphData.Nodes = append(graphData.Nodes, GraphNode{
+				ID:     fileID,
+				Label:  getFileName(uncoveredFile),
+				Type:   nodeType,
+				Parent: parentPackage, // Parent is the package, not a target
+			})
 		}
 	}
 

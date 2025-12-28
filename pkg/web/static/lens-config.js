@@ -65,7 +65,7 @@ const DEFAULT_PACKAGE_LENS = {
       nodeVisibility: {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
         fileTypes: ['all'],  // Show all files
-        showUncovered: false,
+        showUncovered: true,
         showExternal: false,
         showSystemLibraries: true
       },
@@ -82,24 +82,50 @@ const DEFAULT_PACKAGE_LENS = {
 };
 
 /**
- * Focus lens: Currently identical to default lens
- * This keeps the graph structure simple - focusing only adds visual highlighting
- * File expansion can be added later when we implement dynamic data loading
+ * Focus lens: Distance-based visibility rules
+ * Shows files in focused nodes (distance 0), hides files in neighbors (distance 1),
+ * and shows rest of graph collapsed (distance infinite)
  */
 const DEFAULT_FOCUS_LENS = {
   name: "Focus View",
   baseSet: { type: 'full-graph' },
   distanceRules: [
     {
-      distance: 'infinite',  // Apply same rules to all distances for now
+      distance: 0,  // Focused nodes
       nodeVisibility: {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
         fileTypes: ['all'],  // Show all files
+        showUncovered: true,
+        showExternal: false,
+        showSystemLibraries: true
+      },
+      collapseLevel: 3,  // Show down to file level
+      showEdges: true,
+      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
+    },
+    {
+      distance: 1,  // Neighbors (direct dependencies)
+      nodeVisibility: {
+        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
+        fileTypes: ['none'],  // Hide files by default
         showUncovered: false,
         showExternal: false,
         showSystemLibraries: true
       },
-      collapseLevel: 3,  // Show down to file level (same as default)
+      collapseLevel: 2,  // Show targets but hide files
+      showEdges: true,
+      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
+    },
+    {
+      distance: 'infinite',  // Rest of graph
+      nodeVisibility: {
+        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
+        fileTypes: ['none'],
+        showUncovered: false,
+        showExternal: false,
+        showSystemLibraries: true
+      },
+      collapseLevel: 1,  // Show as collapsed packages
       showEdges: true,
       edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
     }

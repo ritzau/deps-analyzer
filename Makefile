@@ -6,7 +6,7 @@ build:
 
 # Run the analyzer in web mode
 run: build
-	./deps-analyzer --workspace=./example --web --port=8080
+	./deps-analyzer --workspace=./example --web --port=8080 --watch
 
 # Run all tests
 test:

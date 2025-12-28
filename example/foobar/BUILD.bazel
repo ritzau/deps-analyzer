@@ -1,0 +1,7 @@
+cc_binary(
+    name = "foobar",
+    linkopts = ["-ldl"],
+    deps = [
+        "//cycle_demo",
+    ],
+)

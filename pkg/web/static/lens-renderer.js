@@ -42,6 +42,23 @@ class LensRenderer {
       state.manualOverrides
     );
 
+    // Debug: Check uncovered file states after applyLensRules
+    const uncoveredStates = [];
+    rawGraphData.nodes.forEach(node => {
+      if (node.type === 'uncovered_source' || node.type === 'uncovered_header') {
+        const state = nodeStates.get(node.id);
+        uncoveredStates.push({
+          id: node.id,
+          type: node.type,
+          visible: state?.visible,
+          collapsed: state?.collapsed
+        });
+      }
+    });
+    if (uncoveredStates.length > 0) {
+      console.log('[LensRenderer] Uncovered file states after applyLensRules:', uncoveredStates);
+    }
+
     // 3.5. Apply manual override visibility (Layer 3 overrides)
     // When a parent is manually expanded, make its children visible
     this.applyManualVisibilityOverrides(rawGraphData, nodeStates, state.manualOverrides);
@@ -70,11 +87,23 @@ class LensRenderer {
       nodeStates
     );
 
+    // Debug: Check if uncovered files survived filtering
+    const uncoveredVisible = visibleNodes.filter(n => n.type === 'uncovered_source' || n.type === 'uncovered_header');
+    console.log('[LensRenderer] Uncovered files after filterVisibleNodes:', uncoveredVisible.length, uncoveredVisible.map(n => n.id));
+
     // 6. Build hierarchy relationships for visible nodes
     const hierarchicalData = this.buildHierarchy(visibleNodes, nodeStates);
 
+    // Debug: Check if uncovered files survived hierarchy building
+    const uncoveredHierarchy = hierarchicalData.nodes.filter(n => n.type === 'uncovered_source' || n.type === 'uncovered_header');
+    console.log('[LensRenderer] Uncovered files after buildHierarchy:', uncoveredHierarchy.length, uncoveredHierarchy.map(n => n.id));
+
     // 7. Filter out children of collapsed nodes
     const expandedNodes = this.filterCollapsedChildren(hierarchicalData.nodes, nodeStates);
+
+    // Debug: Check if uncovered files survived collapse filtering
+    const uncoveredExpanded = expandedNodes.filter(n => n.type === 'uncovered_source' || n.type === 'uncovered_header');
+    console.log('[LensRenderer] Uncovered files after filterCollapsedChildren:', uncoveredExpanded.length, uncoveredExpanded.map(n => n.id));
 
     // 8. Rebuild hierarchy with filtered nodes
     const hierarchicalNodes = this.buildHierarchy(expandedNodes, nodeStates).nodes;
@@ -291,6 +320,7 @@ class LensRenderer {
 
     let targetsShown = 0;
     let filesShown = 0;
+    let uncoveredShown = 0;
 
     // For each node, check if its parent is manually expanded
     graph.nodes.forEach(node => {
@@ -299,8 +329,20 @@ class LensRenderer {
       // node.label is just the display name (e.g., "engine.cc" for files)
       const hierarchicalId = node.id || node.label;
 
+      // Check for uncovered files first (they have IDs like "uncovered:util/orphaned.cc")
+      if (node.type === 'uncovered_source' || node.type === 'uncovered_header') {
+        // Uncovered files have their parent set directly on the node (e.g., "//util")
+        if (node.parent && expandedNodes.has(node.parent)) {
+          const state = nodeStates.get(nodeId);
+          if (state) {
+            state.visible = true;
+            uncoveredShown++;
+            console.log('[ManualVisibility] Made uncovered file visible:', nodeId, 'parent:', node.parent);
+          }
+        }
+      }
       // Check if this is a target node with a package parent
-      if (hierarchicalId.startsWith('//') && hierarchicalId.includes(':')) {
+      else if (hierarchicalId.startsWith('//') && hierarchicalId.includes(':')) {
         const parts = hierarchicalId.substring(2).split(':');
 
         if (parts.length === 2) {
@@ -333,8 +375,8 @@ class LensRenderer {
       }
     });
 
-    if (targetsShown > 0 || filesShown > 0) {
-      console.log(`[ManualVisibility] Made ${targetsShown} targets and ${filesShown} files visible due to manual expansion`);
+    if (targetsShown > 0 || filesShown > 0 || uncoveredShown > 0) {
+      console.log(`[ManualVisibility] Made ${targetsShown} targets, ${filesShown} files, and ${uncoveredShown} uncovered files visible due to manual expansion`);
     }
   }
 
@@ -390,6 +432,18 @@ class LensRenderer {
       if (fileTypes.includes('none')) return false;
       if (fileTypes.includes('all')) return true;
       // Could add more granular filtering here (source vs header)
+      return false;
+    }
+
+    // Check uncovered file visibility (uncovered_source, uncovered_header)
+    if (node.type === 'uncovered_source' || node.type === 'uncovered_header') {
+      // Uncovered files follow same file visibility rules as regular files
+      const fileTypes = rule.nodeVisibility.fileTypes || [];
+      if (fileTypes.includes('none')) return false;
+      if (fileTypes.includes('all')) {
+        // Also check if uncovered files should be shown
+        return rule.nodeVisibility.showUncovered !== false; // Default to true if not specified
+      }
       return false;
     }
 
@@ -515,6 +569,13 @@ class LensRenderer {
         if (parts.length >= 3) {
           const parentLabel = parts[0] + ':' + parts[1]; // //package:target
           parentMap.set(nodeId, parentLabel);
+        }
+      }
+      // Uncovered file nodes: parent is already set by backend (package, not target)
+      else if (node.type === 'uncovered_source' || node.type === 'uncovered_header') {
+        // Parent is set directly on the node (e.g., "//util")
+        if (node.parent) {
+          parentMap.set(nodeId, node.parent);
         }
       }
       // Target nodes: parent is the package (if it has one)
