@@ -189,46 +189,8 @@ function displayUncoveredFiles(files) {
     });
 }
 
-// Position cache for smooth layout transitions
-const nodePositions = new Map();
-
-/**
- * Cache current node positions for layout stability
- */
-function cacheNodePositions() {
-    if (!cy) return;
-    cy.nodes().forEach(node => {
-        nodePositions.set(node.id(), {
-            x: node.position('x'),
-            y: node.position('y')
-        });
-    });
-    console.log(`[LayoutCache] Cached positions for ${nodePositions.size} nodes`);
-}
-
-/**
- * Restore cached node positions
- */
-function restoreNodePositions() {
-    if (!cy) return;
-    let restored = 0;
-    cy.nodes().forEach(node => {
-        const cached = nodePositions.get(node.id());
-        if (cached) {
-            node.position(cached);
-            restored++;
-        }
-    });
-    console.log(`[LayoutCache] Restored positions for ${restored} nodes`);
-}
-
-/**
- * Clear position cache (for full re-layouts)
- */
-function clearPositionCache() {
-    nodePositions.clear();
-    console.log('[LayoutCache] Cleared position cache');
-}
+// Position caching is no longer needed - we do incremental Cytoscape updates
+// Nodes that already exist keep their positions automatically when we only add/remove changed elements
 
 function displayDependencyGraph(graphData) {
     console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
@@ -245,11 +207,7 @@ function displayDependencyGraph(graphData) {
         graphLoading.style.display = 'none';
     }
 
-    // Cache positions before any changes (for incremental updates)
     const isInitialLoad = !cy;
-    if (!isInitialLoad) {
-        cacheNodePositions();
-    }
 
     // Create elements array
     const elements = [
@@ -674,21 +632,48 @@ function displayDependencyGraph(graphData) {
         // Setup event handlers (only on initial load)
         setupEventHandlers();
     } else {
-        // Incremental update - replace elements but keep instance
+        // Incremental update - update only changed elements
         console.log('Incrementally updating cytoscape with', elements.length, 'elements');
 
         cy.startBatch();
 
-        // Remove all existing elements
-        cy.elements().remove();
+        // Get current element IDs
+        const currentNodeIds = new Set(cy.nodes().map(n => n.id()));
+        const currentEdgeIds = new Set(cy.edges().map(e => `${e.data('source')}|${e.data('target')}|${e.data('type')}`));
+
+        // Build sets of new element IDs
+        const newNodeIds = new Set(elements.filter(e => !e.data.source).map(e => e.data.id));
+        const newEdgeIds = new Set(elements.filter(e => e.data.source).map(e => `${e.data.source}|${e.data.target}|${e.data.type}`));
+
+        // Remove elements that no longer exist
+        const nodesToRemove = Array.from(currentNodeIds).filter(id => !newNodeIds.has(id));
+        const edgesToRemove = Array.from(currentEdgeIds).filter(id => !newEdgeIds.has(id));
+
+        console.log(`[Cytoscape] Removing ${nodesToRemove.length} nodes, ${edgesToRemove.length} edges`);
+        nodesToRemove.forEach(id => cy.getElementById(id).remove());
+        edgesToRemove.forEach(id => {
+            const [source, target, type] = id.split('|');
+            cy.edges(`[source = "${source}"][target = "${target}"][type = "${type}"]`).remove();
+        });
 
         // Add new elements
-        cy.add(elements);
+        const elementsToAdd = elements.filter(e => {
+            if (e.data.source) {
+                // Edge
+                const id = `${e.data.source}|${e.data.target}|${e.data.type}`;
+                return !currentEdgeIds.has(id);
+            } else {
+                // Node
+                return !currentNodeIds.has(e.data.id);
+            }
+        });
+
+        console.log(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges`);
+        if (elementsToAdd.length > 0) {
+            cy.add(elementsToAdd);
+        }
 
         cy.endBatch();
-
-        // Restore cached positions
-        restoreNodePositions();
 
         // Run layout with animation and no viewport reset
         cy.layout({
@@ -700,7 +685,7 @@ function displayDependencyGraph(graphData) {
             rankSep: 120,
             fit: false,          // Don't reset viewport/zoom
             animate: true,       // Smooth transitions
-            animationDuration: 250,
+            animationDuration: 1000,  // Slow animation for debugging
             animationEasing: 'ease-out',
             padding: 50
         }).run();
@@ -1848,11 +1833,6 @@ viewStateManager.addListener(async (newState) => {
   console.log('[App] State changed, rendering with backend API');
   console.log('[App] BaseSet:', newState.defaultLens.baseSet);
   console.log('[App] Focused nodes:', Array.from(newState.focusedNodes));
-
-  // Check if we need to clear position cache (full re-layout)
-  if (viewStateManager.needsFullRelayout(previousViewState, newState)) {
-    clearPositionCache();
-  }
 
   // Deep clone the state to avoid reference issues
   // (Maps need special handling)
