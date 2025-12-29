@@ -1719,21 +1719,14 @@ let currentGraphData = null;
 
 /**
  * Run Dagre layout with stable, deterministic ordering
- * Sorts edges to ensure consistent layout even with same graph structure
+ * Uses centralized configuration for consistent layout parameters
+ * Note: Edge ordering is determined by the backend (renderer.go sorts edges)
+ * and preserved when adding to Cytoscape
  * @param {boolean} animate - Whether to animate the layout
  * @param {boolean} fit - Whether to fit the viewport to the graph
  */
 function runStableDagreLayout(animate = true, fit = false) {
     if (!cy) return;
-
-    // Sort edges by source and target IDs for deterministic input to Dagre
-    // This ensures the same graph structure produces the same layout
-    const edges = cy.edges().toArray();
-    edges.sort((a, b) => {
-        const sourceComp = a.source().id().localeCompare(b.source().id());
-        if (sourceComp !== 0) return sourceComp;
-        return a.target().id().localeCompare(b.target().id());
-    });
 
     // Run layout with configuration
     cy.layout({
