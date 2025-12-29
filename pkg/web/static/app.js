@@ -618,19 +618,15 @@ function displayDependencyGraph(graphData) {
             elements: elements,
             style: cytoscapeStylesheet,
             layout: {
-                name: 'dagre',
-                rankDir: 'TB',
-                ranker: 'network-simplex',
-                nodeSep: 80,
-                edgeSep: 20,
-                rankSep: 120,
-                animate: false,
-                padding: 50
+                name: 'preset'  // Use preset to avoid initial layout, we'll run it manually
             }
         });
 
         // Setup event handlers (only on initial load)
         setupEventHandlers();
+
+        // Run stable layout without animation on initial load
+        runStableDagreLayout(false, true);
     } else {
         // Incremental update - update only changed elements
         console.log('Incrementally updating cytoscape with', elements.length, 'elements');
@@ -681,19 +677,7 @@ function displayDependencyGraph(graphData) {
 
         if (nodesChanged) {
             console.log('[Cytoscape] Running layout because nodes changed');
-            cy.layout({
-                name: 'dagre',
-                rankDir: 'TB',
-                ranker: 'network-simplex',
-                nodeSep: 80,
-                edgeSep: 20,
-                rankSep: 120,
-                fit: false,          // Don't reset viewport/zoom
-                animate: true,       // Smooth transitions
-                animationDuration: 250,
-                animationEasing: 'ease-out',
-                padding: 50
-            }).run();
+            runStableDagreLayout(true, false);  // Animate, don't reset viewport
         } else {
             console.log('[Cytoscape] Skipping layout - only edges changed, nodes stay in place');
         }
@@ -1708,6 +1692,21 @@ let packageGraph = null; // Store the original package-level graph
 let binaryGraph = null; // Store the binary-level graph
 let binaryData = null; // Store binary information
 let cy = null; // Store the Cytoscape instance
+
+// Global configuration object
+const GRAPH_CONFIG = {
+    animation: {
+        duration: 500,      // Animation duration in milliseconds
+        easing: 'ease-out'  // Easing function
+    },
+    layout: {
+        nodeSep: 80,
+        edgeSep: 20,
+        rankSep: 120,
+        padding: 50
+    }
+};
+
 // ===== Lens-Based Visualization System =====
 // Replaced currentView, currentTarget, currentBinary with lens system
 // All lens rendering now happens server-side via /api/module/graph/lens
@@ -1717,6 +1716,40 @@ let currentGraphHash = null;
 
 // Current graph data (for applying diffs)
 let currentGraphData = null;
+
+/**
+ * Run Dagre layout with stable, deterministic ordering
+ * Sorts edges to ensure consistent layout even with same graph structure
+ * @param {boolean} animate - Whether to animate the layout
+ * @param {boolean} fit - Whether to fit the viewport to the graph
+ */
+function runStableDagreLayout(animate = true, fit = false) {
+    if (!cy) return;
+
+    // Sort edges by source and target IDs for deterministic input to Dagre
+    // This ensures the same graph structure produces the same layout
+    const edges = cy.edges().toArray();
+    edges.sort((a, b) => {
+        const sourceComp = a.source().id().localeCompare(b.source().id());
+        if (sourceComp !== 0) return sourceComp;
+        return a.target().id().localeCompare(b.target().id());
+    });
+
+    // Run layout with configuration
+    cy.layout({
+        name: 'dagre',
+        rankDir: 'TB',                      // Top to bottom - arrows go down
+        ranker: 'network-simplex',          // Most deterministic ranker
+        nodeSep: GRAPH_CONFIG.layout.nodeSep,
+        edgeSep: GRAPH_CONFIG.layout.edgeSep,
+        rankSep: GRAPH_CONFIG.layout.rankSep,
+        padding: GRAPH_CONFIG.layout.padding,
+        fit: fit,
+        animate: animate,
+        animationDuration: GRAPH_CONFIG.animation.duration,
+        animationEasing: GRAPH_CONFIG.animation.easing
+    }).run();
+}
 
 /**
  * Fetch rendered graph from backend lens API
