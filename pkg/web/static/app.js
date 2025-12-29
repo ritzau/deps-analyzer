@@ -667,6 +667,20 @@ function displayDependencyGraph(graphData) {
         console.log(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges`);
         if (elementsToAdd.length > 0) {
             cy.add(elementsToAdd);
+
+            // Position new nodes at their parent's location for smooth expand animation
+            const newNodes = elementsToAdd.filter(e => !e.data.source);
+            newNodes.forEach(nodeData => {
+                const node = cy.getElementById(nodeData.data.id);
+                const parent = node.parent();
+
+                if (parent && parent.length > 0) {
+                    // Position at parent's current location
+                    const parentPos = parent.position();
+                    node.position({ x: parentPos.x, y: parentPos.y });
+                    console.log(`[Cytoscape] Positioned new node ${nodeData.data.id} at parent location`);
+                }
+            });
         }
 
         cy.endBatch();
