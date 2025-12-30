@@ -34,6 +34,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 	allPackageNodes := extractPackageNodes(rawGraph)
 
 	// Add states for synthetic package nodes
+	// Packages inherit the MINIMUM distance of their child targets
 	for _, pkgNode := range allPackageNodes {
 		if _, exists := nodeStates[pkgNode.ID]; !exists {
 			lensType := nodeLensMap[pkgNode.ID]
@@ -48,11 +49,8 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 				lens = defaultLens
 			}
 
-			// For packages, use distance 0 if assigned focus lens (contains focused target)
-			var distance interface{} = "infinite"
-			if lensType == "focus" {
-				distance = 0
-			}
+			// For packages, compute distance as minimum of child target distances
+			distance := computePackageDistance(pkgNode.ID, rawGraph.Nodes, nodeStates)
 
 			rule := findDistanceRule(lens, distance)
 			collapsed := shouldNodeBeCollapsed(pkgNode, rule, manualOverrides)
@@ -365,6 +363,43 @@ func getNodeHierarchyLevel(nodeID, nodeType string) int {
 	}
 
 	return 3 // File level (//package:target:file)
+}
+
+// computePackageDistance computes the distance for a package node
+// as the MINIMUM distance of ANY nested node (targets, files, etc.) within that package
+func computePackageDistance(packageID string, allNodes []GraphNode, nodeStates map[string]*NodeState) interface{} {
+	var minDistance interface{} = "infinite"
+	hasDescendants := false
+
+	// Find all nodes that are descendants of this package (including targets and files)
+	for _, node := range allNodes {
+		// Check if this node is a descendant of the package
+		// Example: package "//util", descendants: "//util:util", "//util:util:math.cc", etc.
+		if strings.HasPrefix(node.ID, packageID+":") || node.ID == packageID {
+			if node.ID != packageID { // Don't count the package itself
+				hasDescendants = true
+				state := nodeStates[node.ID]
+				if state != nil {
+					// Compare distances (int < int, int < infinite)
+					if distInt, ok := state.Distance.(int); ok {
+						if minDistance == "infinite" {
+							minDistance = distInt
+						} else if minDistInt, ok := minDistance.(int); ok {
+							if distInt < minDistInt {
+								minDistance = distInt
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if !hasDescendants {
+		return "infinite"
+	}
+
+	return minDistance
 }
 
 // extractPackageNodes creates synthetic package nodes from target nodes
