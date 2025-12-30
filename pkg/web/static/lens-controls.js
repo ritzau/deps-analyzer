@@ -153,14 +153,14 @@ function setupDefaultLensControls() {
 
         console.log('[LensControls] New edge types:', Array.from(types));
 
-        // Update both default and focus lenses to use same edge rules
+        // Update both default and focus lenses to use same edge rules (atomic)
         const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
         currentDefaultLens.edgeRules.types = types;
-        viewStateManager.updateDefaultLens(currentDefaultLens);
 
         const currentFocusLens = cloneLens(viewStateManager.getState().focusLens);
         currentFocusLens.edgeRules.types = types;
-        viewStateManager.updateFocusLens(currentFocusLens);
+
+        viewStateManager.updateBothLenses(currentDefaultLens, currentFocusLens);
       });
     }
   });
@@ -171,14 +171,14 @@ function setupDefaultLensControls() {
     collapseEdgeTypesCheckbox.addEventListener('change', () => {
       console.log('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
 
-      // Update both default and focus lenses to use same edge rules
+      // Update both default and focus lenses to use same edge rules (atomic)
       const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
       currentDefaultLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
-      viewStateManager.updateDefaultLens(currentDefaultLens);
 
       const currentFocusLens = cloneLens(viewStateManager.getState().focusLens);
       currentFocusLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
-      viewStateManager.updateFocusLens(currentFocusLens);
+
+      viewStateManager.updateBothLenses(currentDefaultLens, currentFocusLens);
     });
   }
 

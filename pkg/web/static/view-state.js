@@ -59,6 +59,19 @@ class ViewStateManager {
   }
 
   /**
+   * Update both default and focus lenses atomically (single notification)
+   * Use this when edge settings or other global settings need to apply to both lenses
+   * @param {LensConfig} defaultLens - New default lens
+   * @param {LensConfig} focusLens - New focus lens
+   */
+  updateBothLenses(defaultLens, focusLens) {
+    console.log('[ViewState] updateBothLenses called (atomic update)');
+    this.state.defaultLens = defaultLens;
+    this.state.focusLens = focusLens;
+    this.notifyListeners(); // Only notify once
+  }
+
+  /**
    * Update focus on a node
    * In single mode: replace focused set
    * In multi mode: toggle node in focused set
