@@ -85,20 +85,26 @@
      either: a) Add a catch-all rule to hide nodes beyond a certain distance, OR
      b) Change the fallback behavior in findDistanceRule() to hide by default
 
-2. Use a flag --open / --no-open to open the browser. Default to --open for now.
+2. Use single click to clear focus and only focus on the selected node. Use
+   ctrl+click to toggle the focus of a node. If a parent node is focused, so are
+   all the nested ones. (and remove the UI to focus single/multi). Also remove
+   the possibility to manually fold/unfold. It should now all be controlled by
+   focus.
 
-3. Add on option to collapse dependencies to a single edge between each pair of
+3. Use a flag --open / --no-open to open the browser. Default to --open for now.
+
+4. Add on option to collapse dependencies to a single edge between each pair of
    nodes.
 
-4. BUG: Some tooltips (need a better name for these) get stuck. We should track
+5. BUG: Some tooltips (need a better name for these) get stuck. We should track
    all created tooltips and clear them when layout changes, when the window
    loses focus, and other times when appropriate.
 
-5. Improve symbol dependency analysis and presentation. Better distinguish
+6. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-6. Add collapsible external dependencies in focused view. Give users control
+7. Add collapsible external dependencies in focused view. Give users control
    over detail level:
 
    - Level 1: Hide external dependencies completely (only show files within
@@ -106,18 +112,18 @@
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-7. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+8. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-8. Ensure consistent logging in backend and frontend.
+9. Ensure consistent logging in backend and frontend.
 
-9. Make sure docs are up to date.
+10. Make sure docs are up to date.
 
-10. External packages: May require support of .a files.
+11. External packages: May require support of .a files.
 
-11. Collect styles in the CSS (if possible with the graph library).
+12. Collect styles in the CSS (if possible with the graph library).
 
-12. **Uncovered files hierarchical expansion edge case**: When starting at
+13. **Uncovered files hierarchical expansion edge case**: When starting at
     "Targets (hide files)" hierarchy level, manually expanding a target doesn't
     show uncovered files because uncovered files are children of packages, not
     targets. User must collapse and re-expand the parent package to see them.
