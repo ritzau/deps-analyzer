@@ -104,6 +104,20 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 		return finalNodes[i].ID < finalNodes[j].ID
 	})
 
+	// 14. TEMPORARY: Add distance info to labels for debugging
+	if len(focusedNodes) > 0 {
+		for i := range finalNodes {
+			state := nodeStates[finalNodes[i].ID]
+			if state != nil {
+				distStr := "∞"
+				if distInt, ok := state.Distance.(int); ok {
+					distStr = fmt.Sprintf("%d", distInt)
+				}
+				finalNodes[i].Label = fmt.Sprintf("%s [d=%s]", finalNodes[i].Label, distStr)
+			}
+		}
+	}
+
 	log.Printf("[LensRenderer] Final result: %d nodes, %d edges", len(finalNodes), len(visibleEdges))
 
 	return &GraphData{
@@ -429,14 +443,14 @@ func buildHierarchy(nodes []GraphNode, nodeStates map[string]*NodeState) []Graph
 	return result
 }
 
-// filterCollapsedChildren filters out children of collapsed parent nodes
+// filterCollapsedChildren filters out children of collapsed or invisible parent nodes
 func filterCollapsedChildren(nodes []GraphNode, nodeStates map[string]*NodeState) []GraphNode {
 	var result []GraphNode
 	filtered := 0
 
 	for _, node := range nodes {
-		// Check if any ancestor is collapsed
-		if !hasCollapsedAncestor(node.ID, nodeStates) {
+		// Check if any ancestor is collapsed or invisible
+		if !hasCollapsedOrInvisibleAncestor(node.ID, nodeStates) {
 			result = append(result, node)
 		} else {
 			filtered++
@@ -444,20 +458,27 @@ func filterCollapsedChildren(nodes []GraphNode, nodeStates map[string]*NodeState
 	}
 
 	if filtered > 0 {
-		log.Printf("[Lens] Filtered out %d nodes with collapsed ancestors (kept %d nodes)", filtered, len(result))
+		log.Printf("[Lens] Filtered out %d nodes with collapsed/invisible ancestors (kept %d nodes)", filtered, len(result))
 	}
 
 	return result
 }
 
-// hasCollapsedAncestor checks if any ancestor of a node is collapsed
-func hasCollapsedAncestor(nodeID string, nodeStates map[string]*NodeState) bool {
+// hasCollapsedOrInvisibleAncestor checks if any ancestor of a node is collapsed or invisible
+func hasCollapsedOrInvisibleAncestor(nodeID string, nodeStates map[string]*NodeState) bool {
 	parentID := extractParentID(nodeID)
 
 	for parentID != "" && parentID != nodeID {
 		state := nodeStates[parentID]
-		if state != nil && state.Collapsed {
-			return true
+		if state != nil {
+			// If parent is collapsed, hide children
+			if state.Collapsed {
+				return true
+			}
+			// If parent is invisible, also hide children
+			if !state.Visible {
+				return true
+			}
 		}
 		nodeID = parentID
 		parentID = extractParentID(nodeID)
