@@ -21,11 +21,12 @@ func main() {
 	webMode := flag.Bool("web", false, "Start web server instead of printing to console")
 	port := flag.Int("port", 8080, "Port for web server (only used with --web)")
 	watch := flag.Bool("watch", false, "Watch for file changes and re-analyze automatically")
+	open := flag.Bool("open", true, "Automatically open browser when starting web server")
 	flag.Parse()
 
 	if *webMode {
 		// Start web server and run streamlined analysis
-		startWebServerAsync(*workspace, *port, *watch)
+		startWebServerAsync(*workspace, *port, *watch, *open)
 	} else {
 		// TODO: Add CLI mode back with Module-based output
 		// - Show targets, dependencies by type, packages
@@ -36,7 +37,7 @@ func main() {
 	}
 }
 
-func startWebServerAsync(workspace string, port int, watch bool) {
+func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 	// Create server
 	server := web.NewServer()
 
@@ -53,9 +54,13 @@ func startWebServerAsync(workspace string, port int, watch bool) {
 	// Wait a moment for server to start
 	time.Sleep(500 * time.Millisecond)
 
-	// Open browser
-	fmt.Println("Opening browser...")
-	openBrowser(url)
+	// Open browser if requested
+	if open {
+		fmt.Println("Opening browser...")
+		openBrowser(url)
+	} else {
+		fmt.Printf("Server ready at %s (use --open to auto-open browser)\n", url)
+	}
 
 	// Create analysis runner
 	runner := analysis.NewAnalysisRunner(workspace, server)
