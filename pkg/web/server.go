@@ -376,6 +376,46 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	}
 	requestHash := lens.ComputeHash(req.DefaultLens, req.FocusLens, req.FocusedNodes, manualOverrides)
 
+	// Check cache first (before rendering)
+	s.mu.Lock()
+	cachedSnapshot, cacheHit := s.lensCache[requestHash]
+	s.mu.Unlock()
+
+	// If cache hit and frontend's previousHash matches requestHash, return cached result
+	if cacheHit && req.PreviousHash == requestHash {
+		log.Printf("[LensAPI] Cache hit for request hash %s, returning cached graph", requestHash[:12])
+
+		// Reconstruct full graph from cached snapshot
+		cachedGraphData := &GraphData{
+			Nodes: make([]GraphNode, 0, len(cachedSnapshot.Nodes)),
+			Edges: make([]GraphEdge, 0, len(cachedSnapshot.Edges)),
+		}
+
+		for _, node := range cachedSnapshot.Nodes {
+			cachedGraphData.Nodes = append(cachedGraphData.Nodes, GraphNode{
+				ID:       node.ID,
+				Label:    node.Label,
+				Type:     node.Type,
+				Parent:   node.Parent,
+				IsPublic: false, // TODO: restore from raw graph
+			})
+		}
+
+		for _, edge := range cachedSnapshot.Edges {
+			cachedGraphData.Edges = append(cachedGraphData.Edges, GraphEdge{
+				Source: edge.Source,
+				Target: edge.Target,
+				Type:   edge.Type,
+			})
+		}
+
+		json.NewEncoder(w).Encode(&LensRenderResponse{
+			Hash:      requestHash,
+			FullGraph: cachedGraphData,
+		})
+		return
+	}
+
 	// Build raw graph data
 	rawGraphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 
@@ -399,15 +439,23 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Get previous snapshot from cache (if it exists)
+	// Look up previous snapshot using the frontend's previousHash (not requestHash!)
 	var previousSnapshot *lens.GraphSnapshot
-	if cachedSnapshot, exists := s.lensCache[requestHash]; exists {
-		previousSnapshot = cachedSnapshot
-		log.Printf("[LensAPI] Found cached snapshot for request, will compute diff")
+	if req.PreviousHash != "" {
+		log.Printf("[LensAPI] Looking for previous snapshot with hash %s", req.PreviousHash[:12])
+		if prevSnap, exists := s.lensCache[req.PreviousHash]; exists {
+			previousSnapshot = prevSnap
+			log.Printf("[LensAPI] Found previous snapshot for hash %s, will compute diff", req.PreviousHash[:12])
+		} else {
+			log.Printf("[LensAPI] Previous hash %s not found in cache (cache has %d entries)", req.PreviousHash[:12], len(s.lensCache))
+		}
+	} else {
+		log.Printf("[LensAPI] No previousHash provided in request")
 	}
 
 	// Store new snapshot in cache
 	s.lensCache[requestHash] = newSnapshot
+	log.Printf("[LensAPI] Stored snapshot in cache with hash %s (cache now has %d entries)", requestHash[:12], len(s.lensCache))
 
 	// Compute diff if we have a previous snapshot
 	if previousSnapshot != nil {
