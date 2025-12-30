@@ -54,6 +54,15 @@
     - Adding visual indication that package has uncovered files
     - Auto-expanding package when last target is manually expanded
 
+13. **Consider adding request debouncing**: Currently, rapid UI changes trigger
+    rapid backend requests. While we have request cancellation (AbortController)
+    to prevent race conditions, we could further reduce server load by adding
+    debouncing (e.g., 50-100ms delay before sending request). This would batch
+    rapid changes like dragging a slider or quickly toggling multiple checkboxes.
+    Trade-off: Adds slight latency but reduces backend load and potential
+    flickering. Current approach (immediate requests + cancellation) is simpler
+    and gives instant feedback, so debouncing is optional optimization.
+
 ---
 
 ## Attic below

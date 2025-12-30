@@ -1760,6 +1760,9 @@ let currentGraphHash = null;
 // Current graph data (for applying diffs)
 let currentGraphData = null;
 
+// Track pending request for cancellation
+let pendingRequestController = null;
+
 /**
  * Run Dagre layout with stable, deterministic ordering
  * Uses centralized configuration for consistent layout parameters
@@ -1793,6 +1796,16 @@ function runStableDagreLayout(animate = true, fit = false) {
  * @returns {Promise<Object>} Rendered graph from backend
  */
 async function fetchRenderedGraphFromBackend(viewState) {
+  // Cancel any pending request
+  if (pendingRequestController) {
+    console.log('[App] Cancelling previous request');
+    pendingRequestController.abort();
+  }
+
+  // Create new AbortController for this request
+  pendingRequestController = new AbortController();
+  const signal = pendingRequestController.signal;
+
   console.log('[App] Fetching rendered graph from backend lens API');
 
   // Convert edgeRules.types from Set to Array for JSON serialization
@@ -1819,7 +1832,8 @@ async function fetchRenderedGraphFromBackend(viewState) {
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify(requestBody),
+    signal: signal  // Attach abort signal
   });
 
   if (!response.ok) {
@@ -1928,6 +1942,12 @@ viewStateManager.addListener(async (newState) => {
     // Display the pre-rendered graph from backend
     displayDependencyGraph(renderedGraph);
   } catch (error) {
+    // Ignore AbortError - this happens when a new request cancels the previous one
+    if (error.name === 'AbortError') {
+      console.log('[App] Request cancelled (new request started)');
+      return;
+    }
+
     console.error('[App] Error fetching rendered graph from backend:', error);
     console.error('[App] Backend lens rendering failed - this is a fatal error');
   }
