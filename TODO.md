@@ -63,6 +63,14 @@
     flickering. Current approach (immediate requests + cancellation) is simpler
     and gives instant feedback, so debouncing is optional optimization.
 
+14. **Add stress tests and unit tests for concurrent requests**: Create automated
+    tests to verify request handling under load:
+    - Stress test: Rapidly trigger 50-100 settings changes in quick succession
+    - Unit tests: Mock fetch() and verify only the last request completes
+    - Race condition test: Verify responses arriving out-of-order don't corrupt state
+    - Test both atomic lens updates and request cancellation mechanisms
+    - Could use headless browser testing (Playwright/Puppeteer) for full E2E tests
+
 ---
 
 ## Attic below
