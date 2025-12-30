@@ -287,6 +287,15 @@ func isNodeVisibleByRule(node *GraphNode, rule *DistanceRule, lens *LensConfig) 
 		}
 	}
 
+	// Check package visibility - packages should be hidden if no target types are visible
+	// Package nodes have type "package" or empty string and ID like "//foo"
+	if node.Type == "package" || (node.Type == "" && strings.HasPrefix(node.ID, "//") && !strings.Contains(node.ID, ":")) {
+		// If targetTypes is empty, hide the package (since all its children would be hidden)
+		if len(vis.TargetTypes) == 0 {
+			return false
+		}
+	}
+
 	// Check specific visibility flags
 	if node.Type == "uncovered_source" || node.Type == "uncovered_header" {
 		if !vis.ShowUncovered {

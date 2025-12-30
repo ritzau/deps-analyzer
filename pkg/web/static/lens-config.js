@@ -117,17 +117,17 @@ const DEFAULT_FOCUS_LENS = {
       edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
     },
     {
-      distance: 'infinite',  // Rest of graph
+      distance: 'infinite',  // Rest of graph - HIDE EVERYTHING
       nodeVisibility: {
-        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
-        fileTypes: ['none'],
+        targetTypes: [],  // Empty array = hide all targets
+        fileTypes: ['none'],  // Hide all files
         showUncovered: false,
         showExternal: false,
-        showSystemLibraries: true
+        showSystemLibraries: false  // Hide system libraries too
       },
-      collapseLevel: 1,  // Show as collapsed packages
-      showEdges: true,
-      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
+      collapseLevel: 0,  // Doesn't matter since everything is hidden
+      showEdges: false,  // Don't show edges to/from hidden nodes
+      edgeTypes: []
     }
   ],
   globalFilters: {},
