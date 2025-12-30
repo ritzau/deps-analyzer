@@ -64,12 +64,12 @@ const DEFAULT_PACKAGE_LENS = {
       distance: 'infinite',
       nodeVisibility: {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
-        fileTypes: ['all'],  // Show all files
-        showUncovered: true,
+        fileTypes: ['none'],  // Hide files by default
+        showUncovered: false,
         showExternal: false,
         showSystemLibraries: true
       },
-      collapseLevel: 3,  // Show down to file level
+      collapseLevel: 2,  // Show targets but hide files (default)
       showEdges: true,
       edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
     }

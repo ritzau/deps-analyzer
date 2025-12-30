@@ -331,15 +331,22 @@ func shouldNodeBeCollapsed(node GraphNode, rule *DistanceRule, manualOverrides m
 	}
 
 	// Collapse level determines how deep in the hierarchy we show nodes
-	// 0 = hide everything
-	// 1 = show only packages (collapse targets)
-	// 2 = show packages and targets (collapse files)
+	// 0 = hide everything (collapse all packages)
+	// 1 = show only packages (collapse all targets)
+	// 2 = show packages and targets (collapse all files)
 	// 3 = show everything (no collapse)
+	//
+	// A node should be "collapsed" if we want to hide its children.
+	// For example, with collapseLevel = 2:
+	//   - Packages (level 1): NOT collapsed (show their children = targets)
+	//   - Targets (level 2): YES collapsed (hide their children = files)
+	//   - Files (level 3): NOT collapsed (they have no children)
 
 	nodeLevel := getNodeHierarchyLevel(node.ID, node.Type)
 
-	// If node's level is greater than collapse level, it should be collapsed
-	return nodeLevel > rule.CollapseLevel
+	// A node is collapsed if its level equals the collapse level
+	// (meaning we show nodes at this level, but hide their children)
+	return nodeLevel == rule.CollapseLevel
 }
 
 // getNodeHierarchyLevel returns the hierarchy level of a node
@@ -439,12 +446,19 @@ func buildHierarchy(nodes []GraphNode, nodeStates map[string]*NodeState) []Graph
 // filterCollapsedChildren filters out children of collapsed parent nodes
 func filterCollapsedChildren(nodes []GraphNode, nodeStates map[string]*NodeState) []GraphNode {
 	var result []GraphNode
+	filtered := 0
 
 	for _, node := range nodes {
 		// Check if any ancestor is collapsed
 		if !hasCollapsedAncestor(node.ID, nodeStates) {
 			result = append(result, node)
+		} else {
+			filtered++
 		}
+	}
+
+	if filtered > 0 {
+		log.Printf("[Lens] Filtered out %d nodes with collapsed ancestors (kept %d nodes)", filtered, len(result))
 	}
 
 	return result

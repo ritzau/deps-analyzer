@@ -2,47 +2,67 @@
 
 ## Prioritized backlog
 
-1. **[COMPLETED ✅]** Move lens rendering to backend for better performance and simpler frontend architecture:
+1. **[COMPLETED ✅]** Move lens rendering to backend for better performance and
+   simpler frontend architecture:
 
    **Backend implementation - COMPLETED ✅**:
+
    - Created `pkg/lens/` package with Go lens rendering logic
-   - Ported lens configuration structs from JavaScript to Go ([lens/lens.go](pkg/lens/lens.go))
-   - Implemented BFS distance computation ([lens/distance.go](pkg/lens/distance.go))
-   - Ported complete lens rendering pipeline to Go ([lens/renderer.go](pkg/lens/renderer.go)):
+   - Ported lens configuration structs from JavaScript to Go
+     ([lens/lens.go](pkg/lens/lens.go))
+   - Implemented BFS distance computation
+     ([lens/distance.go](pkg/lens/distance.go))
+   - Ported complete lens rendering pipeline to Go
+     ([lens/renderer.go](pkg/lens/renderer.go)):
      - Distance computation and lens assignment
      - Visibility filtering based on node types and distance rules
      - Hierarchy building (package/target/file levels)
      - Collapse filtering based on collapse levels
      - Edge aggregation for collapsed nodes
-   - Added `/api/module/graph/lens` POST endpoint ([server.go:206](pkg/web/server.go#L206))
+   - Added `/api/module/graph/lens` POST endpoint
+     ([server.go:206](pkg/web/server.go#L206))
    - Endpoint accepts lens configurations and returns filtered graph
 
    **Frontend integration - COMPLETED ✅**:
-   - Updated viewStateManager listener to call `/api/module/graph/lens` ([app.js:1691](pkg/web/static/app.js#L1691))
-   - Updated initial page load (loadGraphData) to use backend API ([app.js:1390,1415,1450](pkg/web/static/app.js#L1390))
-   - Added fetchRenderedGraphFromBackend() function with proper serialization ([app.js:1641-1667](pkg/web/static/app.js#L1641-L1667))
+
+   - Updated viewStateManager listener to call `/api/module/graph/lens`
+     ([app.js:1691](pkg/web/static/app.js#L1691))
+   - Updated initial page load (loadGraphData) to use backend API
+     ([app.js:1390,1415,1450](pkg/web/static/app.js#L1390))
+   - Added fetchRenderedGraphFromBackend() function with proper serialization
+     ([app.js:1641-1667](pkg/web/static/app.js#L1641-L1667))
    - Removed client-side lens-renderer.js (1,149 lines deleted)
-   - Removed fallback to client-side rendering - backend failures are now fatal errors
-   - Removed filterReachableFromBinary() helper (83 lines) - backend handles all graph transformations
-   - Removed unused backend endpoints: `/api/analysis`, `/api/binaries/graph`, `/api/module/packages` (50 lines)
+   - Removed fallback to client-side rendering - backend failures are now fatal
+     errors
+   - Removed filterReachableFromBinary() helper (83 lines) - backend handles all
+     graph transformations
+   - Removed unused backend endpoints: `/api/analysis`, `/api/binaries/graph`,
+     `/api/module/packages` (50 lines)
 
    **Diff-based incremental updates - COMPLETED ✅**:
+
    - Created `pkg/lens/diff.go` with diff computation logic:
      - `ComputeHash()` - SHA256 hash of lens config for cache keys
      - `CreateSnapshot()` - Indexed graph representation for efficient diffing
      - `ComputeDiff()` - Computes added/removed/modified nodes and edges
    - Updated backend API to support incremental updates:
-     - Added `lensCache` map to Server for caching rendered graphs by request hash
-     - Modified `/api/module/graph/lens` to return `{hash, fullGraph?, diff?}` format
-     - Sends diff when graph changes are <50% of total, otherwise sends full graph
-     - Created helper functions `convertLensNodesToWeb()` and `convertLensEdgesToWeb()`
+     - Added `lensCache` map to Server for caching rendered graphs by request
+       hash
+     - Modified `/api/module/graph/lens` to return `{hash, fullGraph?, diff?}`
+       format
+     - Sends diff when graph changes are <50% of total, otherwise sends full
+       graph
+     - Created helper functions `convertLensNodesToWeb()` and
+       `convertLensEdgesToWeb()`
    - Updated frontend to handle diff responses:
      - Added `currentGraphHash` and `currentGraphData` state tracking
-     - Modified `fetchRenderedGraphFromBackend()` to send `previousHash` parameter
+     - Modified `fetchRenderedGraphFromBackend()` to send `previousHash`
+       parameter
      - Added `applyGraphDiff()` function to apply incremental changes to graph
      - Handles both full graph and diff responses transparently
 
    **Position caching and smooth transitions - COMPLETED ✅**:
+
    - Added position caching infrastructure:
      - `cacheNodePositions()` - Stores x,y coordinates of all nodes
      - `restoreNodePositions()` - Restores cached positions before re-layout
@@ -58,21 +78,24 @@
    - Moved event handlers into `setupEventHandlers()` function (called once)
 
    **Known issues**:
+
    - Hiding indirect neighbors (distance > 1) doesn't work properly. The focus
      lens only has rules for distance 0, 1, and infinite. Nodes at distance 2,
      3, etc. fall back to the "infinite" rule instead of being hidden. Need to
      either: a) Add a catch-all rule to hide nodes beyond a certain distance, OR
      b) Change the fallback behavior in findDistanceRule() to hide by default
 
-2. BUG: Some tooltips (need a better name for these) get stuck. We should track
+2. Use a flag --open / --no-open to open the browser. Default to --open for now.
+
+3. BUG: Some tooltips (need a better name for these) get stuck. We should track
    all created tooltips and clear them when layout changes, when the window
    loses focus, and other times when appropriate.
 
-3. Improve symbol dependency analysis and presentation. Better distinguish
+4. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-4. Add collapsible external dependencies in focused view. Give users control
+5. Add collapsible external dependencies in focused view. Give users control
    over detail level:
 
    - Level 1: Hide external dependencies completely (only show files within
@@ -80,18 +103,18 @@
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-5. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+6. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-6. Ensure consistent logging in backend and frontend.
+7. Ensure consistent logging in backend and frontend.
 
-7. Make sure docs are up to date.
+8. Make sure docs are up to date.
 
-8. External packages: May require support of .a files.
+9. External packages: May require support of .a files.
 
-9. Collect styles in the CSS (if possible with the graph library).
+10. Collect styles in the CSS (if possible with the graph library).
 
-10. **Uncovered files hierarchical expansion edge case**: When starting at
+11. **Uncovered files hierarchical expansion edge case**: When starting at
     "Targets (hide files)" hierarchy level, manually expanding a target doesn't
     show uncovered files because uncovered files are children of packages, not
     targets. User must collapse and re-expand the parent package to see them.

@@ -176,8 +176,10 @@ function setupDefaultLensControls() {
           // Also update file visibility to match
           if (level >= 3) {
             rule.nodeVisibility.fileTypes = ['all'];
+            rule.nodeVisibility.showUncovered = true;
           } else {
             rule.nodeVisibility.fileTypes = ['none'];
+            rule.nodeVisibility.showUncovered = false;
           }
         }
 
