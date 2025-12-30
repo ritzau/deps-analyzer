@@ -164,9 +164,16 @@ function setupDefaultLensControls() {
   if (collapseEdgeTypesCheckbox) {
     collapseEdgeTypesCheckbox.addEventListener('change', () => {
       console.log('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
-      const currentLens = cloneLens(viewStateManager.getState().defaultLens);
-      currentLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
-      viewStateManager.updateDefaultLens(currentLens);
+
+      // Update default lens
+      const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
+      currentDefaultLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
+      viewStateManager.updateDefaultLens(currentDefaultLens);
+
+      // Also update focus lens so it works when nodes are focused
+      const currentFocusLens = cloneLens(viewStateManager.getState().focusLens);
+      currentFocusLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
+      viewStateManager.updateFocusLens(currentFocusLens);
     });
   }
 
