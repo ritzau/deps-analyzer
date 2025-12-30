@@ -140,7 +140,6 @@ function setupDefaultLensControls() {
     if (checkbox) {
       checkbox.addEventListener('change', () => {
         console.log('[LensControls] Edge type checkbox changed:', id);
-        const currentLens = cloneLens(viewStateManager.getState().defaultLens);
         const types = new Set();
 
         if (document.getElementById('showStatic')?.checked) types.add('static');
@@ -153,8 +152,15 @@ function setupDefaultLensControls() {
         types.add('system_link');
 
         console.log('[LensControls] New edge types:', Array.from(types));
-        currentLens.edgeRules.types = types;
-        viewStateManager.updateDefaultLens(currentLens);
+
+        // Update both default and focus lenses to use same edge rules
+        const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
+        currentDefaultLens.edgeRules.types = types;
+        viewStateManager.updateDefaultLens(currentDefaultLens);
+
+        const currentFocusLens = cloneLens(viewStateManager.getState().focusLens);
+        currentFocusLens.edgeRules.types = types;
+        viewStateManager.updateFocusLens(currentFocusLens);
       });
     }
   });
@@ -165,12 +171,11 @@ function setupDefaultLensControls() {
     collapseEdgeTypesCheckbox.addEventListener('change', () => {
       console.log('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
 
-      // Update default lens
+      // Update both default and focus lenses to use same edge rules
       const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
       currentDefaultLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
       viewStateManager.updateDefaultLens(currentDefaultLens);
 
-      // Also update focus lens so it works when nodes are focused
       const currentFocusLens = cloneLens(viewStateManager.getState().focusLens);
       currentFocusLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
       viewStateManager.updateFocusLens(currentFocusLens);
