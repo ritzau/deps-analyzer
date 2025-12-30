@@ -2,33 +2,33 @@
 
 ## Prioritized backlog
 
-1. Use single click to clear focus and only focus on the selected node. Use
+1. Add on option to collapse dependencies to a single edge between each pair of
+   nodes.
+
+2. BUG: If a package has two targets, and one is the default, it seems as the
+   package itself has a colliding ID. Dependencies sometimes look wrong. This is
+   only visiblein some cases. One such is when the package is a neighbour to a
+   focused node.
+
+3. BUG: Some tooltips (need a better name for these) get stuck. We should track
+   all created tooltips and clear them when layout changes, when the window
+   loses focus, and other times when appropriate.
+
+4. Use single click to clear focus and only focus on the selected node. Use
    ctrl+click to toggle the focus of a node. If a parent node is focused, so are
    all the nested ones. (and remove the UI to focus single/multi). Also remove
    the possibility to manually fold/unfold. It should now all be controlled by
    focus.
 
-2. Use a flag --open / --no-open to open the browser. Default to --open for now.
-
-3. Add on option to collapse dependencies to a single edge between each pair of
-   nodes.
-
-4. If a node has a single nested node, we should be able to collapse the
+5. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-5. BUG: If a package has two targets, and one is the default, it seems as the
-   package itself has a colliding ID. Dependencies sometimes look wrong.
-
-6. BUG: Some tooltips (need a better name for these) get stuck. We should track
-   all created tooltips and clear them when layout changes, when the window
-   loses focus, and other times when appropriate.
-
-7. Improve symbol dependency analysis and presentation. Better distinguish
+6. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-8. Add collapsible external dependencies in focused view. Give users control
+7. Add collapsible external dependencies in focused view. Give users control
    over detail level:
 
    - Level 1: Hide external dependencies completely (only show files within
@@ -36,18 +36,18 @@
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-9. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+8. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-10. Ensure consistent logging in backend and frontend.
+9. Ensure consistent logging in backend and frontend.
 
-11. Make sure docs are up to date.
+10. Make sure docs are up to date.
 
-12. External packages: May require support of .a files.
+11. External packages: May require support of .a files.
 
-13. Collect styles in the CSS (if possible with the graph library).
+12. Collect styles in the CSS (if possible with the graph library).
 
-14. **Uncovered files hierarchical expansion edge case**: When starting at
+13. **Uncovered files hierarchical expansion edge case**: When starting at
     "Targets (hide files)" hierarchy level, manually expanding a target doesn't
     show uncovered files because uncovered files are children of packages, not
     targets. User must collapse and re-expand the parent package to see them.
@@ -87,6 +87,33 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Browser auto-open flag (DONE)
+
+Added `--open` / `--no-open` CLI flag to control browser auto-opening when
+starting the web server.
+
+**Implementation**:
+
+- Added `--open` boolean flag (default: `true`) in
+  [cmd/deps-analyzer/main.go:24](cmd/deps-analyzer/main.go#L24)
+- Updated `startWebServerAsync()` to accept `open` parameter
+- Conditionally calls `openBrowser()` based on flag value
+- When `--no-open` is used, displays helpful message with server URL
+
+**Usage**:
+
+```bash
+./deps-analyzer --web            # Auto-opens browser (default)
+./deps-analyzer --web --open     # Explicitly auto-open
+./deps-analyzer --web --no-open  # Don't auto-open
+```
+
+**Benefits**:
+
+- Maintains backward compatibility (default behavior unchanged)
+- Useful for CI/CD environments or when running multiple instances
+- Better developer experience with clear messaging
 
 ## ✅ Backend lens rendering system (DONE)
 
