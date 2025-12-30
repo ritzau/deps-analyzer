@@ -432,6 +432,18 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	// Convert lens.GraphData back to web.GraphData
 	resultGraphData := convertFromLensGraphData(renderedGraph, rawGraphData)
 
+	// TEMPORARY DEBUG: Log package labels being sent to frontend
+	if len(req.FocusedNodes) > 0 {
+		packageCount := 0
+		for _, node := range resultGraphData.Nodes {
+			if node.Type == "package" {
+				packageCount++
+				log.Printf("[LensAPI] Sending package to frontend: ID=%s, Label=%s", node.ID, node.Label)
+			}
+		}
+		log.Printf("[LensAPI] Total packages being sent: %d", packageCount)
+	}
+
 	// Create snapshot of new graph
 	newSnapshot := lens.CreateSnapshot(convertToLensGraphData(resultGraphData))
 

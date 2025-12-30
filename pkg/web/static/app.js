@@ -213,6 +213,11 @@ function displayDependencyGraph(graphData) {
     const elements = [
         // Nodes
         ...graphData.nodes.map(node => {
+            // TEMPORARY DEBUG: Log package labels
+            if (node.type === 'package' && node.label.includes('(d=')) {
+                console.log(`[Frontend] Package node: id=${node.id}, original label="${node.label}", simplified="${simplifyLabel(node.label)}"`);
+            }
+
             const nodeData = {
                 id: node.id,
                 label: simplifyLabel(node.label),
@@ -652,19 +657,34 @@ function displayDependencyGraph(graphData) {
             cy.edges(`[source = "${source}"][target = "${target}"][type = "${type}"]`).remove();
         });
 
-        // Add new elements
-        const elementsToAdd = elements.filter(e => {
+        // Update existing nodes and add new elements
+        const elementsToAdd = [];
+        let updatedNodes = 0;
+
+        elements.forEach(e => {
             if (e.data.source) {
                 // Edge
                 const id = `${e.data.source}|${e.data.target}|${e.data.type}`;
-                return !currentEdgeIds.has(id);
+                if (!currentEdgeIds.has(id)) {
+                    elementsToAdd.push(e);
+                }
             } else {
                 // Node
-                return !currentNodeIds.has(e.data.id);
+                if (currentNodeIds.has(e.data.id)) {
+                    // Update existing node data (especially label)
+                    const existingNode = cy.getElementById(e.data.id);
+                    if (existingNode.data('label') !== e.data.label) {
+                        existingNode.data('label', e.data.label);
+                        updatedNodes++;
+                    }
+                } else {
+                    // Add new node
+                    elementsToAdd.push(e);
+                }
             }
         });
 
-        console.log(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges`);
+        console.log(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges, updated ${updatedNodes} node labels`);
         if (elementsToAdd.length > 0) {
             cy.add(elementsToAdd);
 

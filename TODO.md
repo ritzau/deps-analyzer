@@ -87,15 +87,18 @@
 
 2. Use a flag --open / --no-open to open the browser. Default to --open for now.
 
-3. BUG: Some tooltips (need a better name for these) get stuck. We should track
+3. Add on option to collapse dependencies to a single edge between each pair of
+   nodes.
+
+4. BUG: Some tooltips (need a better name for these) get stuck. We should track
    all created tooltips and clear them when layout changes, when the window
    loses focus, and other times when appropriate.
 
-4. Improve symbol dependency analysis and presentation. Better distinguish
+5. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-5. Add collapsible external dependencies in focused view. Give users control
+6. Add collapsible external dependencies in focused view. Give users control
    over detail level:
 
    - Level 1: Hide external dependencies completely (only show files within
@@ -103,18 +106,18 @@
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-6. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+7. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-7. Ensure consistent logging in backend and frontend.
+8. Ensure consistent logging in backend and frontend.
 
-8. Make sure docs are up to date.
+9. Make sure docs are up to date.
 
-9. External packages: May require support of .a files.
+10. External packages: May require support of .a files.
 
-10. Collect styles in the CSS (if possible with the graph library).
+11. Collect styles in the CSS (if possible with the graph library).
 
-11. **Uncovered files hierarchical expansion edge case**: When starting at
+12. **Uncovered files hierarchical expansion edge case**: When starting at
     "Targets (hide files)" hierarchy level, manually expanding a target doesn't
     show uncovered files because uncovered files are children of packages, not
     targets. User must collapse and re-expand the parent package to see them.

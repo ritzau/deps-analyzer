@@ -37,9 +37,10 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 	// Packages inherit the MINIMUM distance of their child targets
 	for _, pkgNode := range allPackageNodes {
 		if _, exists := nodeStates[pkgNode.ID]; !exists {
-			lensType := nodeLensMap[pkgNode.ID]
-			if lensType == "" {
-				lensType = "default"
+			// Determine lens type: if we have focused nodes, ALL nodes (including packages) use focus lens
+			lensType := "default"
+			if len(focusedNodes) > 0 {
+				lensType = "focus"
 			}
 
 			var lens *LensConfig
@@ -55,8 +56,19 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 			rule := findDistanceRule(lens, distance)
 			collapsed := shouldNodeBeCollapsed(pkgNode, rule, manualOverrides)
 
+			// Check visibility using the same logic as regular nodes
+			visible := isNodeVisibleByRule(&pkgNode, rule, lens)
+
+			// TEMPORARY DEBUG: Log package visibility decisions
+			targetTypes := []string{}
+			if rule != nil {
+				targetTypes = rule.NodeVisibility.TargetTypes
+			}
+			log.Printf("[SyntheticPackage] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
+				pkgNode.ID, distance, lensType, rule != nil, targetTypes, visible)
+
 			nodeStates[pkgNode.ID] = &NodeState{
-				Visible:     true,
+				Visible:     visible,
 				Collapsed:   collapsed,
 				Distance:    distance,
 				AppliedLens: lensType,
@@ -104,6 +116,8 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 
 	// 14. TEMPORARY: Add distance info to labels for debugging
 	if len(focusedNodes) > 0 {
+		packagesWithDistance := 0
+		packagesWithoutState := 0
 		for i := range finalNodes {
 			state := nodeStates[finalNodes[i].ID]
 			if state != nil {
@@ -111,8 +125,21 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 				if distInt, ok := state.Distance.(int); ok {
 					distStr = fmt.Sprintf("%d", distInt)
 				}
-				finalNodes[i].Label = fmt.Sprintf("%s [d=%s]", finalNodes[i].Label, distStr)
+				// Use parentheses instead of square brackets (which have special meaning in Cytoscape selectors)
+				finalNodes[i].Label = fmt.Sprintf("%s (d=%s)", finalNodes[i].Label, distStr)
+				if finalNodes[i].Type == "package" {
+					packagesWithDistance++
+				}
+			} else {
+				// Log nodes without state
+				log.Printf("[LensRenderer] WARNING: Node %s (type=%s) has no state!", finalNodes[i].ID, finalNodes[i].Type)
+				if finalNodes[i].Type == "package" {
+					packagesWithoutState++
+				}
 			}
+		}
+		if packagesWithDistance > 0 || packagesWithoutState > 0 {
+			log.Printf("[LensRenderer] Package distance labels: %d with state, %d without state", packagesWithDistance, packagesWithoutState)
 		}
 	}
 
@@ -173,6 +200,16 @@ func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances m
 
 		// Check visibility
 		visible := isNodeVisibleByRule(&node, rule, lens)
+
+		// TEMPORARY DEBUG: Log package visibility decisions
+		if node.Type == "package" {
+			targetTypes := []string{}
+			if rule != nil {
+				targetTypes = rule.NodeVisibility.TargetTypes
+			}
+			log.Printf("[ApplyLensRules] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
+				node.ID, distance, lensType, rule != nil, targetTypes, visible)
+		}
 
 		// Check collapse state
 		collapsed := shouldNodeBeCollapsed(node, rule, manualOverrides)
