@@ -77,7 +77,8 @@ const DEFAULT_PACKAGE_LENS = {
   globalFilters: {},
   edgeRules: {
     types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
-    aggregateCollapsed: true
+    aggregateCollapsed: true,
+    collapseEdgeTypes: false
   }
 };
 
@@ -133,7 +134,8 @@ const DEFAULT_FOCUS_LENS = {
   globalFilters: {},
   edgeRules: {
     types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
-    aggregateCollapsed: true
+    aggregateCollapsed: true,
+    collapseEdgeTypes: false
   }
 };
 
@@ -155,6 +157,7 @@ function cloneLens(lens) {
     edgeRules: {
       types: new Set(lens.edgeRules.types),
       aggregateCollapsed: lens.edgeRules.aggregateCollapsed,
+      collapseEdgeTypes: lens.edgeRules.collapseEdgeTypes,
       minimumCount: lens.edgeRules.minimumCount
     }
   };

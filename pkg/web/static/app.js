@@ -568,6 +568,15 @@ function displayDependencyGraph(graphData) {
                     'line-style': 'dashed'
                 }
             },
+            {
+                selector: 'edge[type = "multi"]',
+                style: {
+                    'line-color': '#9cdcfe',
+                    'target-arrow-color': '#9cdcfe',
+                    'width': 3,
+                    'line-style': 'solid'
+                }
+            },
             // Overlapping dependencies - MUST be after type-specific selectors to override
             // Note: Only nodes/edges with hasOverlap/isOverlapping set to true will have this attribute
             {

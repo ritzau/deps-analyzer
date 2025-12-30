@@ -159,6 +159,17 @@ function setupDefaultLensControls() {
     }
   });
 
+  // Collapse edge types checkbox
+  const collapseEdgeTypesCheckbox = document.getElementById('collapseEdgeTypes');
+  if (collapseEdgeTypesCheckbox) {
+    collapseEdgeTypesCheckbox.addEventListener('change', () => {
+      console.log('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
+      const currentLens = cloneLens(viewStateManager.getState().defaultLens);
+      currentLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
+      viewStateManager.updateDefaultLens(currentLens);
+    });
+  }
+
   // Collapse level radio buttons
   const collapseLevelRadios = document.querySelectorAll('input[name="collapseLevel"]');
   collapseLevelRadios.forEach(radio => {

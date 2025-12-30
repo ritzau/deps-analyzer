@@ -45,6 +45,7 @@ type GlobalFilters struct {
 type EdgeDisplayRules struct {
 	Types              []string `json:"types"`
 	AggregateCollapsed bool     `json:"aggregateCollapsed"`
+	CollapseEdgeTypes  bool     `json:"collapseEdgeTypes"`
 	MinimumCount       *int     `json:"minimumCount,omitempty"`
 }
 

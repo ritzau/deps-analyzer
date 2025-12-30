@@ -613,7 +613,16 @@ func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]
 		}
 
 		// Create edge key for aggregation
-		edgeKey := fmt.Sprintf("%s|%s|%s", actualSource, actualTarget, edge.Type)
+		// If CollapseEdgeTypes is true, collapse all edge types between same node pair
+		var edgeKey string
+		var edgeType string
+		if lens.EdgeRules.CollapseEdgeTypes {
+			edgeKey = fmt.Sprintf("%s|%s", actualSource, actualTarget)
+			edgeType = "multi" // Special type for collapsed edges
+		} else {
+			edgeKey = fmt.Sprintf("%s|%s|%s", actualSource, actualTarget, edge.Type)
+			edgeType = edge.Type
+		}
 
 		// Aggregate edges (for collapsed nodes, multiple edges may map to same aggregated edge)
 		if _, exists := edgeMap[edgeKey]; !exists {
@@ -621,7 +630,7 @@ func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]
 			edgeMap[edgeKey] = &GraphEdge{
 				Source: actualSource,
 				Target: actualTarget,
-				Type:   edge.Type,
+				Type:   edgeType,
 			}
 		}
 		// Note: Multiple edges with same source/target/type are aggregated into one
