@@ -2,33 +2,30 @@
 
 ## Prioritized backlog
 
-1. Add on option to collapse dependencies to a single edge between each pair of
-   nodes.
-
-2. BUG: If a package has two targets, and one is the default, it seems as the
+1. BUG: If a package has two targets, and one is the default, it seems as the
    package itself has a colliding ID. Dependencies sometimes look wrong. This is
    only visiblein some cases. One such is when the package is a neighbour to a
    focused node.
 
-3. BUG: Some tooltips (need a better name for these) get stuck. We should track
+2. BUG: Some tooltips (need a better name for these) get stuck. We should track
    all created tooltips and clear them when layout changes, when the window
    loses focus, and other times when appropriate.
 
-4. Use single click to clear focus and only focus on the selected node. Use
+3. Use single click to clear focus and only focus on the selected node. Use
    ctrl+click to toggle the focus of a node. If a parent node is focused, so are
    all the nested ones. (and remove the UI to focus single/multi). Also remove
    the possibility to manually fold/unfold. It should now all be controlled by
    focus.
 
-5. If a node has a single nested node, we should be able to collapse the
+4. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-6. Improve symbol dependency analysis and presentation. Better distinguish
+5. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-7. Add collapsible external dependencies in focused view. Give users control
+6. Add collapsible external dependencies in focused view. Give users control
    over detail level:
 
    - Level 1: Hide external dependencies completely (only show files within
@@ -36,18 +33,18 @@
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-8. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+7. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-9. Ensure consistent logging in backend and frontend.
+8. Ensure consistent logging in backend and frontend.
 
-10. Make sure docs are up to date.
+9. Make sure docs are up to date.
 
-11. External packages: May require support of .a files.
+10. External packages: May require support of .a files.
 
-12. Collect styles in the CSS (if possible with the graph library).
+11. Collect styles in the CSS (if possible with the graph library).
 
-13. **Uncovered files hierarchical expansion edge case**: When starting at
+12. **Uncovered files hierarchical expansion edge case**: When starting at
     "Targets (hide files)" hierarchy level, manually expanding a target doesn't
     show uncovered files because uncovered files are children of packages, not
     targets. User must collapse and re-expand the parent package to see them.
@@ -87,6 +84,42 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Edge type collapse option (DONE)
+
+Added option to collapse all dependency types between the same pair of nodes into
+a single aggregated edge.
+
+**Implementation**:
+
+- Added `CollapseEdgeTypes` field to `EdgeDisplayRules` struct in
+  [pkg/lens/lens.go:48](pkg/lens/lens.go#L48)
+- Modified edge aggregation logic in
+  [pkg/lens/renderer.go:615-625](pkg/lens/renderer.go#L615-L625) to use
+  `"source|target"` key when `CollapseEdgeTypes` is true
+- Collapsed edges use type `"multi"` to distinguish them visually
+- Added "Collapse to single edge" checkbox in
+  [index.html:144-147](pkg/web/static/index.html#L144-L147)
+- Added `collapseEdgeTypes` field to lens configurations in
+  [lens-config.js](pkg/web/static/lens-config.js)
+- Wired up checkbox handler in
+  [lens-controls.js:162-171](pkg/web/static/lens-controls.js#L162-L171)
+- Added styling for "multi" edge type (light blue, width 3, solid) in
+  [app.js:571-579](pkg/web/static/app.js#L571-L579)
+
+**Usage**:
+
+Check "Collapse to single edge" in the Edge Aggregation section to merge all
+dependency types (static, dynamic, compile, data, symbol) between the same pair
+of nodes into a single edge. Unchecked by default to maintain existing behavior.
+
+**Benefits**:
+
+- Reduces visual clutter when multiple edge types exist between same nodes
+- Makes high-level dependency structure easier to see
+- Works seamlessly with all other lens features (edge type filters, collapse
+  levels, focused nodes)
+- Aggregation happens server-side for performance
 
 ## ✅ Browser auto-open flag (DONE)
 
