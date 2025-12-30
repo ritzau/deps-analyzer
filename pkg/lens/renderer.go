@@ -113,7 +113,8 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 }
 
 // assignLensesToNodes determines which lens applies to each node
-// Nodes at distance 0 or 1 from focus use focus lens, others use default
+// When focused nodes exist, ALL nodes use focus lens (allowing distance rules to control visibility)
+// When no focused nodes exist, all nodes use default lens
 func assignLensesToNodes(distances map[string]interface{}, focusedNodes []string) map[string]string {
 	nodeLensMap := make(map[string]string)
 
@@ -121,28 +122,13 @@ func assignLensesToNodes(distances map[string]interface{}, focusedNodes []string
 		return nodeLensMap // Empty map = all use default lens
 	}
 
-	// Nodes at distance 0 or 1 use focus lens
-	for nodeID, distance := range distances {
-		distInt, isInt := distance.(int)
-		if isInt && (distInt == 0 || distInt == 1) {
-			nodeLensMap[nodeID] = "focus"
-		}
-	}
-
-	// Also assign focus lens to package nodes that contain focused targets
-	for nodeID, distance := range distances {
-		distInt, isInt := distance.(int)
-		if isInt && distInt == 0 {
-			// If this is a target (//package:target), also assign focus lens to its package
-			if strings.HasPrefix(nodeID, "//") && strings.Contains(nodeID, ":") {
-				parts := strings.Split(nodeID[2:], ":")
-				if len(parts) >= 2 {
-					packageID := "//" + parts[0]
-					nodeLensMap[packageID] = "focus"
-					log.Printf("[LensRenderer] Assigning focus lens to package %s because target %s is focused", packageID, nodeID)
-				}
-			}
-		}
+	// When we have focused nodes, ALL nodes use the focus lens
+	// This allows the focus lens's distance rules (0, 1, infinite) to properly control visibility
+	// Nodes at distance 0: shown with files (per focus lens distance 0 rule)
+	// Nodes at distance 1: shown without files (per focus lens distance 1 rule)
+	// Nodes at distance 2+: hidden (per focus lens infinite distance rule with targetTypes: [])
+	for nodeID := range distances {
+		nodeLensMap[nodeID] = "focus"
 	}
 
 	return nodeLensMap
