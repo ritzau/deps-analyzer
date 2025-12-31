@@ -15,16 +15,12 @@ class ViewStateManager {
       // Layer 1: Default lens
       defaultLens: cloneLens(DEFAULT_PACKAGE_LENS),
 
-      // Layer 2: Focus lens
-      focusLens: cloneLens(DEFAULT_FOCUS_LENS),
-      focusMode: 'single',  // 'single' or 'multi-select'
-      focusedNodes: new Set(),
-
-      // Layer 3: Manual overrides
-      manualOverrides: new Map(),  // nodeId -> {collapsed: boolean, timestamp: number}
+      // Layer 2: Detail lens
+      detailLens: cloneLens(DEFAULT_DETAIL_LENS),
+      selectedNodes: new Set(),
 
       // UI state
-      activeTab: 'tree'  // 'tree' | 'default' | 'focus'
+      activeTab: 'tree'  // 'tree' | 'default' | 'detail'
     };
 
     this.listeners = [];
@@ -50,125 +46,67 @@ class ViewStateManager {
   }
 
   /**
-   * Update focus lens configuration
-   * @param {LensConfig} lens - New focus lens
+   * Update detail lens configuration
+   * @param {LensConfig} lens - New detail lens
    */
-  updateFocusLens(lens) {
-    this.state.focusLens = lens;
+  updateDetailLens(lens) {
+    this.state.detailLens = lens;
     this.notifyListeners();
   }
 
   /**
-   * Update both default and focus lenses atomically (single notification)
+   * Update both default and detail lenses atomically (single notification)
    * Use this when edge settings or other global settings need to apply to both lenses
    * @param {LensConfig} defaultLens - New default lens
-   * @param {LensConfig} focusLens - New focus lens
+   * @param {LensConfig} detailLens - New detail lens
    */
-  updateBothLenses(defaultLens, focusLens) {
+  updateBothLenses(defaultLens, detailLens) {
     console.log('[ViewState] updateBothLenses called (atomic update)');
     this.state.defaultLens = defaultLens;
-    this.state.focusLens = focusLens;
+    this.state.detailLens = detailLens;
     this.notifyListeners(); // Only notify once
   }
 
   /**
-   * Update focus on a node
-   * In single mode: replace focused set
-   * In multi mode: toggle node in focused set
-   *
-   * @param {string} nodeId - Node ID to focus
+   * Set selection to a specific set of nodes (replaces entire selection)
+   * @param {string[]} nodeIds - Array of node IDs to select
    */
-  updateFocus(nodeId) {
-    console.log('[ViewState] updateFocus called with nodeId:', nodeId, 'mode:', this.state.focusMode);
+  setSelection(nodeIds) {
+    console.log('[ViewState] setSelection called with:', nodeIds);
+    this.state.selectedNodes = new Set(nodeIds);
+    this.notifyListeners();
+  }
 
-    if (this.state.focusMode === 'single') {
-      // Single mode: replace focused set
-      this.state.focusedNodes = new Set([nodeId]);
-      console.log('[ViewState] Single mode - focused nodes now:', Array.from(this.state.focusedNodes));
+  /**
+   * Toggle a node in the selection (add if not present, remove if present)
+   * @param {string} nodeId - Node ID to toggle
+   */
+  toggleSelection(nodeId) {
+    console.log('[ViewState] toggleSelection called with nodeId:', nodeId);
+
+    if (this.state.selectedNodes.has(nodeId)) {
+      this.state.selectedNodes.delete(nodeId);
+      console.log('[ViewState] Removed from selection:', nodeId);
     } else {
-      // Multi mode: toggle in set
-      if (this.state.focusedNodes.has(nodeId)) {
-        this.state.focusedNodes.delete(nodeId);
-        console.log('[ViewState] Multi mode - removed:', nodeId);
-      } else {
-        this.state.focusedNodes.add(nodeId);
-        console.log('[ViewState] Multi mode - added:', nodeId);
-      }
-      console.log('[ViewState] Multi mode - focused nodes now:', Array.from(this.state.focusedNodes));
+      this.state.selectedNodes.add(nodeId);
+      console.log('[ViewState] Added to selection:', nodeId);
     }
+    console.log('[ViewState] Selected nodes now:', Array.from(this.state.selectedNodes));
     this.notifyListeners();
   }
 
   /**
-   * Clear all focused nodes
+   * Clear all selected nodes
    */
-  clearFocus() {
-    this.state.focusedNodes = new Set();
-    this.notifyListeners();
-  }
-
-  /**
-   * Set manual override for a node's collapse state
-   *
-   * @param {string} nodeId - Node ID
-   * @param {boolean} collapsed - Collapsed state
-   */
-  setManualOverride(nodeId, collapsed) {
-    this.state.manualOverrides.set(nodeId, {
-      collapsed: collapsed,
-      timestamp: Date.now()
-    });
-    this.notifyListeners();
-  }
-
-  /**
-   * Clear manual override for a node (revert to lens rules)
-   *
-   * @param {string} nodeId - Node ID
-   */
-  clearManualOverride(nodeId) {
-    this.state.manualOverrides.delete(nodeId);
-    this.notifyListeners();
-  }
-
-  /**
-   * Clear all manual overrides
-   */
-  resetManualOverrides() {
-    this.state.manualOverrides.clear();
-    this.notifyListeners();
-  }
-
-  /**
-   * Reset all layers (focus + manual)
-   */
-  resetAll() {
-    this.state.focusedNodes = new Set();
-    this.state.manualOverrides.clear();
-    this.notifyListeners();
-  }
-
-  /**
-   * Set focus mode (single or multi-select)
-   *
-   * @param {'single'|'multi-select'} mode - Focus mode
-   */
-  setFocusMode(mode) {
-    this.state.focusMode = mode;
-
-    // If switching to single mode with multiple focused nodes, keep only first
-    if (mode === 'single' && this.state.focusedNodes.size > 1) {
-      const first = Array.from(this.state.focusedNodes)[0];
-      this.state.focusedNodes = new Set([first]);
-    }
-
+  clearSelection() {
+    this.state.selectedNodes = new Set();
     this.notifyListeners();
   }
 
   /**
    * Set active tab
    *
-   * @param {'tree'|'default'|'focus'} tab - Tab name
+   * @param {'tree'|'default'|'detail'} tab - Tab name
    */
   setActiveTab(tab) {
     this.state.activeTab = tab;
@@ -240,19 +178,11 @@ class ViewStateManager {
       return true;
     }
 
-    // Check if focused nodes changed (different graph structure)
-    const oldFocus = Array.from(oldState.focusedNodes).sort().join(',');
-    const newFocus = Array.from(newState.focusedNodes).sort().join(',');
-    if (oldFocus !== newFocus) {
-      console.log('[ViewState] Full re-layout: focused nodes changed');
-      return true;
-    }
-
-    // Check if manual overrides changed (collapse/expand changes graph structure)
-    const oldOverrides = JSON.stringify(Array.from(oldState.manualOverrides.entries()).sort());
-    const newOverrides = JSON.stringify(Array.from(newState.manualOverrides.entries()).sort());
-    if (oldOverrides !== newOverrides) {
-      console.log('[ViewState] Full re-layout: manual overrides changed (collapse/expand)');
+    // Check if selected nodes changed (different graph structure)
+    const oldSelection = Array.from(oldState.selectedNodes).sort().join(',');
+    const newSelection = Array.from(newState.selectedNodes).sort().join(',');
+    if (oldSelection !== newSelection) {
+      console.log('[ViewState] Full re-layout: selected nodes changed');
       return true;
     }
 
@@ -268,13 +198,11 @@ class ViewStateManager {
    */
   getDebugInfo() {
     return {
-      focusMode: this.state.focusMode,
-      focusedNodeCount: this.state.focusedNodes.size,
-      focusedNodes: Array.from(this.state.focusedNodes),
-      manualOverrideCount: this.state.manualOverrides.size,
+      selectedNodeCount: this.state.selectedNodes.size,
+      selectedNodes: Array.from(this.state.selectedNodes),
       activeTab: this.state.activeTab,
       defaultLensName: this.state.defaultLens.name,
-      focusLensName: this.state.focusLens.name
+      detailLensName: this.state.detailLens.name
     };
   }
 }

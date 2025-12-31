@@ -9,26 +9,26 @@ import (
 
 // RenderGraph applies lens transformations to raw graph data
 // This is the main entry point for the lens rendering pipeline
-func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focusedNodes []string, manualOverrides map[string]ManualOverride) (*GraphData, error) {
+func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selectedNodes []string) (*GraphData, error) {
 	log.Printf("[LensRenderer] Rendering graph with %d nodes", len(rawGraph.Nodes))
-	log.Printf("[LensRenderer] Focused nodes: %v", focusedNodes)
+	log.Printf("[LensRenderer] Selected nodes: %v", selectedNodes)
 
-	// 1. Compute distances from focused nodes using BFS
-	distances := ComputeDistances(rawGraph, focusedNodes)
+	// 1. Compute distances from selected nodes using BFS
+	distances := ComputeDistances(rawGraph, selectedNodes)
 
-	// 2. Assign which lens controls each node (default or focus)
-	nodeLensMap := assignLensesToNodes(distances, focusedNodes)
+	// 2. Assign which lens controls each node (default or detail)
+	nodeLensMap := assignLensesToNodes(distances, selectedNodes)
 
-	focusCount := 0
+	detailCount := 0
 	for _, lensType := range nodeLensMap {
-		if lensType == "focus" {
-			focusCount++
+		if lensType == "detail" {
+			detailCount++
 		}
 	}
-	log.Printf("[LensRenderer] Nodes using focus lens: %d", focusCount)
+	log.Printf("[LensRenderer] Nodes using detail lens: %d", detailCount)
 
 	// 3. Apply lens rules to determine visibility and collapse state
-	nodeStates := applyLensRules(rawGraph, nodeLensMap, distances, defaultLens, focusLens, manualOverrides)
+	nodeStates := applyLensRules(rawGraph, nodeLensMap, distances, defaultLens, detailLens)
 
 	// 4. Extract and create synthetic package nodes from ALL targets
 	allPackageNodes := extractPackageNodes(rawGraph)
@@ -37,15 +37,15 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 	// Packages inherit the MINIMUM distance of their child targets
 	for _, pkgNode := range allPackageNodes {
 		if _, exists := nodeStates[pkgNode.ID]; !exists {
-			// Determine lens type: if we have focused nodes, ALL nodes (including packages) use focus lens
+			// Determine lens type: if we have selected nodes, ALL nodes (including packages) use detail lens
 			lensType := "default"
-			if len(focusedNodes) > 0 {
-				lensType = "focus"
+			if len(selectedNodes) > 0 {
+				lensType = "detail"
 			}
 
 			var lens *LensConfig
-			if lensType == "focus" {
-				lens = focusLens
+			if lensType == "detail" {
+				lens = detailLens
 			} else {
 				lens = defaultLens
 			}
@@ -54,7 +54,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 			distance := computePackageDistance(pkgNode.ID, rawGraph.Nodes, nodeStates)
 
 			rule := findDistanceRule(lens, distance)
-			collapsed := shouldNodeBeCollapsed(pkgNode, rule, manualOverrides)
+			collapsed := shouldNodeBeCollapsed(pkgNode, rule)
 
 			// Check visibility using the same logic as regular nodes
 			visible := isNodeVisibleByRule(&pkgNode, rule, lens)
@@ -107,7 +107,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 	}
 
 	// 12. Aggregate edges for collapsed nodes
-	visibleEdges := aggregateEdgesForCollapsedNodes(rawGraph, nodeStates, defaultLens, focusLens, nodeLensMap, includedNodeIds, childToParentMap)
+	visibleEdges := aggregateEdgesForCollapsedNodes(rawGraph, nodeStates, defaultLens, detailLens, nodeLensMap, includedNodeIds, childToParentMap)
 
 	// 13. Sort nodes for deterministic ordering (Dagre layout stability)
 	sort.Slice(finalNodes, func(i, j int) bool {
@@ -115,7 +115,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 	})
 
 	// 14. TEMPORARY: Add distance info to labels for debugging
-	if len(focusedNodes) > 0 {
+	if len(selectedNodes) > 0 {
 		packagesWithDistance := 0
 		packagesWithoutState := 0
 		for i := range finalNodes {
@@ -152,29 +152,29 @@ func RenderGraph(rawGraph *GraphData, defaultLens, focusLens *LensConfig, focuse
 }
 
 // assignLensesToNodes determines which lens applies to each node
-// When focused nodes exist, ALL nodes use focus lens (allowing distance rules to control visibility)
-// When no focused nodes exist, all nodes use default lens
-func assignLensesToNodes(distances map[string]interface{}, focusedNodes []string) map[string]string {
+// When selected nodes exist, ALL nodes use detail lens (allowing distance rules to control visibility)
+// When no selected nodes exist, all nodes use default lens
+func assignLensesToNodes(distances map[string]interface{}, selectedNodes []string) map[string]string {
 	nodeLensMap := make(map[string]string)
 
-	if len(focusedNodes) == 0 {
+	if len(selectedNodes) == 0 {
 		return nodeLensMap // Empty map = all use default lens
 	}
 
-	// When we have focused nodes, ALL nodes use the focus lens
-	// This allows the focus lens's distance rules (0, 1, infinite) to properly control visibility
-	// Nodes at distance 0: shown with files (per focus lens distance 0 rule)
-	// Nodes at distance 1: shown without files (per focus lens distance 1 rule)
-	// Nodes at distance 2+: hidden (per focus lens infinite distance rule with targetTypes: [])
+	// When we have selected nodes, ALL nodes use the detail lens
+	// This allows the detail lens's distance rules (0, 1, infinite) to properly control visibility
+	// Nodes at distance 0: shown with files (per detail lens distance 0 rule)
+	// Nodes at distance 1: shown without files (per detail lens distance 1 rule)
+	// Nodes at distance 2+: hidden (per detail lens infinite distance rule with targetTypes: [])
 	for nodeID := range distances {
-		nodeLensMap[nodeID] = "focus"
+		nodeLensMap[nodeID] = "detail"
 	}
 
 	return nodeLensMap
 }
 
 // applyLensRules applies lens rules to determine visibility and collapse state for each node
-func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances map[string]interface{}, defaultLens, focusLens *LensConfig, manualOverrides map[string]ManualOverride) map[string]*NodeState {
+func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances map[string]interface{}, defaultLens, detailLens *LensConfig) map[string]*NodeState {
 	nodeStates := make(map[string]*NodeState)
 
 	for _, node := range graph.Nodes {
@@ -184,8 +184,8 @@ func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances m
 		}
 
 		var lens *LensConfig
-		if lensType == "focus" {
-			lens = focusLens
+		if lensType == "detail" {
+			lens = detailLens
 		} else {
 			lens = defaultLens
 		}
@@ -212,7 +212,7 @@ func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances m
 		}
 
 		// Check collapse state
-		collapsed := shouldNodeBeCollapsed(node, rule, manualOverrides)
+		collapsed := shouldNodeBeCollapsed(node, rule)
 
 		nodeStates[node.ID] = &NodeState{
 			Visible:     visible,
@@ -354,13 +354,8 @@ func isNodeVisibleByRule(node *GraphNode, rule *DistanceRule, lens *LensConfig) 
 }
 
 // shouldNodeBeCollapsed determines if a node should be collapsed
-func shouldNodeBeCollapsed(node GraphNode, rule *DistanceRule, manualOverrides map[string]ManualOverride) bool {
-	// Manual overrides take precedence (Layer 3)
-	if override, exists := manualOverrides[node.ID]; exists {
-		return override.Collapsed
-	}
-
-	// Use lens rule (Layer 1 or 2)
+func shouldNodeBeCollapsed(node GraphNode, rule *DistanceRule) bool {
+	// Use lens rule
 	if rule == nil {
 		return false
 	}
@@ -574,7 +569,7 @@ func buildChildToParentMap(nodes []GraphNode, nodeStates map[string]*NodeState) 
 }
 
 // aggregateEdgesForCollapsedNodes aggregates edges based on node collapse state
-func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]*NodeState, defaultLens, focusLens *LensConfig, nodeLensMap map[string]string, includedNodeIds map[string]bool, childToParentMap map[string]string) []GraphEdge {
+func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]*NodeState, defaultLens, detailLens *LensConfig, nodeLensMap map[string]string, includedNodeIds map[string]bool, childToParentMap map[string]string) []GraphEdge {
 	var visibleEdges []GraphEdge
 	edgeMap := make(map[string]*GraphEdge) // Key: "source|target|type"
 
@@ -601,8 +596,8 @@ func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]
 
 		lensType := sourceState.AppliedLens
 		var lens *LensConfig
-		if lensType == "focus" {
-			lens = focusLens
+		if lensType == "detail" {
+			lens = detailLens
 		} else {
 			lens = defaultLens
 		}

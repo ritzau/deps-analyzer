@@ -16,7 +16,7 @@ type BaseSetConfig struct {
 	PackagePath *string `json:"packagePath,omitempty"`
 }
 
-// DistanceRule defines visibility and display rules based on distance from focused nodes
+// DistanceRule defines visibility and display rules based on distance from selected nodes
 type DistanceRule struct {
 	Distance       interface{}    `json:"distance"` // int or "infinite"
 	NodeVisibility NodeVisibility `json:"nodeVisibility"`
@@ -54,12 +54,6 @@ type NodeState struct {
 	Visible      bool
 	Collapsed    bool
 	Distance     interface{} // int or "infinite"
-	AppliedLens  string      // "default" or "focus"
+	AppliedLens  string      // "default" or "detail"
 	Rule         *DistanceRule
-}
-
-// ManualOverride represents a user's manual collapse/expand action on a node
-type ManualOverride struct {
-	Collapsed bool  `json:"collapsed"`
-	Timestamp int64 `json:"timestamp"`
 }

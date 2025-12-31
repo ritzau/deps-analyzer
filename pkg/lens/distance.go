@@ -33,11 +33,11 @@ type distanceQueueNode struct {
 
 // expandPackagesToTargets expands package IDs into all their target IDs
 // For example, "//main" becomes ["//main:test_app", "//main:other_target", ...]
-// This allows focusing on a package to focus all targets within it
-func expandPackagesToTargets(focusedNodes []string, graph *GraphData) []string {
+// This allows selecting a package to select all targets within it
+func expandPackagesToTargets(selectedNodes []string, graph *GraphData) []string {
 	expanded := make(map[string]bool)
 
-	for _, nodeID := range focusedNodes {
+	for _, nodeID := range selectedNodes {
 		// Check if this is a package ID (no colons, like "//main")
 		if !strings.Contains(nodeID, ":") {
 			// Find all targets in this package
@@ -74,13 +74,13 @@ func expandPackagesToTargets(focusedNodes []string, graph *GraphData) []string {
 	return result
 }
 
-// ComputeDistances calculates shortest distance from each node to nearest focused node
+// ComputeDistances calculates shortest distance from each node to nearest selected node
 // Returns a map of nodeID -> distance (int or "infinite")
-func ComputeDistances(graph *GraphData, focusedNodes []string) map[string]interface{} {
+func ComputeDistances(graph *GraphData, selectedNodes []string) map[string]interface{} {
 	distances := make(map[string]interface{})
 
-	// If no focused nodes, all distances are infinite
-	if len(focusedNodes) == 0 {
+	// If no selected nodes, all distances are infinite
+	if len(selectedNodes) == 0 {
 		for _, node := range graph.Nodes {
 			distances[node.ID] = "infinite"
 		}
@@ -90,13 +90,13 @@ func ComputeDistances(graph *GraphData, focusedNodes []string) map[string]interf
 	// Build adjacency list (undirected graph for distance computation)
 	adjacency := buildAdjacencyList(graph)
 
-	// Expand focused nodes: if a package is focused (e.g., "//main"), include all its targets
-	// This ensures that clicking on a package focuses all targets within it
-	expandedFocusedNodes := expandPackagesToTargets(focusedNodes, graph)
+	// Expand selected nodes: if a package is selected (e.g., "//main"), include all its targets
+	// This ensures that clicking on a package selects all targets within it
+	expandedSelectedNodes := expandPackagesToTargets(selectedNodes, graph)
 
-	// Initialize BFS queue with focused nodes at distance 0
+	// Initialize BFS queue with selected nodes at distance 0
 	queue := []distanceQueueNode{}
-	for _, nodeID := range expandedFocusedNodes {
+	for _, nodeID := range expandedSelectedNodes {
 		distances[nodeID] = 0
 		queue = append(queue, distanceQueueNode{nodeID: nodeID, distance: 0})
 	}

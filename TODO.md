@@ -5,71 +5,77 @@
 1. BUG: If a package has two targets, and one is the default, it seems as the
    package itself has a colliding ID. Dependencies sometimes look wrong. This is
    only visiblein some cases. One such is when the package is a neighbour to a
-   focused node.
+   selected node.
 
 2. BUG: Some tooltips (need a better name for these) get stuck. We should track
    all created tooltips and clear them when layout changes, when the window
    loses focus, and other times when appropriate.
 
-3. Use single click to clear focus and only focus on the selected node. Use
-   ctrl+click to toggle the focus of a node. If a parent node is focused, so are
-   all the nested ones. (and remove the UI to focus single/multi). Also remove
-   the possibility to manually fold/unfold. It should now all be controlled by
-   focus.
-
-4. If a node has a single nested node, we should be able to collapse the
+3. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-5. Improve symbol dependency analysis and presentation. Better distinguish
+4. BUG: If a file node is selected we end up in a weird state where no files are
+   visible and neighbour packages remain visible (but no targets).
+
+5. Node selection should also work in the targets list (including ctrl+click).
+
+6. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-6. Add collapsible external dependencies in focused view. Give users control
+7. Add collapsible external dependencies in detail view. Give users control
    over detail level:
 
    - Level 1: Hide external dependencies completely (only show files within
-     focused target)
+     selected target)
    - Level 2: Show external targets as collapsed nodes (hide individual files)
    - Level 3: Show all files in external targets (current behavior)
 
-7. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+8. Detect eliminated symbols: Analyze the built artifacts to see which symbols
    made it into the final binary.
 
-8. Ensure consistent logging in backend and frontend.
+9. Ensure consistent logging in backend and frontend.
 
-9. Make sure docs are up to date.
+10. Make sure docs are up to date.
 
-10. External packages: May require support of .a files.
+11. External packages: May require support of .a files.
 
-11. Collect styles in the CSS (if possible with the graph library).
+12. Collect styles in the CSS (if possible with the graph library).
 
-12. **Uncovered files hierarchical expansion edge case**: When starting at
+13. **Uncovered files hierarchical expansion edge case**: When starting at
     "Targets (hide files)" hierarchy level, manually expanding a target doesn't
     show uncovered files because uncovered files are children of packages, not
     targets. User must collapse and re-expand the parent package to see them.
     This is technically correct behavior (uncovered files aren't part of
     targets), but UX could be improved by either:
+
     - Showing uncovered files when any sibling target is expanded
     - Adding visual indication that package has uncovered files
     - Auto-expanding package when last target is manually expanded
 
-13. **Consider adding request debouncing**: Currently, rapid UI changes trigger
+14. **Consider adding request debouncing**: Currently, rapid UI changes trigger
     rapid backend requests. While we have request cancellation (AbortController)
     to prevent race conditions, we could further reduce server load by adding
     debouncing (e.g., 50-100ms delay before sending request). This would batch
-    rapid changes like dragging a slider or quickly toggling multiple checkboxes.
-    Trade-off: Adds slight latency but reduces backend load and potential
-    flickering. Current approach (immediate requests + cancellation) is simpler
-    and gives instant feedback, so debouncing is optional optimization.
+    rapid changes like dragging a slider or quickly toggling multiple
+    checkboxes. Trade-off: Adds slight latency but reduces backend load and
+    potential flickering. Current approach (immediate requests + cancellation)
+    is simpler and gives instant feedback, so debouncing is optional
+    optimization.
 
-14. **Add stress tests and unit tests for concurrent requests**: Create automated
-    tests to verify request handling under load:
+15. **Add stress tests and unit tests for concurrent requests**: Create
+    automated tests to verify request handling under load:
+
     - Stress test: Rapidly trigger 50-100 settings changes in quick succession
     - Unit tests: Mock fetch() and verify only the last request completes
-    - Race condition test: Verify responses arriving out-of-order don't corrupt state
+    - Race condition test: Verify responses arriving out-of-order don't corrupt
+      state
     - Test both atomic lens updates and request cancellation mechanisms
-    - Could use headless browser testing (Playwright/Puppeteer) for full E2E tests
+    - Could use headless browser testing (Playwright/Puppeteer) for full E2E
+      tests
+
+16. Consider TypeScript.
 
 ---
 
@@ -102,10 +108,66 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ "Focus" to "Select" terminology refactoring (DONE)
+
+Comprehensive refactoring to rename all "focus" terminology to "select" throughout the codebase and simplify the interaction model.
+
+**Implementation**:
+
+**Backend changes (Go)**:
+- Renamed `focusedNodes` → `selectedNodes` in all backend files
+- Renamed `focusLens` → `detailLens` throughout
+- Updated API struct fields in [pkg/web/server.go](pkg/web/server.go):
+  - `LensRenderRequest` now uses `DetailLens` and `SelectedNodes`
+- Removed `ManualOverride` struct and functionality from [pkg/lens/lens.go](pkg/lens/lens.go)
+- Updated distance computation in [pkg/lens/distance.go](pkg/lens/distance.go)
+- Updated hash computation in [pkg/lens/diff.go](pkg/lens/diff.go)
+- Updated lens rendering pipeline in [pkg/lens/renderer.go](pkg/lens/renderer.go)
+
+**Frontend changes (JavaScript)**:
+- Updated state management in [view-state.js](pkg/web/static/view-state.js):
+  - Renamed `focusedNodes` → `selectedNodes`
+  - Removed `focusMode` and `manualOverrides` state
+  - Added new methods: `setSelection()`, `toggleSelection()`, `clearSelection()`
+  - Removed `resetAll()` method
+- Updated lens configuration in [lens-config.js](pkg/web/static/lens-config.js):
+  - Renamed `DEFAULT_FOCUS_LENS` → `DEFAULT_DETAIL_LENS`
+- Updated UI controls in [lens-controls.js](pkg/web/static/lens-controls.js):
+  - Renamed `setupFocusLensControls()` → `setupDetailLensControls()`
+  - Removed focus mode toggle handler
+  - Simplified reset controls (removed button handlers)
+- Updated main application in [app.js](pkg/web/static/app.js):
+  - API requests now send `selectedNodes` and `detailLens`
+  - Removed `manualOverrides` from requests
+  - Simplified click handlers (removed 250ms timeout and double-click logic)
+  - Updated CSS selectors: `[focused]` → `[selected]`
+  - Updated navigation tree clicks to use `setSelection()`
+- Updated HTML in [index.html](pkg/web/static/index.html):
+  - Renamed "Focus" tab to "Detail"
+  - Removed focus mode toggle (single/multi-select radio buttons)
+  - Removed "Clear Selection" and "Reset All" buttons (redundant with background click)
+  - Updated element IDs: `focusTab` → `detailTab`, `focusD0Files` → `detailD0Files`, etc.
+  - Updated hint text to explain new interaction model
+
+**Simplified Interaction Model**:
+- **Click**: Clear selection and select only the clicked node
+- **Ctrl+Click** (Cmd+Click on Mac): Toggle node in selection
+- **Background click**: Clear all selections
+- **Removed**: Manual fold/unfold via double-click
+- **Removed**: Single vs multi-select mode toggle
+- **Removed**: Redundant "Clear Selection" and "Reset All" buttons
+
+**Benefits**:
+- More intuitive terminology: "select" is more user-friendly than "focus"
+- Simpler interaction model: always multi-select with Ctrl modifier
+- Reduced UI clutter: removed 3 UI elements (focus mode toggle, 2 buttons)
+- Cleaner codebase: removed manual override complexity
+- Better consistency: single way to clear selection (click background)
+
 ## ✅ Edge type collapse option (DONE)
 
-Added option to collapse all dependency types between the same pair of nodes into
-a single aggregated edge.
+Added option to collapse all dependency types between the same pair of nodes
+into a single aggregated edge.
 
 **Implementation**:
 

@@ -225,10 +225,10 @@ function displayDependencyGraph(graphData) {
                 parent: node.parent // For compound nodes (grouping)
             };
 
-            // Mark focused nodes
-            const focusedNodes = viewStateManager.getState().focusedNodes;
-            if (focusedNodes.has(node.id) || focusedNodes.has(node.label)) {
-                nodeData.focused = true;
+            // Mark selected nodes
+            const selectedNodes = viewStateManager.getState().selectedNodes;
+            if (selectedNodes.has(node.id) || selectedNodes.has(node.label)) {
+                nodeData.selected = true;
             }
 
             // Only set hasOverlap if it's true (don't set it at all if false)
@@ -416,7 +416,7 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'node[type $= "_focused"]',
+                selector: 'node[type $= "_selected"]',
                 style: {
                     'background-color': '#ff8c00',
                     'color': 'white',
@@ -460,7 +460,7 @@ function displayDependencyGraph(graphData) {
                 }
             },
             {
-                selector: 'node[type = "target-group"][focused]',
+                selector: 'node[type = "target-group"][selected]',
                 style: {
                     'border-width': '4px',
                     'border-color': '#ff8c00',
@@ -612,9 +612,9 @@ function displayDependencyGraph(graphData) {
                     'border-color': '#ffd700'
                 }
             },
-            // Focused node styling - MUST come after isPublic to override it
+            // Selected node styling - MUST come after isPublic to override it
             {
-                selector: 'node[focused]',
+                selector: 'node[selected]',
                 style: {
                     'border-width': '4px',
                     'border-color': '#ff8c00',
@@ -935,90 +935,31 @@ function setupEventHandlers() {
         tooltip.style.display = 'none';
     });
 
-    // Click on graph background to clear focus
+    // Click on graph background to clear selection
     cy.on('tap', function(evt) {
         // Check if we clicked on the background (not a node or edge)
         if (evt.target === cy) {
-            console.log('Background clicked - clearing focus');
-            viewStateManager.clearFocus();
+            console.log('Background clicked - clearing selection');
+            viewStateManager.clearSelection();
         }
     });
 
-    // Track click timing to distinguish single from double clicks
-    let clickTimeout = null;
-
-    // Single-click on nodes to focus them (with delay to check for double-click)
+    // Click on nodes to select them
+    // Simple click: select single node (clear other selections)
+    // Ctrl+Click: toggle node in selection
     cy.on('tap', 'node', function(evt) {
         const node = evt.target;
         const nodeId = node.data('id');
 
-        // Clear any existing timeout
-        if (clickTimeout) {
-            clearTimeout(clickTimeout);
-            clickTimeout = null;
-        }
-
-        // Set a timeout to handle single click
-        clickTimeout = setTimeout(function() {
-            console.log('Node clicked (focus):', nodeId);
-            viewStateManager.updateFocus(nodeId);
-        }, 250); // 250ms delay to check for double-click
-    });
-
-    // Double-click on nodes to toggle manual collapse
-    cy.on('dbltap', 'node', function(evt) {
-        const node = evt.target;
-        const nodeId = node.data('id');
-        const nodeType = node.data('type');
-
-        // Cancel the single-click timeout
-        if (clickTimeout) {
-            clearTimeout(clickTimeout);
-            clickTimeout = null;
-        }
-
-        console.log('Node double-clicked (toggle collapse):', nodeId, 'type:', nodeType);
-
-        const currentState = viewStateManager.getState();
-        const manual = currentState.manualOverrides.get(nodeId);
-
-        // Determine current collapse state:
-        // 1. If there's a manual override, use that
-        // 2. Otherwise, use the default from lens collapseLevel
-        let currentCollapsed;
-        if (manual !== undefined && manual.collapsed !== null && manual.collapsed !== undefined) {
-            currentCollapsed = manual.collapsed;
+        if (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey) {
+            // Ctrl/Cmd+Click: Toggle selection
+            console.log('Node ctrl+clicked (toggle selection):', nodeId);
+            viewStateManager.toggleSelection(nodeId);
         } else {
-            // Use the lens's collapseLevel to determine default state
-            const collapseLevel = currentState.defaultLens.distanceRules[0]?.collapseLevel || 3;
-
-            // Determine node level
-            let nodeLevel = 0;
-            if (nodeType === 'package') {
-                nodeLevel = 1;
-            } else if (nodeType === 'cc_binary' || nodeType === 'cc_library' || nodeType === 'cc_shared_library') {
-                nodeLevel = 2;
-            } else if (nodeType === 'source_file' || nodeType === 'header_file') {
-                nodeLevel = 3;
-            }
-
-            // Check if this node should be collapsed based on collapseLevel
-            if (nodeLevel === 2 && collapseLevel < 3) {
-                currentCollapsed = true; // Collapse targets when we don't want to see files
-            } else if (nodeLevel === 1 && collapseLevel < 2) {
-                currentCollapsed = true; // Collapse packages when we don't want to see targets
-            } else {
-                currentCollapsed = false;
-            }
+            // Simple click: Replace selection with this node only
+            console.log('Node clicked (select):', nodeId);
+            viewStateManager.setSelection([nodeId]);
         }
-
-        console.log('Current collapse state:', currentCollapsed, 'Manual override:', manual?.collapsed);
-
-        // Toggle: flip the current state
-        const newCollapsed = !currentCollapsed;
-        console.log('Setting new collapse state:', newCollapsed);
-
-        viewStateManager.setManualOverride(nodeId, newCollapsed);
     });
 
     // Set explicit dimensions based on flex container size
@@ -1819,9 +1760,8 @@ async function fetchRenderedGraphFromBackend(viewState) {
 
   const requestBody = {
     defaultLens: serializeLens(viewState.defaultLens),
-    focusLens: serializeLens(viewState.focusLens),
-    focusedNodes: Array.from(viewState.focusedNodes),
-    manualOverrides: Object.fromEntries(viewState.manualOverrides),
+    detailLens: serializeLens(viewState.detailLens),
+    selectedNodes: Array.from(viewState.selectedNodes),
     previousHash: currentGraphHash  // Send previous hash for diff-based updates
   };
 
@@ -1923,16 +1863,14 @@ viewStateManager.addListener(async (newState) => {
 
   console.log('[App] State changed, rendering with backend API');
   console.log('[App] BaseSet:', newState.defaultLens.baseSet);
-  console.log('[App] Focused nodes:', Array.from(newState.focusedNodes));
+  console.log('[App] Selected nodes:', Array.from(newState.selectedNodes));
 
   // Deep clone the state to avoid reference issues
-  // (Maps need special handling)
   previousViewState = {
     ...newState,
-    focusedNodes: new Set(newState.focusedNodes),
-    manualOverrides: new Map(newState.manualOverrides),
+    selectedNodes: new Set(newState.selectedNodes),
     defaultLens: JSON.parse(JSON.stringify(newState.defaultLens)),
-    focusLens: JSON.parse(JSON.stringify(newState.focusLens))
+    detailLens: JSON.parse(JSON.stringify(newState.detailLens))
   };
 
   try {
@@ -1959,13 +1897,13 @@ viewStateManager.addListener(async (newState) => {
 
 // NOTE: Old view-switching functions removed - now handled by lens system
 // The following functions have been replaced by the lens-based visualization:
-// - selectTreeNode() -> use viewStateManager.updateFocus()
+// - selectTreeNode() -> use viewStateManager.setSelection()
 // - showBinaryGraphFocused() -> handled by lens renderer
-// - zoomOutOneLevel() -> use viewStateManager.clearFocus()
+// - zoomOutOneLevel() -> use viewStateManager.clearSelection()
 // - showFocusedTargetView() -> handled by lens renderer
 // - showFileGraphForTarget() -> handled by lens renderer
-// - selectBinary() -> use viewStateManager.updateFocus()
-// - selectTarget() -> use viewStateManager.updateFocus()
+// - selectBinary() -> use viewStateManager.setSelection()
+// - selectTarget() -> use viewStateManager.setSelection()
 // - showBinaryFocusedGraph() -> handled by lens renderer
 // - buildBinaryFocusedGraphData() -> handled by lens renderer
 
@@ -1983,9 +1921,9 @@ function populateTreeBrowser(data) {
             const icon = binary.kind === 'cc_binary' ? '🔧' : '📚';
             item.textContent = `${icon} ${simplifyLabel(binary.label)}`;
 
-            // Click focuses on this binary
+            // Click selects this binary
             item.onclick = () => {
-                viewStateManager.updateFocus(binary.label);
+                viewStateManager.setSelection([binary.label]);
                 // Highlight in tree
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('selected'));
                 item.classList.add('selected');
@@ -2006,9 +1944,9 @@ function populateTreeBrowser(data) {
                 item.className = 'nav-item';
                 item.textContent = `📦 ${simplifyLabel(node.label)}`;
 
-                // Click focuses on this target
+                // Click selects this target
                 item.onclick = () => {
-                    viewStateManager.updateFocus(node.label);
+                    viewStateManager.setSelection([node.label]);
                     // Highlight in tree
                     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('selected'));
                     item.classList.add('selected');

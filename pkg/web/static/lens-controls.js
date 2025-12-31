@@ -15,10 +15,9 @@
  */
 function initializeLensControls() {
   setupTabSwitching();
-  setupFocusModeToggle();
   setupResetControls();
   setupDefaultLensControls();
-  setupFocusLensControls();
+  setupDetailLensControls();
 }
 
 /**
@@ -44,41 +43,13 @@ function setupTabSwitching() {
   });
 }
 
-/**
- * Set up focus mode toggle (single vs multi-select)
- */
-function setupFocusModeToggle() {
-  document.querySelectorAll('input[name="focusMode"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      viewStateManager.setFocusMode(e.target.value);
-    });
-  });
-}
 
 /**
- * Set up reset controls (Clear Focus, Reset Manual, Reset All)
+ * Set up reset controls
+ * Note: Reset controls removed - users can click background to clear selection
  */
 function setupResetControls() {
-  const resetFocusBtn = document.getElementById('resetFocus');
-  if (resetFocusBtn) {
-    resetFocusBtn.addEventListener('click', () => {
-      viewStateManager.clearFocus();
-    });
-  }
-
-  const resetManualBtn = document.getElementById('resetManual');
-  if (resetManualBtn) {
-    resetManualBtn.addEventListener('click', () => {
-      viewStateManager.resetManualOverrides();
-    });
-  }
-
-  const resetAllBtn = document.getElementById('resetAll');
-  if (resetAllBtn) {
-    resetAllBtn.addEventListener('click', () => {
-      viewStateManager.resetAll();
-    });
-  }
+  // No controls to set up - function kept for API compatibility
 }
 
 /**
@@ -153,14 +124,14 @@ function setupDefaultLensControls() {
 
         console.log('[LensControls] New edge types:', Array.from(types));
 
-        // Update both default and focus lenses to use same edge rules (atomic)
+        // Update both default and detail lenses to use same edge rules (atomic)
         const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
         currentDefaultLens.edgeRules.types = types;
 
-        const currentFocusLens = cloneLens(viewStateManager.getState().focusLens);
-        currentFocusLens.edgeRules.types = types;
+        const currentDetailLens = cloneLens(viewStateManager.getState().detailLens);
+        currentDetailLens.edgeRules.types = types;
 
-        viewStateManager.updateBothLenses(currentDefaultLens, currentFocusLens);
+        viewStateManager.updateBothLenses(currentDefaultLens, currentDetailLens);
       });
     }
   });
@@ -171,14 +142,14 @@ function setupDefaultLensControls() {
     collapseEdgeTypesCheckbox.addEventListener('change', () => {
       console.log('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
 
-      // Update both default and focus lenses to use same edge rules (atomic)
+      // Update both default and detail lenses to use same edge rules (atomic)
       const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
       currentDefaultLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
 
-      const currentFocusLens = cloneLens(viewStateManager.getState().focusLens);
-      currentFocusLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
+      const currentDetailLens = cloneLens(viewStateManager.getState().detailLens);
+      currentDetailLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
 
-      viewStateManager.updateBothLenses(currentDefaultLens, currentFocusLens);
+      viewStateManager.updateBothLenses(currentDefaultLens, currentDetailLens);
     });
   }
 
@@ -206,9 +177,6 @@ function setupDefaultLensControls() {
           }
         }
 
-        // Clear all manual fold/unfold overrides since they were based on the previous collapse level
-        viewStateManager.resetManualOverrides();
-        console.log('[LensControls] Cleared manual overrides due to collapse level change');
 
         viewStateManager.updateDefaultLens(currentLens);
       }
@@ -217,14 +185,14 @@ function setupDefaultLensControls() {
 }
 
 /**
- * Set up focus lens configuration controls
+ * Set up detail lens configuration controls
  */
-function setupFocusLensControls() {
-  // Distance 0 (focused nodes) file visibility
-  const focusD0Files = document.getElementById('focusD0Files');
-  if (focusD0Files) {
-    focusD0Files.addEventListener('change', (e) => {
-      const currentLens = cloneLens(viewStateManager.getState().focusLens);
+function setupDetailLensControls() {
+  // Distance 0 (selected nodes) file visibility
+  const detailD0Files = document.getElementById('detailD0Files');
+  if (detailD0Files) {
+    detailD0Files.addEventListener('change', (e) => {
+      const currentLens = cloneLens(viewStateManager.getState().detailLens);
 
       // Find distance 0 rule
       const rule = currentLens.distanceRules.find(r => r.distance === 0);
@@ -238,15 +206,15 @@ function setupFocusLensControls() {
         }
       }
 
-      viewStateManager.updateFocusLens(currentLens);
+      viewStateManager.updateDetailLens(currentLens);
     });
   }
 
   // Distance 1 (neighbors) file visibility
-  const focusD1Files = document.getElementById('focusD1Files');
-  if (focusD1Files) {
-    focusD1Files.addEventListener('change', (e) => {
-      const currentLens = cloneLens(viewStateManager.getState().focusLens);
+  const detailD1Files = document.getElementById('detailD1Files');
+  if (detailD1Files) {
+    detailD1Files.addEventListener('change', (e) => {
+      const currentLens = cloneLens(viewStateManager.getState().detailLens);
 
       // Find distance 1 rule
       const rule = currentLens.distanceRules.find(r => r.distance === 1);
@@ -260,15 +228,15 @@ function setupFocusLensControls() {
         }
       }
 
-      viewStateManager.updateFocusLens(currentLens);
+      viewStateManager.updateDetailLens(currentLens);
     });
   }
 
   // Distance infinite (rest of graph) visibility
-  const focusInfiniteView = document.getElementById('focusInfiniteView');
-  if (focusInfiniteView) {
-    focusInfiniteView.addEventListener('change', (e) => {
-      const currentLens = cloneLens(viewStateManager.getState().focusLens);
+  const detailInfiniteView = document.getElementById('detailInfiniteView');
+  if (detailInfiniteView) {
+    detailInfiniteView.addEventListener('change', (e) => {
+      const currentLens = cloneLens(viewStateManager.getState().detailLens);
 
       // Find infinite distance rule
       const rule = currentLens.distanceRules.find(r => r.distance === 'infinite');
@@ -291,7 +259,7 @@ function setupFocusLensControls() {
         }
       }
 
-      viewStateManager.updateFocusLens(currentLens);
+      viewStateManager.updateDetailLens(currentLens);
     });
   }
 }

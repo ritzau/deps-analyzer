@@ -83,16 +83,16 @@ const DEFAULT_PACKAGE_LENS = {
 };
 
 /**
- * Focus lens: Distance-based visibility rules
- * Shows files in focused nodes (distance 0), hides files in neighbors (distance 1),
- * and shows rest of graph collapsed (distance infinite)
+ * Detail lens: Distance-based visibility rules
+ * Shows files in selected nodes (distance 0), hides files in neighbors (distance 1),
+ * and hides rest of graph (distance infinite)
  */
-const DEFAULT_FOCUS_LENS = {
-  name: "Focus View",
+const DEFAULT_DETAIL_LENS = {
+  name: "Detail View",
   baseSet: { type: 'full-graph' },
   distanceRules: [
     {
-      distance: 0,  // Focused nodes
+      distance: 0,  // Selected nodes
       nodeVisibility: {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
         fileTypes: ['all'],  // Show all files

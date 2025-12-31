@@ -52,30 +52,13 @@
                 <div class="tab-header">
                     <button class="tab-button active" data-tab="tree">Tree</button>
                     <button class="tab-button" data-tab="default">Default</button>
-                    <button class="tab-button" data-tab="focus">Focus</button>
+                    <button class="tab-button" data-tab="detail">Detail</button>
                 </div>
 
                 <!-- Tab Content -->
                 <div class="tab-content">
                     <!-- Tree Tab -->
                     <div id="treeTab" class="tab-pane active">
-                        <!-- Focus Mode Toggle -->
-                        <div class="focus-mode-toggle">
-                            <label>
-                                <input type="radio" name="focusMode" value="single" checked> Single
-                            </label>
-                            <label>
-                                <input type="radio" name="focusMode" value="multi-select"> Multi
-                            </label>
-                        </div>
-
-                        <!-- Reset Controls -->
-                        <div class="reset-controls">
-                            <button id="resetFocus" class="reset-button">Clear Focus</button>
-                            <button id="resetManual" class="reset-button">Reset Manual</button>
-                            <button id="resetAll" class="reset-button">Reset All</button>
-                        </div>
-
                         <!-- Navigation Lists -->
                         <div id="binariesList" class="nav-section">
                             <div class="nav-section-title">🔧 Binaries</div>
@@ -86,7 +69,7 @@
                             <div id="targetsItems" class="nav-items"></div>
                         </div>
 
-                        <p class="hint">💡 Double-click nodes to manually collapse/expand</p>
+                        <p class="hint">💡 Click to select, Ctrl+Click to toggle, click background to clear</p>
                     </div>
 
                     <!-- Default Config Tab -->
@@ -147,24 +130,24 @@
                         </label>
                     </div>
 
-                    <!-- Focus Config Tab -->
-                    <div id="focusTab" class="tab-pane">
-                        <p class="hint">Configure what to show when nodes are focused</p>
+                    <!-- Detail Config Tab -->
+                    <div id="detailTab" class="tab-pane">
+                        <p class="hint">Configure what to show when nodes are selected</p>
 
-                        <h4>Distance 0 (Focused)</h4>
-                        <select id="focusD0Files">
+                        <h4>Distance 0 (Selected)</h4>
+                        <select id="detailD0Files">
                             <option value="all" selected>All Files</option>
                             <option value="none">No Files</option>
                         </select>
 
                         <h4>Distance 1 (Neighbors)</h4>
-                        <select id="focusD1Files">
+                        <select id="detailD1Files">
                             <option value="all">All Files</option>
                             <option value="none" selected>No Files</option>
                         </select>
 
                         <h4>Distance 2+ (Rest)</h4>
-                        <select id="focusInfiniteView">
+                        <select id="detailInfiniteView">
                             <option value="hide" selected>Hide Completely</option>
                             <option value="collapsed">Show Collapsed</option>
                             <option value="default">Same as Default</option>
@@ -214,7 +197,7 @@
                     </div>
 
                     <div class="legend-section">
-                        <div class="legend-section-title">File Types (Focused View)</div>
+                        <div class="legend-section-title">File Types (Detail View)</div>
                         <div class="legend-item">
                             <div class="legend-color" style="background: #89d185; border-radius: 50%; width: 18px; height: 18px;"></div>
                             <span>Source file (.cc)</span>

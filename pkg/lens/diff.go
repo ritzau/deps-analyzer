@@ -24,18 +24,16 @@ type GraphSnapshot struct {
 }
 
 // ComputeHash generates a hash for the request to identify cache entries
-func ComputeHash(defaultLens, focusLens *LensConfig, focusedNodes []string, manualOverrides map[string]ManualOverride) string {
+func ComputeHash(defaultLens, detailLens *LensConfig, selectedNodes []string) string {
 	// Serialize the request to JSON for hashing
 	data := struct {
-		DefaultLens     *LensConfig
-		FocusLens       *LensConfig
-		FocusedNodes    []string
-		ManualOverrides map[string]ManualOverride
+		DefaultLens  *LensConfig
+		DetailLens   *LensConfig
+		SelectedNodes []string
 	}{
-		DefaultLens:     defaultLens,
-		FocusLens:       focusLens,
-		FocusedNodes:    focusedNodes,
-		ManualOverrides: manualOverrides,
+		DefaultLens:   defaultLens,
+		DetailLens:    detailLens,
+		SelectedNodes: selectedNodes,
 	}
 
 	jsonData, err := json.Marshal(data)

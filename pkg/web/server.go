@@ -206,7 +206,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/module/graph", s.handleModuleGraph).Methods("GET")
 	s.router.HandleFunc("/api/module/graph/lens", s.handleModuleGraphWithLens).Methods("POST")
 	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
-	s.router.HandleFunc("/api/target/{label}/focused", s.handleTargetFocused).Methods("GET")
+	s.router.HandleFunc("/api/target/{label}/selected", s.handleTargetSelected).Methods("GET")
 
 	// Serve static files
 	staticFS, err := fs.Sub(staticFiles, "static")
@@ -322,11 +322,10 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 
 // LensRenderRequest represents the request body for lens rendering
 type LensRenderRequest struct {
-	DefaultLens     *lens.LensConfig               `json:"defaultLens"`
-	FocusLens       *lens.LensConfig               `json:"focusLens"`
-	FocusedNodes    []string                       `json:"focusedNodes"`
-	ManualOverrides map[string]lens.ManualOverride `json:"manualOverrides"`
-	PreviousHash    string                         `json:"previousHash,omitempty"` // Hash of previous graph for diffing
+	DefaultLens   *lens.LensConfig `json:"defaultLens"`
+	DetailLens    *lens.LensConfig `json:"detailLens"`
+	SelectedNodes []string         `json:"selectedNodes"`
+	PreviousHash  string           `json:"previousHash,omitempty"` // Hash of previous graph for diffing
 }
 
 // LensRenderResponse represents the response from lens rendering
@@ -364,17 +363,13 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Validate that we have lens configurations
-	if req.DefaultLens == nil || req.FocusLens == nil {
+	if req.DefaultLens == nil || req.DetailLens == nil {
 		http.Error(w, "Missing required lens configurations", http.StatusBadRequest)
 		return
 	}
 
 	// Compute request hash for cache lookup
-	manualOverrides := req.ManualOverrides
-	if manualOverrides == nil {
-		manualOverrides = make(map[string]lens.ManualOverride)
-	}
-	requestHash := lens.ComputeHash(req.DefaultLens, req.FocusLens, req.FocusedNodes, manualOverrides)
+	requestHash := lens.ComputeHash(req.DefaultLens, req.DetailLens, req.SelectedNodes)
 
 	// Check cache first (before rendering)
 	s.mu.Lock()
@@ -423,7 +418,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	lensGraphData := convertToLensGraphData(rawGraphData)
 
 	// Apply lens rendering
-	renderedGraph, err := lens.RenderGraph(lensGraphData, req.DefaultLens, req.FocusLens, req.FocusedNodes, manualOverrides)
+	renderedGraph, err := lens.RenderGraph(lensGraphData, req.DefaultLens, req.DetailLens, req.SelectedNodes)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Lens rendering failed: %v", err), http.StatusInternalServerError)
 		return
@@ -433,7 +428,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	resultGraphData := convertFromLensGraphData(renderedGraph, rawGraphData)
 
 	// TEMPORARY DEBUG: Log package labels being sent to frontend
-	if len(req.FocusedNodes) > 0 {
+	if len(req.SelectedNodes) > 0 {
 		packageCount := 0
 		for _, node := range resultGraphData.Nodes {
 			if node.Type == "package" {
@@ -514,7 +509,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (s *Server) handleTargetFocused(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTargetSelected(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if s.module == nil {
@@ -542,8 +537,8 @@ func (s *Server) handleTargetFocused(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build focused graph data with file-level dependencies
-	graphData := buildTargetFocusedGraph(s.module, target, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
+	// Build selected target graph data with file-level dependencies
+	graphData := buildTargetSelectedGraph(s.module, target, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 	json.NewEncoder(w).Encode(graphData)
 }
 
@@ -911,35 +906,35 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 	return graphData
 }
 
-// buildTargetFocusedGraph creates a focused view of a target showing:
-// - The focused target with all its files (sources and headers)
+// buildTargetSelectedGraph creates a detailed view of a selected target showing:
+// - The selected target with all its files (sources and headers)
 // - Incoming dependencies (targets that depend on this one) with their files
 // - Outgoing dependencies (targets this one depends on) with their files
 // - All compile-time and link-time dependencies between files and targets
-// - Uncovered files in the focused target's package
-func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string, uncoveredFiles []string) *GraphData {
+// - Uncovered files in the selected target's package
+func buildTargetSelectedGraph(module *model.Module, selectedTarget *model.Target, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string, uncoveredFiles []string) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
 	}
 
-	// Track which targets are relevant (connect to/from focused target)
+	// Track which targets are relevant (connect to/from selected target)
 	relevantTargets := make(map[string]bool)
-	relevantTargets[focusedTarget.Label] = true
+	relevantTargets[selectedTarget.Label] = true
 
-	// Find all incoming dependencies (targets that depend on focused target)
+	// Find all incoming dependencies (targets that depend on selected target)
 	incomingDeps := make(map[string]bool)
 	for _, dep := range module.Dependencies {
-		if dep.To == focusedTarget.Label {
+		if dep.To == selectedTarget.Label {
 			incomingDeps[dep.From] = true
 			relevantTargets[dep.From] = true
 		}
 	}
 
-	// Find all outgoing dependencies (targets that focused target depends on)
+	// Find all outgoing dependencies (targets that selected target depends on)
 	outgoingDeps := make(map[string]bool)
 	for _, dep := range module.Dependencies {
-		if dep.From == focusedTarget.Label {
+		if dep.From == selectedTarget.Label {
 			outgoingDeps[dep.To] = true
 			relevantTargets[dep.To] = true
 		}
@@ -956,7 +951,7 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 	}
 
 	// Add parent nodes for all relevant targets
-	addTargetParent(focusedTarget)
+	addTargetParent(selectedTarget)
 	for targetLabel := range incomingDeps {
 		if target, exists := module.Targets[targetLabel]; exists {
 			addTargetParent(target)
@@ -971,11 +966,11 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 	// Track which files have edges (so we only show files that are connected)
 	filesWithEdges := make(map[string]bool)
 
-	// Add target-level edges - only those that connect to/from the focused target
+	// Add target-level edges - only those that connect to/from the selected target
 	// Edges connect to the parent node IDs (with "parent-" prefix)
 	for _, dep := range module.Dependencies {
-		// Include edge if it connects to or from the focused target
-		if dep.From == focusedTarget.Label || dep.To == focusedTarget.Label {
+		// Include edge if it connects to or from the selected target
+		if dep.From == selectedTarget.Label || dep.To == selectedTarget.Label {
 			// Use parent- prefix for compound node IDs
 			sourceID := "parent-" + dep.From
 			targetID := "parent-" + dep.To
@@ -992,9 +987,9 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 		}
 	}
 
-	// Add system library nodes and edges for the focused target
-	if len(focusedTarget.Linkopts) > 0 {
-		for _, linkopt := range focusedTarget.Linkopts {
+	// Add system library nodes and edges for the selected target
+	if len(selectedTarget.Linkopts) > 0 {
+		for _, linkopt := range selectedTarget.Linkopts {
 			if strings.HasPrefix(linkopt, "-l") {
 				libName := strings.TrimPrefix(linkopt, "-l")
 				if libName != "" {
@@ -1006,14 +1001,14 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 						Type:  "system_library",
 					})
 
-					// Add edge from focused target to system library
+					// Add edge from selected target to system library
 					graphData.Edges = append(graphData.Edges, GraphEdge{
-						Source:      "parent-" + focusedTarget.Label,
+						Source:      "parent-" + selectedTarget.Label,
 						Target:      libNodeID,
 						Type:        "system_link",
 						Linkage:     "system",
 						Symbols:     []string{},
-						SourceLabel: focusedTarget.Label,
+						SourceLabel: selectedTarget.Label,
 						TargetLabel: libName,
 					})
 				}
@@ -1059,8 +1054,8 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 					continue // Skip if target is not in a relevant target
 				}
 
-				// Only show edges where at least one end is in the focused target
-				if sourceTarget != focusedTarget.Label && targetTarget != focusedTarget.Label {
+				// Only show edges where at least one end is in the selected target
+				if sourceTarget != selectedTarget.Label && targetTarget != selectedTarget.Label {
 					continue
 				}
 
@@ -1109,8 +1104,8 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 				continue
 			}
 
-			// Only show edges where at least one end is in the focused target
-			if symDep.SourceTarget != focusedTarget.Label && symDep.TargetTarget != focusedTarget.Label {
+			// Only show edges where at least one end is in the selected target
+			if symDep.SourceTarget != selectedTarget.Label && symDep.TargetTarget != selectedTarget.Label {
 				continue
 			}
 
@@ -1170,16 +1165,16 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 		graphData.Edges = append(graphData.Edges, *edge)
 	}
 
-	// Now add file nodes - only for files that have edges OR are in the focused target
+	// Now add file nodes - only for files that have edges OR are in the selected target
 	addFileNodes := func(target *model.Target, typeSuffix string) {
 		parentID := "parent-" + target.Label
-		isFocused := target.Label == focusedTarget.Label
+		isSelected := target.Label == selectedTarget.Label
 
 		// Add source file nodes
 		for _, source := range target.Sources {
 			fileID := target.Label + ":file:" + source
-			// Only add if file has edges OR is in focused target
-			if isFocused || filesWithEdges[fileID] {
+			// Only add if file has edges OR is in selected target
+			if isSelected || filesWithEdges[fileID] {
 				graphData.Nodes = append(graphData.Nodes, GraphNode{
 					ID:     fileID,
 					Label:  getFileName(source),
@@ -1192,8 +1187,8 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 		// Add header file nodes
 		for _, header := range target.Headers {
 			fileID := target.Label + ":file:" + header
-			// Only add if file has edges OR is in focused target
-			if isFocused || filesWithEdges[fileID] {
+			// Only add if file has edges OR is in selected target
+			if isSelected || filesWithEdges[fileID] {
 				graphData.Nodes = append(graphData.Nodes, GraphNode{
 					ID:     fileID,
 					Label:  getFileName(header),
@@ -1204,16 +1199,16 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 		}
 	}
 
-	// Add file nodes for focused target
-	addFileNodes(focusedTarget, "_focused")
+	// Add file nodes for selected target
+	addFileNodes(selectedTarget, "_selected")
 
-	// Add uncovered files in the focused target's package
-	focusedPackage := focusedTarget.Package
-	parentID := "parent-" + focusedTarget.Label
+	// Add uncovered files in the selected target's package
+	selectedPackage := selectedTarget.Package
+	selectedParentID := "parent-" + selectedTarget.Label
 	for _, uncoveredFile := range uncoveredFiles {
-		// Check if file is in the focused package
+		// Check if file is in the selected package
 		filePath := uncoveredFile
-		if strings.HasPrefix(filePath, strings.TrimPrefix(focusedPackage, "//")+"/") {
+		if strings.HasPrefix(filePath, strings.TrimPrefix(selectedPackage, "//")+"/") {
 			// Determine if source or header
 			nodeType := "uncovered_source"
 			if strings.HasSuffix(filePath, ".h") || strings.HasSuffix(filePath, ".hpp") {
@@ -1225,7 +1220,7 @@ func buildTargetFocusedGraph(module *model.Module, focusedTarget *model.Target, 
 				ID:     "uncovered:" + uncoveredFile,
 				Label:  getFileName(uncoveredFile),
 				Type:   nodeType,
-				Parent: parentID, // Group under focused target
+				Parent: selectedParentID, // Group under selected target
 			})
 		}
 	}
