@@ -866,7 +866,13 @@ function setupEventHandlers() {
         }
 
         tooltip.textContent = tooltipText;
+        // Fade in animation
         tooltip.style.display = 'block';
+        tooltip.style.opacity = '0';
+        // Force reflow to ensure transition works
+        tooltip.offsetHeight;
+        tooltip.style.transition = 'opacity 0.2s ease-in';
+        tooltip.style.opacity = '1';
         }, 500); // 500ms delay
     });
 
@@ -876,12 +882,12 @@ function setupEventHandlers() {
     });
 
     cy.on('mouseout', 'edge', function(evt) {
-        // Clear timeout and hide tooltip
+        // Clear timeout and hide tooltip with fade
         if (tooltipTimeout) {
             clearTimeout(tooltipTimeout);
             tooltipTimeout = null;
         }
-        tooltip.style.display = 'none';
+        clearInfoPopup(true); // Fade out
     });
 
     // Tooltip for nodes with delay
@@ -935,7 +941,13 @@ function setupEventHandlers() {
         }
 
         tooltip.textContent = tooltipText;
+        // Fade in animation
         tooltip.style.display = 'block';
+        tooltip.style.opacity = '0';
+        // Force reflow to ensure transition works
+        tooltip.offsetHeight;
+        tooltip.style.transition = 'opacity 0.2s ease-in';
+        tooltip.style.opacity = '1';
         }, 500); // 500ms delay
     });
 
@@ -945,12 +957,12 @@ function setupEventHandlers() {
     });
 
     cy.on('mouseout', 'node', function(evt) {
-        // Clear timeout and hide tooltip
+        // Clear timeout and hide tooltip with fade
         if (tooltipTimeout) {
             clearTimeout(tooltipTimeout);
             tooltipTimeout = null;
         }
-        tooltip.style.display = 'none';
+        clearInfoPopup(true); // Fade out
     });
 
     // Hide tooltip when clicking anywhere (fixes tooltip staying visible after click)
@@ -960,7 +972,7 @@ function setupEventHandlers() {
             clearTimeout(tooltipTimeout);
             tooltipTimeout = null;
         }
-        tooltip.style.display = 'none';
+        clearInfoPopup(); // Immediate hide on click
     });
 
     // Click on graph background to clear selection
