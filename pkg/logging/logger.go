@@ -14,9 +14,9 @@ const requestIDKey contextKey = "requestID"
 var logger *slog.Logger
 
 func init() {
-	// Initialize with a default handler (text format for development)
+	// Initialize with compact handler for readable console output
 	// Can be replaced with JSON handler for production
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	handler := NewCompactHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo, // Default level
 	})
 	logger = slog.New(handler)
@@ -24,7 +24,7 @@ func init() {
 
 // SetLevel changes the logging level
 func SetLevel(level slog.Level) {
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	handler := NewCompactHandler(os.Stdout, &slog.HandlerOptions{
 		Level: level,
 	})
 	logger = slog.New(handler)
