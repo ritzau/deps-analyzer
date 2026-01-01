@@ -963,7 +963,23 @@ function setupEventHandlers() {
     // Ctrl+Click: toggle node in selection
     cy.on('tap', 'node', function(evt) {
         const node = evt.target;
-        const nodeId = node.data('id');
+        let nodeId = node.data('id');
+        const nodeType = node.data('type');
+
+        // If clicking a file node, select its parent target instead
+        // Files don't have dependencies - their parent targets do
+        const isFileNode = nodeType === 'source_file' || nodeType === 'header_file' ||
+                          nodeType === 'uncovered_source' || nodeType === 'uncovered_header';
+
+        if (isFileNode) {
+            const parentId = node.data('parent');
+            if (parentId) {
+                appLogger.info('File node clicked - redirecting to parent target:', {file: nodeId, parent: parentId});
+                nodeId = parentId;
+            } else {
+                appLogger.warn('File node has no parent - selecting anyway:', nodeId);
+            }
+        }
 
         if (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey) {
             // Ctrl/Cmd+Click: Toggle selection
@@ -1947,12 +1963,18 @@ function populateTreeBrowser(data) {
         });
     }
 
-    // Populate targets list (exclude system libraries)
+    // Populate targets list (exclude system libraries and file nodes)
     const targetsItems = document.getElementById('targetsItems');
     if (targetsItems && data.graph && data.graph.nodes) {
         targetsItems.innerHTML = '';
         data.graph.nodes
-            .filter(node => node.type !== 'system_library')  // Exclude system libraries
+            .filter(node => {
+                // Exclude system libraries and file nodes
+                const isSystemLib = node.type === 'system_library';
+                const isFile = node.type === 'source_file' || node.type === 'header_file' ||
+                              node.type === 'uncovered_source' || node.type === 'uncovered_header';
+                return !isSystemLib && !isFile;
+            })
             .forEach(node => {
                 const item = document.createElement('div');
                 item.className = 'nav-item';
