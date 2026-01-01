@@ -107,6 +107,18 @@ class ViewStateManager {
   }
 
   /**
+   * Update default lens and clear selection atomically (single notification)
+   * Use this when changing default lens settings where keeping selection doesn't make sense
+   * @param {LensConfig} lens - New default lens
+   */
+  updateDefaultLensAndClearSelection(lens) {
+    viewStateLogger.debug('[ViewState] updateDefaultLensAndClearSelection called (atomic update)');
+    this.state.defaultLens = lens;
+    this.state.selectedNodes = new Set();
+    this.notifyListeners(); // Only notify once
+  }
+
+  /**
    * Set active tab
    *
    * @param {'tree'|'default'|'detail'} tab - Tab name

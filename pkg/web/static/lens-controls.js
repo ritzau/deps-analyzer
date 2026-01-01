@@ -87,12 +87,10 @@ function setupDefaultLensControls() {
         }
       }
 
-      // Clear selection to show default view when changing base set
+      // Update lens and clear selection atomically (single backend request)
       // Switching between full graph and binary-focused is a major view change
-      viewStateManager.clearSelection();
-
       lensLogger.debug('[LensControls] Updating default lens with new base set');
-      viewStateManager.updateDefaultLens(currentLens);
+      viewStateManager.updateDefaultLensAndClearSelection(currentLens);
     });
   }
 
@@ -184,11 +182,9 @@ function setupDefaultLensControls() {
           }
         }
 
-        // Clear selection to show default view when changing hierarchy level
+        // Update lens and clear selection atomically (single backend request)
         // Otherwise the detail lens keeps being used with old settings
-        viewStateManager.clearSelection();
-
-        viewStateManager.updateDefaultLens(currentLens);
+        viewStateManager.updateDefaultLensAndClearSelection(currentLens);
       }
     });
   });
@@ -297,10 +293,8 @@ function populateBinarySelector(binaries) {
     const currentLens = cloneLens(viewStateManager.getState().defaultLens);
     currentLens.baseSet.binaryLabel = e.target.value;
 
-    // Clear selection when changing binary selection
-    // This shows the new binary's dependencies in the default view
-    viewStateManager.clearSelection();
-
-    viewStateManager.updateDefaultLens(currentLens);
+    // Update lens and clear selection atomically (single backend request)
+    // Switching binary selection is a major view change
+    viewStateManager.updateDefaultLensAndClearSelection(currentLens);
   });
 }
