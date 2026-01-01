@@ -10,10 +10,7 @@
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-3. BUG: If a file node is selected we end up in a weird state where no files are
-   visible and neighbour packages remain visible (but no targets).
-
-4. External packages: May require support of .a files. These packages can be
+3. External packages: May require support of .a files. These packages can be
    added using cc_foreign_rule, bazel_dep, or cc_import. They typically result
    in static or dynamic libraries, alternatively being header only. Add a
    special configuration step for their visualization much like the system libs.
@@ -93,6 +90,53 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ File node selection redirect to parent target (DONE)
+
+Fixed confusing behavior when selecting file nodes in the graph.
+
+**Problem**: Selecting a file node (like `engine.cc` or `orphaned.cc`) resulted in a weird state where:
+- No files were visible in the graph
+- Neighbor packages remained visible but their targets were hidden
+- The graph appeared broken or incomplete
+
+**Root Cause**: Files don't have dependencies - their parent targets do. The lens system computes distances and visibility based on dependencies, so when a file was selected, it had no outgoing edges to follow. This caused the BFS distance computation to not reach other nodes properly, resulting in an inconsistent visibility state.
+
+**Solution**: Redirect file node selections to their parent target automatically. When a user clicks on a file node in the graph, the selection logic now:
+1. Detects if the clicked node is a file type (`source_file`, `header_file`, `uncovered_source`, `uncovered_header`)
+2. Extracts the parent target ID from the file node's `parent` field
+3. Selects the parent target instead of the file itself
+4. Logs the redirection for debugging: `File node clicked - redirecting to parent target`
+
+This makes semantic sense because:
+- Files are implementation details of targets
+- Users likely want to see what the target depends on, not the individual file
+- Target nodes have proper dependency edges that the lens system can follow
+- Prevents the confusing "broken graph" state entirely
+
+**Implementation**: Modified [pkg/web/static/app.js:964-993](pkg/web/static/app.js#L964-L993) node click handler:
+```javascript
+const isFileNode = nodeType === 'source_file' || nodeType === 'header_file' ||
+                  nodeType === 'uncovered_source' || nodeType === 'uncovered_header';
+
+if (isFileNode) {
+    const parentId = node.data('parent');
+    if (parentId) {
+        appLogger.info('File node clicked - redirecting to parent target:', {file: nodeId, parent: parentId});
+        nodeId = parentId;
+    }
+}
+```
+
+Also added defensive filtering in navigation tree to prevent file nodes from appearing in the targets sidebar list (only packages, targets, and binaries should be listed there).
+
+**Example Behavior**:
+- Click on `engine.cc` file → automatically selects `//core:core` target instead
+- Click on uncovered `orphaned.cc` → selects `//util:util` target
+- The selected target's dependencies are then shown normally with proper visibility
+- Works with both simple click and Ctrl+click (toggle)
+
+**Result**: File nodes can still be visible in the graph (when their parent target is selected), but clicking them now produces sensible behavior instead of breaking the visualization.
 
 ## ✅ Uncovered files visibility fixes (DONE)
 
