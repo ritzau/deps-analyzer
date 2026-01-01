@@ -99,10 +99,11 @@ type DependencyIssue struct {
 
 // Module represents the complete build graph (a Bazel workspace/module)
 type Module struct {
-	Name         string             `json:"name"`         // Workspace/module name
-	Targets      map[string]*Target `json:"targets"`      // Map of label -> Target
-	Dependencies []Dependency       `json:"dependencies"` // All target-level dependencies
-	Issues       []DependencyIssue  `json:"issues"`       // Dependency issues/warnings
+	Name          string             `json:"name"`          // Workspace/module name
+	WorkspacePath string             `json:"workspacePath"` // Absolute path to workspace directory
+	Targets       map[string]*Target `json:"targets"`       // Map of label -> Target
+	Dependencies  []Dependency       `json:"dependencies"`  // All target-level dependencies
+	Issues        []DependencyIssue  `json:"issues"`        // Dependency issues/warnings
 }
 
 // GetPackages derives the package structure from targets

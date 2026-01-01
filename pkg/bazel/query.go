@@ -84,6 +84,13 @@ func QueryWorkspace(workspacePath string) (*model.Module, error) {
 	}
 	module.Name = workspaceName
 
+	// Get absolute path to workspace
+	absPath, err := filepath.Abs(workspacePath)
+	if err != nil {
+		absPath = workspacePath // Fall back to original path if absolute path fails
+	}
+	module.WorkspacePath = absPath
+
 	// First pass: create all targets
 	for _, rule := range result.Rules {
 		target := parseTarget(rule)

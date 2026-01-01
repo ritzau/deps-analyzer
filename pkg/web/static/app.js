@@ -227,11 +227,17 @@ function markAnalysisUpdate() {
     updateWatchingText();
 }
 
-// Update the subtitle with the module/workspace name
-function updateModuleName(name) {
+// Update the subtitle with the module/workspace name and path
+function updateModuleName(name, workspacePath) {
     const subtitle = document.querySelector('.subtitle');
-    if (subtitle && name) {
-        subtitle.textContent = name;
+    if (subtitle) {
+        if (name && workspacePath) {
+            subtitle.textContent = `${name} • ${workspacePath}`;
+        } else if (name) {
+            subtitle.textContent = name;
+        } else if (workspacePath) {
+            subtitle.textContent = workspacePath;
+        }
     }
 }
 
@@ -1483,8 +1489,8 @@ async function loadGraphData() {
                 module: moduleData
             };
 
-            // Update subtitle with module name
-            updateModuleName(moduleData.name);
+            // Update subtitle with module name and workspace path
+            updateModuleName(moduleData.name, moduleData.workspacePath);
 
             // Populate tree browser
             if (packageGraph && packageGraph.nodes) {
