@@ -663,7 +663,8 @@ func findVisibleAncestor(nodeID string, includedNodeIds map[string]bool, childTo
 		return nodeID
 	}
 
-	// Walk up the hierarchy
+	// Walk up the hierarchy, tracking the first visible package in case we need it
+	var firstVisiblePackage string
 	currentID := nodeID
 	for {
 		parentID := childToParentMap[currentID]
@@ -672,20 +673,32 @@ func findVisibleAncestor(nodeID string, includedNodeIds map[string]bool, childTo
 		}
 
 		if includedNodeIds[parentID] {
-			// Skip package nodes - they're synthetic grouping nodes, not real targets
-			// A node is a package if it has no colon (e.g., "//audio" vs "//audio:audio")
-			if !strings.Contains(parentID, ":") {
-				// Continue walking up past the package node
+			// Check if this is a package node (no colon, e.g., "//audio" vs "//audio:audio")
+			isPackage := !strings.Contains(parentID, ":")
+
+			if isPackage {
+				// Remember the first visible package we encounter
+				if firstVisiblePackage == "" {
+					firstVisiblePackage = parentID
+				}
+				// Continue walking up to see if there's a visible target above
 				currentID = parentID
 				continue
 			}
+			// Found a visible non-package ancestor (target)
 			return parentID
 		}
 
 		currentID = parentID
 	}
 
-	// No visible non-package ancestor found
+	// If we found a visible package but no visible target, use the package
+	// This handles the case where only packages are visible (collapseLevel: 1)
+	if firstVisiblePackage != "" {
+		return firstVisiblePackage
+	}
+
+	// No visible ancestor found at all
 	return ""
 }
 
