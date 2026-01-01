@@ -20,12 +20,6 @@
    The "source" files they share are the headers and libs. We can either show
    them collapsed or with those files, alternatively we can hide them.
 
-5. ~~BUG: Uncovered files are shown at top level, they should be shown in the
-   package where they reside.~~ ✅ DONE
-
-6. ~~Add something in the web ui indicating the directory that we ran the
-   analysis in~~ ✅ DONE
-
 ## Unclear
 
 1. What can we do with a CLI in this case. Can it be used to find
