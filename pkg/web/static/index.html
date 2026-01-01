@@ -307,8 +307,14 @@
     </div>
 
     <!-- Structured logging (must load first) -->
-    <!-- To enable DEBUG logs in console: appLogger.setLevel(LogLevel.DEBUG) -->
-    <!-- To disable DEBUG logs: appLogger.setLevel(LogLevel.INFO) -->
+    <!-- Structured logging configuration:
+         To enable DEBUG logs in console: appLogger.setLevel(LogLevel.DEBUG)
+         To disable DEBUG logs: appLogger.setLevel(LogLevel.INFO)
+         To send logs to backend: logger.enableBackendLogging(true)
+           - Logs are batched (10 logs or 5s timeout)
+           - Backend logs include source=frontend tag for filtering
+           - Useful for debugging production issues
+    -->
     <script src="/logger.js"></script>
 
     <!-- Lens-based visualization system -->

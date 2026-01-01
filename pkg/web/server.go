@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -207,6 +208,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/module/graph/lens", s.handleModuleGraphWithLens).Methods("POST")
 	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
 	s.router.HandleFunc("/api/target/{label}/selected", s.handleTargetSelected).Methods("GET")
+	s.router.HandleFunc("/api/logs", s.handleFrontendLogs).Methods("POST")
 
 	// Serve static files
 	staticFS, err := fs.Sub(staticFiles, "static")
@@ -542,6 +544,59 @@ func (s *Server) handleTargetSelected(w http.ResponseWriter, r *http.Request) {
 	// Build selected target graph data with file-level dependencies
 	graphData := buildTargetSelectedGraph(s.module, target, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 	json.NewEncoder(w).Encode(graphData)
+}
+
+// FrontendLogEntry represents a log entry from the frontend
+type FrontendLogEntry struct {
+	Timestamp string                 `json:"timestamp"`
+	Level     string                 `json:"level"`
+	Message   string                 `json:"message"`
+	Data      map[string]interface{} `json:"data,omitempty"`
+}
+
+// FrontendLogsRequest represents a batch of logs from the frontend
+type FrontendLogsRequest struct {
+	Logs []FrontendLogEntry `json:"logs"`
+}
+
+func (s *Server) handleFrontendLogs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req FrontendLogsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logging.WarnContext(ctx, "failed to decode frontend logs", "error", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Log each frontend log entry with source=frontend marker
+	for _, entry := range req.Logs {
+		// Convert frontend log level to slog level
+		var logFunc func(context.Context, string, ...any)
+		switch entry.Level {
+		case "TRACE", "DEBUG":
+			logFunc = logging.DebugContext
+		case "INFO":
+			logFunc = logging.InfoContext
+		case "WARN":
+			logFunc = logging.WarnContext
+		case "ERROR":
+			logFunc = logging.ErrorContext
+		default:
+			logFunc = logging.InfoContext
+		}
+
+		// Build log attributes
+		attrs := []any{"source", "frontend"}
+		for key, value := range entry.Data {
+			attrs = append(attrs, key, value)
+		}
+
+		// Log with context
+		logFunc(ctx, entry.Message, attrs...)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // buildBinaryGraphData creates a graph visualization for binaries and their shared library dependencies

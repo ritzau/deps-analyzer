@@ -21,6 +21,11 @@ class Logger {
   constructor() {
     this.level = LogLevel.INFO; // Default level
     this.requestIDCounter = 0;
+    this.sendToBackend = false; // Whether to send logs to backend
+    this.logBuffer = []; // Buffer for batching logs
+    this.batchSize = 10; // Send after this many logs
+    this.batchTimeout = 5000; // Send after this many milliseconds
+    this.batchTimer = null; // Timer for batch sending
   }
 
   /**
@@ -29,6 +34,69 @@ class Logger {
    */
   setLevel(level) {
     this.level = level;
+  }
+
+  /**
+   * Enable sending logs to backend
+   * @param {boolean} enabled - Whether to send logs to backend
+   */
+  enableBackendLogging(enabled = true) {
+    this.sendToBackend = enabled;
+    if (!enabled && this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+  }
+
+  /**
+   * Flush buffered logs to backend immediately
+   * @private
+   */
+  async _flushLogs() {
+    if (this.logBuffer.length === 0) return;
+
+    const logsToSend = this.logBuffer.splice(0, this.logBuffer.length);
+
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+
+    try {
+      await fetch('/api/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ logs: logsToSend }),
+      });
+    } catch (error) {
+      // Don't log errors sending logs to avoid infinite loop
+      console.error('[Logger] Failed to send logs to backend:', error);
+    }
+  }
+
+  /**
+   * Add log to buffer and maybe flush
+   * @private
+   */
+  _bufferLog(logData) {
+    if (!this.sendToBackend) return;
+
+    this.logBuffer.push(logData);
+
+    // Flush if buffer is full
+    if (this.logBuffer.length >= this.batchSize) {
+      this._flushLogs();
+      return;
+    }
+
+    // Set timer to flush after timeout
+    if (!this.batchTimer) {
+      this.batchTimer = setTimeout(() => {
+        this._flushLogs();
+      }, this.batchTimeout);
+    }
   }
 
   /**
@@ -96,6 +164,14 @@ class Logger {
         console.error(fullMessage, attrs);
         break;
     }
+
+    // Also buffer for backend if enabled
+    this._bufferLog({
+      timestamp: logData.timestamp,
+      level: logData.level,
+      message: logData.message,
+      data: attrs,
+    });
   }
 
   /**
