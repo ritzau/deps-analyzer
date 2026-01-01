@@ -69,6 +69,24 @@ The UI displays "👁️ Watching for changes..." when active, and shows notific
 - `--workspace PATH`: Path to Bazel workspace (default: current directory)
 - `--port PORT`: HTTP server port (default: 8080)
 
+### Logging
+
+The tool uses structured logging with a compact, readable console format:
+
+```
+[INFO]  21:54:51 starting web server | url=http://localhost:8080
+[INFO]  21:54:51 request started | req=eb419103 method=GET path=/
+[INFO]  21:54:51 request completed | req=eb419103 status=200 duration=3ms
+[INFO]  21:54:55 analysis complete | targets=10 dependencies=25 packages=8
+```
+
+Features:
+- **Compact timestamps**: HH:MM:SS instead of full RFC3339
+- **Shortened request IDs**: First 8 characters for readability
+- **Structured key-value pairs**: Easy to grep and parse
+- **Request tracking**: Each HTTP request gets a unique ID for end-to-end tracing
+- **Log levels**: DEBUG (internal details), INFO (operations), WARN (issues), ERROR (bugs)
+
 ## How It Works
 
 ### Analysis Phases
@@ -95,13 +113,20 @@ This minimizes re-analysis time for common changes.
 
 The web UI provides:
 
-- **Navigation Panel**: Browse binaries and targets
+- **Navigation Panel**: Browse binaries and targets, with tabbed configuration
+- **Lens-based Visualization**: Advanced graph filtering and focus system
+  - **Default Lens**: Controls the base graph view (hierarchy level, filters, edge types)
+  - **Detail Lens**: Automatically applied to selected nodes and their neighbors
+  - **Distance-based Rules**: Show/hide nodes based on distance from selection
+  - **Configurable Collapse**: Package-level, target-level, or file-level detail
 - **Dependency Graph**: Interactive visualization with Cytoscape.js
-  - Click nodes to focus on specific targets
+  - Click nodes to select/focus on specific targets
+  - Ctrl+Click to toggle multiple selections
   - Hover for tooltips with dependency details
-  - Color-coded by target type (binary, library, shared library)
+  - Color-coded by target type (binary, library, shared library, system library)
+  - Edge types: Static deps, dynamic deps, compile deps (#include), data deps
   - Warnings for overlapping dependencies
-- **Real-time Status**: SSE-based updates during analysis
+- **Real-time Status**: SSE-based updates during analysis with progress checklist
 - **Live Updates**: Automatic refresh when files change (with `--watch`)
 
 ## Development
@@ -115,11 +140,14 @@ pkg/
   bazel/              Bazel query interface
   binaries/           Binary and shared library analysis
   deps/               Compile dependency parser (.d files)
+  lens/               Lens-based graph filtering and rendering
+  logging/            Structured logging with compact console output
   model/              Graph data model
-  pubsub/             SSE event publishing
+  pubsub/             SSE event publishing for real-time updates
   symbols/            Symbol dependency analysis (nm)
   watcher/            File system watching and debouncing
   web/                HTTP server and static files
+    static/           Frontend HTML, CSS, and JavaScript
 ```
 
 ### Running Tests
