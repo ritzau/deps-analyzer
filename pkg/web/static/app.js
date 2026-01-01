@@ -1952,7 +1952,7 @@ viewStateManager.addListener(async (newState) => {
 
 // Populate the tree browser
 function populateTreeBrowser(data) {
-    appLogger.info('Populating navigation with data:', data);
+    appLogger.debug('Populating navigation with data:', { nodeCount: data.graph?.nodes?.length, edgeCount: data.graph?.edges?.length });
 
     // Populate binaries list
     const binariesItems = document.getElementById('binariesItems');
