@@ -1,3 +1,6 @@
+// Use structured logger (loaded from logger.js)
+const appLogger = new Logger();
+
 // Global reference to the info popup element (singleton)
 let infoPopup = null;
 
@@ -212,7 +215,7 @@ function displayUncoveredFiles(files) {
 // Nodes that already exist keep their positions automatically when we only add/remove changed elements
 
 function displayDependencyGraph(graphData) {
-    console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
+    appLogger.info('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
 
     // Clear any visible info popups when graph is re-rendered
     clearInfoPopup();
@@ -237,7 +240,7 @@ function displayDependencyGraph(graphData) {
         ...graphData.nodes.map(node => {
             // TEMPORARY DEBUG: Log package labels
             if (node.type === 'package' && node.label.includes('(d=')) {
-                console.log(`[Frontend] Package node: id=${node.id}, original label="${node.label}", simplified="${simplifyLabel(node.label)}"`);
+                appLogger.info(`[Frontend] Package node: id=${node.id}, original label="${node.label}", simplified="${simplifyLabel(node.label)}"`);
             }
 
             const nodeData = {
@@ -296,8 +299,8 @@ function displayDependencyGraph(graphData) {
     // Debug: Log overlapping flags
     const overlappingNodes = elements.filter(e => e.data.hasOverlap === true);
     const overlappingEdges = elements.filter(e => e.data.isOverlapping === true);
-    console.log('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.label || n.data.id));
-    console.log('Edges with isOverlapping=true:', overlappingEdges.map(e => `${e.data.source} -> ${e.data.target}`));
+    appLogger.info('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.label || n.data.id));
+    appLogger.info('Edges with isOverlapping=true:', overlappingEdges.map(e => `${e.data.source} -> ${e.data.target}`));
 
     // Cytoscape stylesheet (shared between initial and incremental updates)
     const cytoscapeStylesheet = [
@@ -647,7 +650,7 @@ function displayDependencyGraph(graphData) {
 
     if (isInitialLoad) {
         // Initial creation - create new cytoscape instance
-        console.log('Creating new cytoscape instance with', elements.length, 'elements');
+        appLogger.info('Creating new cytoscape instance with', elements.length, 'elements');
 
         cy = cytoscape({
             container: document.getElementById('cy'),
@@ -665,7 +668,7 @@ function displayDependencyGraph(graphData) {
         runStableDagreLayout(false, true);
     } else {
         // Incremental update - update only changed elements
-        console.log('Incrementally updating cytoscape with', elements.length, 'elements');
+        appLogger.info('Incrementally updating cytoscape with', elements.length, 'elements');
 
         cy.startBatch();
 
@@ -681,7 +684,7 @@ function displayDependencyGraph(graphData) {
         const nodesToRemove = Array.from(currentNodeIds).filter(id => !newNodeIds.has(id));
         const edgesToRemove = Array.from(currentEdgeIds).filter(id => !newEdgeIds.has(id));
 
-        console.log(`[Cytoscape] Removing ${nodesToRemove.length} nodes, ${edgesToRemove.length} edges`);
+        appLogger.info(`[Cytoscape] Removing ${nodesToRemove.length} nodes, ${edgesToRemove.length} edges`);
         nodesToRemove.forEach(id => cy.getElementById(id).remove());
         edgesToRemove.forEach(id => {
             const [source, target, type] = id.split('|');
@@ -715,7 +718,7 @@ function displayDependencyGraph(graphData) {
             }
         });
 
-        console.log(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges, updated ${updatedNodes} node labels`);
+        appLogger.info(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges, updated ${updatedNodes} node labels`);
         if (elementsToAdd.length > 0) {
             cy.add(elementsToAdd);
 
@@ -729,7 +732,7 @@ function displayDependencyGraph(graphData) {
                     // Position at parent's current location
                     const parentPos = parent.position();
                     node.position({ x: parentPos.x, y: parentPos.y });
-                    console.log(`[Cytoscape] Positioned new node ${nodeData.data.id} at parent location`);
+                    appLogger.info(`[Cytoscape] Positioned new node ${nodeData.data.id} at parent location`);
                 }
             });
         }
@@ -741,10 +744,10 @@ function displayDependencyGraph(graphData) {
         const nodesChanged = nodesToRemove.length > 0 || elementsToAdd.some(e => !e.data.source);
 
         if (nodesChanged) {
-            console.log('[Cytoscape] Running layout because nodes changed');
+            appLogger.info('[Cytoscape] Running layout because nodes changed');
             runStableDagreLayout(true, false);  // Animate, don't reset viewport
         } else {
-            console.log('[Cytoscape] Skipping layout - only edges changed, nodes stay in place');
+            appLogger.info('[Cytoscape] Skipping layout - only edges changed, nodes stay in place');
         }
     }
 }
@@ -979,7 +982,7 @@ function setupEventHandlers() {
     cy.on('tap', function(evt) {
         // Check if we clicked on the background (not a node or edge)
         if (evt.target === cy) {
-            console.log('Background clicked - clearing selection');
+            appLogger.info('Background clicked - clearing selection');
             viewStateManager.clearSelection();
         }
     });
@@ -993,11 +996,11 @@ function setupEventHandlers() {
 
         if (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey) {
             // Ctrl/Cmd+Click: Toggle selection
-            console.log('Node ctrl+clicked (toggle selection):', nodeId);
+            appLogger.info('Node ctrl+clicked (toggle selection):', nodeId);
             viewStateManager.toggleSelection(nodeId);
         } else {
             // Simple click: Replace selection with this node only
-            console.log('Node clicked (select):', nodeId);
+            appLogger.info('Node clicked (select):', nodeId);
             viewStateManager.setSelection([nodeId]);
         }
     });
@@ -1027,7 +1030,7 @@ function setupEventHandlers() {
 function applyCollapseStates(nodeStates) {
     if (!cy || !nodeStates) return;
 
-    console.log('[CollapseStates] Applying collapse states to graph');
+    appLogger.info('[CollapseStates] Applying collapse states to graph');
 
     // First, show all nodes (reset state)
     cy.nodes().show();
@@ -1041,7 +1044,7 @@ function applyCollapseStates(nodeStates) {
             // Hide all descendants (children and their children recursively)
             const descendants = parentNode.descendants();
             descendants.hide();
-            console.log(`[CollapseStates] Collapsed ${parentId}, hiding ${descendants.length} descendants`);
+            appLogger.info(`[CollapseStates] Collapsed ${parentId}, hiding ${descendants.length} descendants`);
         }
     });
 }
@@ -1105,7 +1108,7 @@ function handleConnectionLost(source) {
     }
 
     connectionLost = true;
-    console.error('Connection lost to backend server (source:', source, ')');
+    appLogger.error('Connection lost to backend server (source:', source, ')');
 
     // Show connection lost modal
     showConnectionLostModal();
@@ -1151,14 +1154,14 @@ function attemptReconnect() {
         .then(response => {
             if (response.ok) {
                 // Connection restored
-                console.log('Connection restored, reloading page...');
+                appLogger.info('Connection restored, reloading page...');
                 window.location.reload();
             } else {
                 throw new Error('Server not ready');
             }
         })
         .catch(error => {
-            console.error('Reconnection failed:', error);
+            appLogger.error('Reconnection failed:', error);
             // Wait a bit before showing modal again
             setTimeout(() => {
                 if (connectionLost) {
@@ -1178,7 +1181,7 @@ function monitoredFetch(url, options) {
             return response;
         })
         .catch(error => {
-            console.error('Fetch failed:', url, error);
+            appLogger.error('Fetch failed:', url, error);
             // Network error - backend likely down
             handleConnectionLost('fetch');
             throw error;
@@ -1193,7 +1196,7 @@ function startHealthCheck() {
 
         // Only check if analysis is complete and it's been a while
         if (analysisComplete && timeSinceLastSuccess > 3000 && !connectionLost) {
-            console.log('Performing health check...');
+            appLogger.info('Performing health check...');
             fetch('/api/module', { method: 'HEAD' })
                 .then(response => {
                     if (response.ok) {
@@ -1273,23 +1276,23 @@ function setupActivityListeners() {
     document.addEventListener('keydown', scheduleActivityCheck);
     document.addEventListener('click', scheduleActivityCheck);
 
-    console.log('Activity-based connection monitoring enabled');
+    appLogger.info('Activity-based connection monitoring enabled');
 }
 
 // Subscribe to workspace status events
 function subscribeToWorkspaceStatus() {
-    console.log('Creating EventSource for workspace_status...');
+    appLogger.info('Creating EventSource for workspace_status...');
     workspaceStatusSource = new EventSource('/api/subscribe/workspace_status');
 
     workspaceStatusSource.onopen = function() {
-        console.log('workspace_status EventSource connected, readyState:', workspaceStatusSource.readyState);
+        appLogger.info('workspace_status EventSource connected, readyState:', workspaceStatusSource.readyState);
     };
 
     workspaceStatusSource.onmessage = function(event) {
-        console.log('Raw workspace_status event data:', event.data);
+        appLogger.info('Raw workspace_status event data:', event.data);
         try {
             const sseEvent = JSON.parse(event.data);
-            console.log('Parsed SSE event:', sseEvent);
+            appLogger.info('Parsed SSE event:', sseEvent);
 
             // sseEvent.data is json.RawMessage (already a JSON string), parse it
             let status;
@@ -1298,9 +1301,9 @@ function subscribeToWorkspaceStatus() {
             } else {
                 status = sseEvent.data; // Already an object (shouldn't happen with json.RawMessage)
             }
-            console.log('Parsed status:', status);
+            appLogger.info('Parsed status:', status);
 
-            console.log('Workspace status:', status.state, '-', status.message);
+            appLogger.info('Workspace status:', status.state, '-', status.message);
 
             // Update watching indicator
             updateWatchingIndicator(status.watching);
@@ -1360,12 +1363,12 @@ function subscribeToWorkspaceStatus() {
                 }
             }
         } catch (e) {
-            console.error('Error processing workspace status:', e, 'Raw data:', event.data);
+            appLogger.error('Error processing workspace status:', e, 'Raw data:', event.data);
         }
     };
 
     workspaceStatusSource.onerror = function(error) {
-        console.error('Workspace status SSE error:', error, 'readyState:', workspaceStatusSource.readyState);
+        appLogger.error('Workspace status SSE error:', error, 'readyState:', workspaceStatusSource.readyState);
 
         // EventSource readyState: 0 = CONNECTING, 1 = OPEN, 2 = CLOSED
         if (workspaceStatusSource.readyState === 2) {
@@ -1390,7 +1393,7 @@ function subscribeToTargetGraph() {
                 graphData = sseEvent.data;
             }
 
-            console.log('Target graph update:', sseEvent.type, 'complete:', graphData.complete);
+            appLogger.info('Target graph update:', sseEvent.type, 'complete:', graphData.complete);
 
             // Load full graph data when available
             if (sseEvent.type === 'complete' && !graphDataLoaded) {
@@ -1398,12 +1401,12 @@ function subscribeToTargetGraph() {
                 graphDataLoaded = true;
             }
         } catch (e) {
-            console.error('Error processing target graph event:', e);
+            appLogger.error('Error processing target graph event:', e);
         }
     };
 
     targetGraphSource.onerror = function(error) {
-        console.error('Target graph SSE error:', error);
+        appLogger.error('Target graph SSE error:', error);
 
         // EventSource readyState: 0 = CONNECTING, 1 = OPEN, 2 = CLOSED
         if (targetGraphSource.readyState === 2) {
@@ -1430,7 +1433,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
         }
     });
 
-    console.log('Overlapping targets found:', Array.from(allOverlappingTargets.keys()));
+    appLogger.info('Overlapping targets found:', Array.from(allOverlappingTargets.keys()));
 
     // Mark nodes that have overlapping dependencies
     graph.nodes.forEach(node => {
@@ -1438,7 +1441,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
         if (allOverlappingTargets.has(nodeLabel)) {
             node.hasOverlap = true;
             node.overlappingWith = Array.from(allOverlappingTargets.get(nodeLabel));
-            console.log('Marked node as overlapping:', nodeLabel, 'with:', node.overlappingWith);
+            appLogger.info('Marked node as overlapping:', nodeLabel, 'with:', node.overlappingWith);
         }
     });
 
@@ -1451,7 +1454,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
                 if (node) {
                     node.hasOverlap = true;
                     node.overlappingTargets = Object.values(binary.overlappingDeps).flat();
-                    console.log('Marked shared library as overlapping:', binary.label);
+                    appLogger.info('Marked shared library as overlapping:', binary.label);
                 }
             }
         }
@@ -1460,37 +1463,37 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
 
 // Load full graph data from API
 async function loadGraphData() {
-    console.log('loadGraphData() called');
+    appLogger.info('loadGraphData() called');
     try {
         // Fetch module graph
         const graphResponse = await monitoredFetch('/api/module/graph');
-        console.log('Module graph response status:', graphResponse.status);
+        appLogger.info('Module graph response status:', graphResponse.status);
         if (graphResponse.ok) {
             packageGraph = await graphResponse.json();
-            console.log('Loaded graph with', packageGraph.nodes?.length, 'nodes');
+            appLogger.info('Loaded graph with', packageGraph.nodes?.length, 'nodes');
 
             // Render through backend lens API to ensure proper hierarchy and collapse states
             if (packageGraph && packageGraph.nodes && packageGraph.nodes.length > 0) {
-                console.log('Graph loaded, rendering through backend lens API');
+                appLogger.info('Graph loaded, rendering through backend lens API');
                 try {
                     const currentState = viewStateManager.getState();
                     const renderedGraph = await fetchRenderedGraphFromBackend(currentState);
                     displayDependencyGraph(renderedGraph);
                 } catch (error) {
-                    console.error('Error rendering graph via backend:', error);
+                    appLogger.error('Error rendering graph via backend:', error);
                 }
             } else {
-                console.warn('Package graph has no nodes or is invalid:', packageGraph);
+                appLogger.warn('Package graph has no nodes or is invalid:', packageGraph);
             }
         } else {
-            console.error('Failed to fetch module graph:', graphResponse.status, graphResponse.statusText);
+            appLogger.error('Failed to fetch module graph:', graphResponse.status, graphResponse.statusText);
         }
 
         // Fetch binary data
         const binariesResponse = await monitoredFetch('/api/binaries');
         if (binariesResponse.ok) {
             binaryData = await binariesResponse.json();
-            console.log('Loaded binary data:', binaryData);
+            appLogger.info('Loaded binary data:', binaryData);
 
             // Enrich the displayed graph with overlapping dependency information
             if (packageGraph && packageGraph.nodes) {
@@ -1501,7 +1504,7 @@ async function loadGraphData() {
                     const renderedGraph = await fetchRenderedGraphFromBackend(currentState);
                     displayDependencyGraph(renderedGraph);
                 } catch (error) {
-                    console.error('Error rendering graph via backend:', error);
+                    appLogger.error('Error rendering graph via backend:', error);
                 }
             }
         }
@@ -1536,17 +1539,17 @@ async function loadGraphData() {
                 const renderedGraph = await fetchRenderedGraphFromBackend(viewStateManager.getState());
                 displayDependencyGraph(renderedGraph);
             } catch (error) {
-                console.error('Error rendering graph via backend:', error);
+                appLogger.error('Error rendering graph via backend:', error);
             }
         }
     } catch (e) {
-        console.error('Error loading graph data:', e);
+        appLogger.error('Error loading graph data:', e);
     }
 }
 
 // Clean up connections when page is being unloaded
 window.addEventListener('beforeunload', function() {
-    console.log('Page unloading, closing SSE connections');
+    appLogger.info('Page unloading, closing SSE connections');
     if (workspaceStatusSource) {
         workspaceStatusSource.close();
         workspaceStatusSource = null;
@@ -1563,23 +1566,23 @@ window.addEventListener('beforeunload', function() {
 
 // Initialize subscriptions when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Starting SSE subscriptions...');
+    appLogger.info('Starting SSE subscriptions...');
 
     // Close any existing connections first (in case of reload)
     if (workspaceStatusSource) {
-        console.log('Closing existing workspace_status connection');
+        appLogger.info('Closing existing workspace_status connection');
         workspaceStatusSource.close();
         workspaceStatusSource = null;
     }
     if (targetGraphSource) {
-        console.log('Closing existing target_graph connection');
+        appLogger.info('Closing existing target_graph connection');
         targetGraphSource.close();
         targetGraphSource = null;
     }
 
     // Destroy any existing Cytoscape instance
     if (cy) {
-        console.log('Destroying existing Cytoscape instance');
+        appLogger.info('Destroying existing Cytoscape instance');
         cy.destroy();
         cy = null;
     }
@@ -1604,14 +1607,14 @@ async function showTargetDetails(targetLabel) {
         const response = await monitoredFetch(`/api/target/${encodedLabel}`);
         
         if (!response.ok) {
-            console.error('Failed to fetch target details');
+            appLogger.error('Failed to fetch target details');
             return;
         }
         
         const details = await response.json();
         displayTargetModal(details);
     } catch (error) {
-        console.error('Error fetching target details:', error);
+        appLogger.error('Error fetching target details:', error);
     }
 }
 
@@ -1779,7 +1782,7 @@ function runStableDagreLayout(animate = true, fit = false) {
 async function fetchRenderedGraphFromBackend(viewState) {
   // Cancel any pending request
   if (pendingRequestController) {
-    console.log('[App] Cancelling previous request');
+    appLogger.info('[App] Cancelling previous request');
     pendingRequestController.abort();
   }
 
@@ -1787,7 +1790,7 @@ async function fetchRenderedGraphFromBackend(viewState) {
   pendingRequestController = new AbortController();
   const signal = pendingRequestController.signal;
 
-  console.log('[App] Fetching rendered graph from backend lens API');
+  appLogger.info('[App] Fetching rendered graph from backend lens API');
 
   // Convert edgeRules.types from Set to Array for JSON serialization
   const serializeLens = (lens) => ({
@@ -1805,7 +1808,7 @@ async function fetchRenderedGraphFromBackend(viewState) {
     previousHash: currentGraphHash  // Send previous hash for diff-based updates
   };
 
-  console.log('[App] Request body:', JSON.stringify(requestBody, null, 2));
+  appLogger.info('[App] Request body:', JSON.stringify(requestBody, null, 2));
 
   const response = await fetch('/api/module/graph/lens', {
     method: 'POST',
@@ -1829,11 +1832,11 @@ async function fetchRenderedGraphFromBackend(viewState) {
   // Handle diff vs full graph response
   let renderedGraph;
   if (responseData.fullGraph) {
-    console.log('[App] Received full graph from backend:', responseData.fullGraph.nodes?.length, 'nodes,', responseData.fullGraph.edges?.length, 'edges');
+    appLogger.info('[App] Received full graph from backend:', responseData.fullGraph.nodes?.length, 'nodes,', responseData.fullGraph.edges?.length, 'edges');
     renderedGraph = responseData.fullGraph;
     currentGraphData = renderedGraph;
   } else if (responseData.diff) {
-    console.log('[App] Received diff from backend:',
+    appLogger.info('[App] Received diff from backend:',
       responseData.diff.addedNodes?.length || 0, 'added nodes,',
       responseData.diff.removedNodes?.length || 0, 'removed nodes,',
       responseData.diff.addedEdges?.length || 0, 'added edges,',
@@ -1901,9 +1904,9 @@ let previousViewState = null;
 viewStateManager.addListener(async (newState) => {
   if (!packageGraph) return; // Wait for initial load
 
-  console.log('[App] State changed, rendering with backend API');
-  console.log('[App] BaseSet:', newState.defaultLens.baseSet);
-  console.log('[App] Selected nodes:', Array.from(newState.selectedNodes));
+  appLogger.info('[App] State changed, rendering with backend API');
+  appLogger.info('[App] BaseSet:', newState.defaultLens.baseSet);
+  appLogger.info('[App] Selected nodes:', Array.from(newState.selectedNodes));
 
   // Deep clone the state to avoid reference issues
   previousViewState = {
@@ -1922,12 +1925,12 @@ viewStateManager.addListener(async (newState) => {
   } catch (error) {
     // Ignore AbortError - this happens when a new request cancels the previous one
     if (error.name === 'AbortError') {
-      console.log('[App] Request cancelled (new request started)');
+      appLogger.info('[App] Request cancelled (new request started)');
       return;
     }
 
-    console.error('[App] Error fetching rendered graph from backend:', error);
-    console.error('[App] Backend lens rendering failed - this is a fatal error');
+    appLogger.error('[App] Error fetching rendered graph from backend:', error);
+    appLogger.error('[App] Backend lens rendering failed - this is a fatal error');
   }
 });
 
@@ -1949,7 +1952,7 @@ viewStateManager.addListener(async (newState) => {
 
 // Populate the tree browser
 function populateTreeBrowser(data) {
-    console.log('Populating navigation with data:', data);
+    appLogger.info('Populating navigation with data:', data);
 
     // Populate binaries list
     const binariesItems = document.getElementById('binariesItems');

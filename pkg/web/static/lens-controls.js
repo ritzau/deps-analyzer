@@ -1,3 +1,6 @@
+// Use structured logger (loaded from logger.js)
+const lensLogger = new Logger();
+
 /**
  * Lens Controls
  *
@@ -73,7 +76,7 @@ function setupDefaultLensControls() {
       }
 
       // Update lens configuration
-      console.log('[LensControls] Base set type changed to:', type);
+      lensLogger.debug('[LensControls] Base set type changed to:', type);
       const currentLens = cloneLens(viewStateManager.getState().defaultLens);
       currentLens.baseSet.type = type;
 
@@ -84,7 +87,7 @@ function setupDefaultLensControls() {
         }
       }
 
-      console.log('[LensControls] Updating default lens with new base set');
+      lensLogger.debug('[LensControls] Updating default lens with new base set');
       viewStateManager.updateDefaultLens(currentLens);
     });
   }
@@ -110,7 +113,7 @@ function setupDefaultLensControls() {
     const checkbox = document.getElementById(id);
     if (checkbox) {
       checkbox.addEventListener('change', () => {
-        console.log('[LensControls] Edge type checkbox changed:', id);
+        lensLogger.debug('[LensControls] Edge type checkbox changed:', id);
         const types = new Set();
 
         if (document.getElementById('showStatic')?.checked) types.add('static');
@@ -122,7 +125,7 @@ function setupDefaultLensControls() {
         // Always keep system_link
         types.add('system_link');
 
-        console.log('[LensControls] New edge types:', Array.from(types));
+        lensLogger.debug('[LensControls] New edge types:', Array.from(types));
 
         // Update both default and detail lenses to use same edge rules (atomic)
         const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
@@ -140,7 +143,7 @@ function setupDefaultLensControls() {
   const collapseEdgeTypesCheckbox = document.getElementById('collapseEdgeTypes');
   if (collapseEdgeTypesCheckbox) {
     collapseEdgeTypesCheckbox.addEventListener('change', () => {
-      console.log('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
+      lensLogger.debug('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
 
       // Update both default and detail lenses to use same edge rules (atomic)
       const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
@@ -159,7 +162,7 @@ function setupDefaultLensControls() {
     radio.addEventListener('change', (e) => {
       if (e.target.checked) {
         const level = parseInt(e.target.value);
-        console.log('[LensControls] Collapse level changed to:', level);
+        lensLogger.debug('[LensControls] Collapse level changed to:', level);
         const currentLens = cloneLens(viewStateManager.getState().defaultLens);
 
         // Update the collapse level in the distance rule

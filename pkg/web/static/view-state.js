@@ -1,3 +1,6 @@
+// Use structured logger (loaded from logger.js)
+const viewStateLogger = new Logger();
+
 /**
  * View State Manager
  *
@@ -39,8 +42,8 @@ class ViewStateManager {
    * @param {LensConfig} lens - New default lens
    */
   updateDefaultLens(lens) {
-    console.log('[ViewState] updateDefaultLens called');
-    console.log('[ViewState] New lens edge types:', Array.from(lens.edgeRules.types));
+    viewStateLogger.debug('[ViewState] updateDefaultLens called');
+    viewStateLogger.debug('[ViewState] New lens edge types:', Array.from(lens.edgeRules.types));
     this.state.defaultLens = lens;
     this.notifyListeners();
   }
@@ -61,7 +64,7 @@ class ViewStateManager {
    * @param {LensConfig} detailLens - New detail lens
    */
   updateBothLenses(defaultLens, detailLens) {
-    console.log('[ViewState] updateBothLenses called (atomic update)');
+    viewStateLogger.debug('[ViewState] updateBothLenses called (atomic update)');
     this.state.defaultLens = defaultLens;
     this.state.detailLens = detailLens;
     this.notifyListeners(); // Only notify once
@@ -72,7 +75,7 @@ class ViewStateManager {
    * @param {string[]} nodeIds - Array of node IDs to select
    */
   setSelection(nodeIds) {
-    console.log('[ViewState] setSelection called with:', nodeIds);
+    viewStateLogger.debug('[ViewState] setSelection called with:', nodeIds);
     this.state.selectedNodes = new Set(nodeIds);
     this.notifyListeners();
   }
@@ -82,16 +85,16 @@ class ViewStateManager {
    * @param {string} nodeId - Node ID to toggle
    */
   toggleSelection(nodeId) {
-    console.log('[ViewState] toggleSelection called with nodeId:', nodeId);
+    viewStateLogger.debug('[ViewState] toggleSelection called with nodeId:', nodeId);
 
     if (this.state.selectedNodes.has(nodeId)) {
       this.state.selectedNodes.delete(nodeId);
-      console.log('[ViewState] Removed from selection:', nodeId);
+      viewStateLogger.debug('[ViewState] Removed from selection:', nodeId);
     } else {
       this.state.selectedNodes.add(nodeId);
-      console.log('[ViewState] Added to selection:', nodeId);
+      viewStateLogger.debug('[ViewState] Added to selection:', nodeId);
     }
-    console.log('[ViewState] Selected nodes now:', Array.from(this.state.selectedNodes));
+    viewStateLogger.debug('[ViewState] Selected nodes now:', Array.from(this.state.selectedNodes));
     this.notifyListeners();
   }
 
@@ -143,7 +146,7 @@ class ViewStateManager {
       try {
         callback(this.state);
       } catch (error) {
-        console.error('Error in view state listener:', error);
+        viewStateLogger.error('Error in view state listener:', error);
       }
     });
   }
@@ -164,17 +167,17 @@ class ViewStateManager {
     const newBase = newState.defaultLens.baseSet;
 
     if (oldBase.type !== newBase.type) {
-      console.log('[ViewState] Full re-layout: baseSet type changed');
+      viewStateLogger.debug('[ViewState] Full re-layout: baseSet type changed');
       return true;
     }
 
     if (oldBase.binaryLabel !== newBase.binaryLabel) {
-      console.log('[ViewState] Full re-layout: binaryLabel changed');
+      viewStateLogger.debug('[ViewState] Full re-layout: binaryLabel changed');
       return true;
     }
 
     if (oldBase.packagePath !== newBase.packagePath) {
-      console.log('[ViewState] Full re-layout: packagePath changed');
+      viewStateLogger.debug('[ViewState] Full re-layout: packagePath changed');
       return true;
     }
 
@@ -182,13 +185,13 @@ class ViewStateManager {
     const oldSelection = Array.from(oldState.selectedNodes).sort().join(',');
     const newSelection = Array.from(newState.selectedNodes).sort().join(',');
     if (oldSelection !== newSelection) {
-      console.log('[ViewState] Full re-layout: selected nodes changed');
+      viewStateLogger.debug('[ViewState] Full re-layout: selected nodes changed');
       return true;
     }
 
     // Changes to collapse levels, edge types, or visibility settings do NOT require full re-layout
     // These are visual changes that can use cached positions
-    console.log('[ViewState] No full re-layout needed - visual change only');
+    viewStateLogger.debug('[ViewState] No full re-layout needed - visual change only');
     return false;
   }
 
