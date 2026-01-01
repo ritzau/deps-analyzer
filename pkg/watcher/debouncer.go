@@ -2,7 +2,7 @@ package watcher
 
 import (
 	"context"
-	"log"
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"sync"
 	"time"
 )
@@ -45,7 +45,7 @@ func (d *Debouncer) run(ctx context.Context) {
 			return
 		}
 
-		log.Printf("[DEBOUNCE] Flushing %d accumulated events", eventCount)
+		logging.Info("[DEBOUNCE] Flushing %d accumulated events", eventCount)
 
 		// Send events in order: BUILD files first (need full analysis), then others
 		if paths, ok := accumulated[ChangeTypeBuildFile]; ok && len(paths) > 0 {

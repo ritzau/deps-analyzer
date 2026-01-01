@@ -3,7 +3,7 @@ package watcher
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,15 +59,15 @@ func NewFileWatcher(workspace string) (*FileWatcher, error) {
 func (fw *FileWatcher) Start(ctx context.Context) error {
 	// Find and watch all directories containing BUILD files
 	if err := fw.watchBuildFiles(); err != nil {
-		log.Printf("[WATCHER] Warning: Failed to watch BUILD files: %v", err)
+		logging.Info("[WATCHER] Warning: Failed to watch BUILD files: %v", err)
 	}
 
 	// Watch bazel-out directory if it exists
 	if err := fw.watchBazelOut(); err != nil {
-		log.Printf("[WATCHER] Warning: Failed to watch bazel-out: %v", err)
+		logging.Info("[WATCHER] Warning: Failed to watch bazel-out: %v", err)
 	}
 
-	log.Printf("[WATCHER] Started watching workspace: %s", fw.workspace)
+	logging.Info("[WATCHER] Started watching workspace: %s", fw.workspace)
 
 	// Process events
 	go fw.processEvents(ctx)
@@ -105,11 +105,11 @@ func (fw *FileWatcher) watchBuildFiles() error {
 	// Add all directories to watcher
 	for dir := range buildDirs {
 		if err := fw.watcher.Add(dir); err != nil {
-			log.Printf("[WATCHER] Warning: Failed to watch directory %s: %v", dir, err)
+			logging.Info("[WATCHER] Warning: Failed to watch directory %s: %v", dir, err)
 		}
 	}
 
-	log.Printf("[WATCHER] Monitoring %d directories for BUILD files", len(buildDirs))
+	logging.Info("[WATCHER] Monitoring %d directories for BUILD files", len(buildDirs))
 	return nil
 }
 
@@ -119,7 +119,7 @@ func (fw *FileWatcher) watchBazelOut() error {
 
 	// Check if bazel-out exists
 	if _, err := os.Stat(bazelOut); os.IsNotExist(err) {
-		log.Printf("[WATCHER] bazel-out directory does not exist yet, skipping")
+		logging.Info("[WATCHER] bazel-out directory does not exist yet, skipping")
 		return nil
 	}
 
@@ -134,7 +134,7 @@ func (fw *FileWatcher) watchBazelOut() error {
 		return fmt.Errorf("failed to watch bazel-out: %w", err)
 	}
 
-	log.Printf("[WATCHER] Monitoring bazel-out at: %s", resolvedPath)
+	logging.Info("[WATCHER] Monitoring bazel-out at: %s", resolvedPath)
 	return nil
 }
 
@@ -209,7 +209,7 @@ func (fw *FileWatcher) processEvents(ctx context.Context) {
 			if !ok {
 				return
 			}
-			log.Printf("[WATCHER] Error: %v", err)
+			logging.Info("[WATCHER] Error: %v", err)
 		}
 	}
 }

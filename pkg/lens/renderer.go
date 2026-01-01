@@ -2,7 +2,7 @@ package lens
 
 import (
 	"fmt"
-	"log"
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"sort"
 	"strings"
 )
@@ -10,8 +10,8 @@ import (
 // RenderGraph applies lens transformations to raw graph data
 // This is the main entry point for the lens rendering pipeline
 func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selectedNodes []string) (*GraphData, error) {
-	log.Printf("[LensRenderer] Rendering graph with %d nodes", len(rawGraph.Nodes))
-	log.Printf("[LensRenderer] Selected nodes: %v", selectedNodes)
+	logging.Info("[LensRenderer] Rendering graph with %d nodes", len(rawGraph.Nodes))
+	logging.Info("[LensRenderer] Selected nodes: %v", selectedNodes)
 
 	// 1. Compute distances from selected nodes using BFS
 	distances := ComputeDistances(rawGraph, selectedNodes)
@@ -25,7 +25,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 			detailCount++
 		}
 	}
-	log.Printf("[LensRenderer] Nodes using detail lens: %d", detailCount)
+	logging.Info("[LensRenderer] Nodes using detail lens: %d", detailCount)
 
 	// 3. Apply lens rules to determine visibility and collapse state
 	nodeStates := applyLensRules(rawGraph, nodeLensMap, distances, defaultLens, detailLens)
@@ -64,7 +64,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 			if rule != nil {
 				targetTypes = rule.NodeVisibility.TargetTypes
 			}
-			log.Printf("[SyntheticPackage] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
+			logging.Info("[SyntheticPackage] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
 				pkgNode.ID, distance, lensType, rule != nil, targetTypes, visible)
 
 			nodeStates[pkgNode.ID] = &NodeState{
@@ -84,7 +84,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 	// 6. Filter to only visible nodes
 	visibleNodes := filterVisibleNodes(allNodes, nodeStates)
 
-	log.Printf("[LensRenderer] Visible nodes after filtering: %d", len(visibleNodes))
+	logging.Info("[LensRenderer] Visible nodes after filtering: %d", len(visibleNodes))
 
 	// 7. Build hierarchy relationships for visible nodes
 	hierarchicalNodes := buildHierarchy(visibleNodes, nodeStates)
@@ -92,7 +92,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 	// 8. Filter out children of collapsed nodes
 	expandedNodes := filterCollapsedChildren(hierarchicalNodes, nodeStates)
 
-	log.Printf("[LensRenderer] Nodes after collapse filtering: %d", len(expandedNodes))
+	logging.Info("[LensRenderer] Nodes after collapse filtering: %d", len(expandedNodes))
 
 	// 9. Rebuild hierarchy with filtered nodes
 	finalNodes := buildHierarchy(expandedNodes, nodeStates)
@@ -132,18 +132,18 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 				}
 			} else {
 				// Log nodes without state
-				log.Printf("[LensRenderer] WARNING: Node %s (type=%s) has no state!", finalNodes[i].ID, finalNodes[i].Type)
+				logging.Info("[LensRenderer] WARNING: Node %s (type=%s) has no state!", finalNodes[i].ID, finalNodes[i].Type)
 				if finalNodes[i].Type == "package" {
 					packagesWithoutState++
 				}
 			}
 		}
 		if packagesWithDistance > 0 || packagesWithoutState > 0 {
-			log.Printf("[LensRenderer] Package distance labels: %d with state, %d without state", packagesWithDistance, packagesWithoutState)
+			logging.Info("[LensRenderer] Package distance labels: %d with state, %d without state", packagesWithDistance, packagesWithoutState)
 		}
 	}
 
-	log.Printf("[LensRenderer] Final result: %d nodes, %d edges", len(finalNodes), len(visibleEdges))
+	logging.Info("[LensRenderer] Final result: %d nodes, %d edges", len(finalNodes), len(visibleEdges))
 
 	return &GraphData{
 		Nodes: finalNodes,
@@ -207,7 +207,7 @@ func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances m
 			if rule != nil {
 				targetTypes = rule.NodeVisibility.TargetTypes
 			}
-			log.Printf("[ApplyLensRules] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
+			logging.Info("[ApplyLensRules] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
 				node.ID, distance, lensType, rule != nil, targetTypes, visible)
 		}
 
@@ -525,7 +525,7 @@ func filterCollapsedChildren(nodes []GraphNode, nodeStates map[string]*NodeState
 	}
 
 	if filtered > 0 {
-		log.Printf("[Lens] Filtered out %d nodes with collapsed/invisible ancestors (kept %d nodes)", filtered, len(result))
+		logging.Info("[Lens] Filtered out %d nodes with collapsed/invisible ancestors (kept %d nodes)", filtered, len(result))
 	}
 
 	return result
