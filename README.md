@@ -14,17 +14,27 @@ A tool for analyzing and visualizing C++ dependencies in Bazel projects, with su
 
 ## Installation
 
+### Quick Install (Recommended)
+
+```bash
+go install github.com/ritzau/deps-analyzer/cmd/deps-analyzer@latest
+```
+
+This installs the `deps-analyzer` binary to `$GOPATH/bin` (usually `~/go/bin`). Make sure `$GOPATH/bin` is in your `$PATH`.
+
+### Build from Source
+
+```bash
+git clone https://github.com/ritzau/deps-analyzer.git
+cd deps-analyzer
+go build -o deps-analyzer cmd/deps-analyzer/main.go
+```
+
 ### Prerequisites
 
 - Go 1.21 or later
 - Bazel 7.0 or later
 - A Bazel workspace with C++ targets
-
-### Build from Source
-
-```bash
-go build -o deps-analyzer cmd/deps-analyzer/main.go
-```
 
 ## Usage
 
@@ -167,10 +177,14 @@ cd ..
 ./deps-analyzer --web --watch --workspace=./example
 ```
 
-## License
-
-[Your License Here]
+See [example/README.md](example/README.md) for details on the test cases and intentional problems.
 
 ## Contributing
 
 Contributions welcome! Please open an issue or pull request.
+
+For development documentation, architecture decisions, and implementation details, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+## License
+
+[Your License Here]
