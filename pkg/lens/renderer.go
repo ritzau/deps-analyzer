@@ -585,7 +585,26 @@ func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]
 			continue
 		}
 
-		// Skip self-edges
+		// Normalize endpoints to same level (package vs target)
+		// If one is a package and the other is a target, elevate the target to its package
+		sourceIsPackage := !strings.Contains(actualSource, ":")
+		targetIsPackage := !strings.Contains(actualTarget, ":")
+
+		if sourceIsPackage && !targetIsPackage {
+			// Source is package, target is target - elevate target to package
+			targetPackage := childToParentMap[actualTarget]
+			if targetPackage != "" && includedNodeIds[targetPackage] {
+				actualTarget = targetPackage
+			}
+		} else if !sourceIsPackage && targetIsPackage {
+			// Target is package, source is target - elevate source to package
+			sourcePackage := childToParentMap[actualSource]
+			if sourcePackage != "" && includedNodeIds[sourcePackage] {
+				actualSource = sourcePackage
+			}
+		}
+
+		// Skip self-edges (after normalization)
 		if actualSource == actualTarget {
 			continue
 		}

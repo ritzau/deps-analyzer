@@ -1887,6 +1887,22 @@ function applyGraphDiff(currentGraph, diff) {
 // Track previous state for detecting when full re-layout is needed
 let previousViewState = null;
 
+// Update navigation item highlighting based on selection
+function updateNavigationHighlighting(selectedNodes) {
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(item => {
+    // Check if this item's node ID is in the selection
+    const nodeId = item.dataset.nodeId;
+    const isSelected = nodeId && selectedNodes.has(nodeId);
+
+    if (isSelected) {
+      item.classList.add('selected');
+    } else {
+      item.classList.remove('selected');
+    }
+  });
+}
+
 // Listen for state changes and re-render graph
 viewStateManager.addListener(async (newState) => {
   if (!packageGraph) return; // Wait for initial load
@@ -1894,6 +1910,9 @@ viewStateManager.addListener(async (newState) => {
   appLogger.debug('[App] State changed, rendering with backend API');
   appLogger.debug('[App] BaseSet:', newState.defaultLens.baseSet);
   appLogger.debug('[App] Selected nodes:', Array.from(newState.selectedNodes));
+
+  // Update navigation highlighting
+  updateNavigationHighlighting(newState.selectedNodes);
 
   // Deep clone the state to avoid reference issues
   previousViewState = {
@@ -1948,15 +1967,19 @@ function populateTreeBrowser(data) {
         binaryData.forEach(binary => {
             const item = document.createElement('div');
             item.className = 'nav-item';
+            item.dataset.nodeId = binary.label;  // Store full node ID for selection matching
             const icon = binary.kind === 'cc_binary' ? '🔧' : '📚';
             item.textContent = `${icon} ${simplifyLabel(binary.label)}`;
 
-            // Click selects this binary
-            item.onclick = () => {
-                viewStateManager.setSelection([binary.label]);
-                // Highlight in tree
-                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('selected'));
-                item.classList.add('selected');
+            // Click selects this binary (Cmd/Ctrl+click for multi-select)
+            item.onclick = (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    // Multi-select: toggle this item
+                    viewStateManager.toggleSelection(binary.label);
+                } else {
+                    // Single select: replace selection
+                    viewStateManager.setSelection([binary.label]);
+                }
             };
 
             binariesItems.appendChild(item);
@@ -1978,14 +2001,18 @@ function populateTreeBrowser(data) {
             .forEach(node => {
                 const item = document.createElement('div');
                 item.className = 'nav-item';
+                item.dataset.nodeId = node.label;  // Store full node ID for selection matching
                 item.textContent = `📦 ${simplifyLabel(node.label)}`;
 
-                // Click selects this target
-                item.onclick = () => {
-                    viewStateManager.setSelection([node.label]);
-                    // Highlight in tree
-                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('selected'));
-                    item.classList.add('selected');
+                // Click selects this target (Cmd/Ctrl+click for multi-select)
+                item.onclick = (e) => {
+                    if (e.ctrlKey || e.metaKey) {
+                        // Multi-select: toggle this item
+                        viewStateManager.toggleSelection(node.label);
+                    } else {
+                        // Single select: replace selection
+                        viewStateManager.setSelection([node.label]);
+                    }
                 };
 
                 targetsItems.appendChild(item);

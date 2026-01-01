@@ -2,9 +2,9 @@
 
 ## Prioritized backlog
 
-1. Node selection should also work in the targets list (including ctrl+click).
-   While doing this we need an alternative to ctrl+click since ctrl+click on
-   macOS is equivalent to secondary click.
+1. Set up the frontend logger to log the events back to the backend and there
+   they are logged with the backend logs. But make sure it is easy to separate
+   them.
 
 2. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
@@ -91,52 +91,152 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ Navigation multi-select and mixed-level edge fix (DONE)
+
+Fixed two issues with node selection and edge rendering.
+
+**Problem 1: No multi-select in navigation lists**
+
+Navigation sidebar (binaries and targets lists) only supported single-select, and Ctrl+click on macOS triggers right-click menu instead of multi-select.
+
+**Solution**: Added Cmd/Ctrl+click support for multi-select in navigation lists:
+- Simple click replaces selection with clicked item
+- Cmd+click (⌘ on macOS) or Ctrl+click toggles item in/out of selection
+- Added `data-node-id` attribute to navigation items for accurate matching
+- Implemented `updateNavigationHighlighting()` to sync `.selected` class with view state
+- Visual feedback shows which items are currently selected
+
+**Implementation**: Modified [pkg/web/static/app.js](pkg/web/static/app.js):
+- Updated binaries list click handler (lines 1975-1982)
+- Updated targets list click handler (lines 2008-2015)
+- Added navigation highlighting sync (lines 1891-1904)
+
+**Problem 2: Mixed-level edges (package→target)**
+
+When selecting `//main:test_app`, saw edge from `//audio` (package) to `//util:util` (target), which is inconsistent. Edges should connect nodes at the same hierarchy level.
+
+**Root Cause**: When finding visible ancestors for edge endpoints during aggregation, one endpoint might resolve to a package while the other resolves to a target, creating mixed-level edges like `//audio → //util:util`.
+
+**Solution**: Added endpoint normalization after ancestor resolution. If one endpoint is a package and the other is a target, elevate the target to its package level to ensure consistency.
+
+**Implementation**: Modified [pkg/lens/renderer.go:588-610](pkg/lens/renderer.go#L588-L610):
+```go
+// Normalize endpoints to same level (package vs target)
+sourceIsPackage := !strings.Contains(actualSource, ":")
+targetIsPackage := !strings.Contains(actualTarget, ":")
+
+if sourceIsPackage && !targetIsPackage {
+    // Elevate target to package
+    targetPackage := childToParentMap[actualTarget]
+    if targetPackage != "" && includedNodeIds[targetPackage] {
+        actualTarget = targetPackage
+    }
+} else if !sourceIsPackage && targetIsPackage {
+    // Elevate source to package
+    sourcePackage := childToParentMap[actualSource]
+    if sourcePackage != "" && includedNodeIds[sourcePackage] {
+        actualSource = sourcePackage
+    }
+}
+```
+
+**Result**:
+- Navigation lists support Cmd/Ctrl+click multi-select with visual feedback ✓
+- macOS users can use Cmd+click (standard macOS modifier) ✓
+- Edges are always at consistent hierarchy levels (package→package or target→target) ✓
+- Fixed edge: `//audio → //util` (both packages) instead of `//audio → //util:util` ✓
+
+## ✅ Atomic state updates for performance (DONE)
+
+Fixed redundant backend requests when changing default lens settings.
+
+**Problem**: When changing hierarchy level, base set type, or binary selection, the UI triggered 3-4 backend requests instead of 1, causing unnecessary load and delays.
+
+**Root Cause**: `clearSelection()` and `updateDefaultLens()` each called `notifyListeners()` separately, triggering independent backend fetches. These operations needed to happen atomically but were executed as two separate state mutations.
+
+**Solution**: Added `updateDefaultLensAndClearSelection()` method that batches both state updates before calling `notifyListeners()` once.
+
+**Implementation**:
+- Added atomic update method to [pkg/web/static/view-state.js:109-119](pkg/web/static/view-state.js#L109-L119)
+- Updated base set change handler in [pkg/web/static/lens-controls.js:93](pkg/web/static/lens-controls.js#L93)
+- Updated collapse level change handler in [pkg/web/static/lens-controls.js:187](pkg/web/static/lens-controls.js#L187)
+- Updated binary selector change handler in [pkg/web/static/lens-controls.js:298](pkg/web/static/lens-controls.js#L298)
+
+**Result**: Changing hierarchy level or other major lens settings now triggers exactly 1 backend request instead of 3-4, improving performance and reducing server load.
+
 ## ✅ File node selection redirect to parent target (DONE)
 
 Fixed confusing behavior when selecting file nodes in the graph.
 
-**Problem**: Selecting a file node (like `engine.cc` or `orphaned.cc`) resulted in a weird state where:
+**Problem**: Selecting a file node (like `engine.cc` or `orphaned.cc`) resulted
+in a weird state where:
+
 - No files were visible in the graph
 - Neighbor packages remained visible but their targets were hidden
 - The graph appeared broken or incomplete
 
-**Root Cause**: Files don't have dependencies - their parent targets do. The lens system computes distances and visibility based on dependencies, so when a file was selected, it had no outgoing edges to follow. This caused the BFS distance computation to not reach other nodes properly, resulting in an inconsistent visibility state.
+**Root Cause**: Files don't have dependencies - their parent targets do. The
+lens system computes distances and visibility based on dependencies, so when a
+file was selected, it had no outgoing edges to follow. This caused the BFS
+distance computation to not reach other nodes properly, resulting in an
+inconsistent visibility state.
 
-**Solution**: Redirect file node selections to their parent target automatically. When a user clicks on a file node in the graph, the selection logic now:
-1. Detects if the clicked node is a file type (`source_file`, `header_file`, `uncovered_source`, `uncovered_header`)
+**Solution**: Redirect file node selections to their parent target
+automatically. When a user clicks on a file node in the graph, the selection
+logic now:
+
+1. Detects if the clicked node is a file type (`source_file`, `header_file`,
+   `uncovered_source`, `uncovered_header`)
 2. Extracts the parent target ID from the file node's `parent` field
 3. Selects the parent target instead of the file itself
-4. Logs the redirection for debugging: `File node clicked - redirecting to parent target`
+4. Logs the redirection for debugging:
+   `File node clicked - redirecting to parent target`
 
 This makes semantic sense because:
+
 - Files are implementation details of targets
 - Users likely want to see what the target depends on, not the individual file
 - Target nodes have proper dependency edges that the lens system can follow
 - Prevents the confusing "broken graph" state entirely
 
-**Implementation**: Modified [pkg/web/static/app.js:964-993](pkg/web/static/app.js#L964-L993) node click handler:
+**Implementation**: Modified
+[pkg/web/static/app.js:964-993](pkg/web/static/app.js#L964-L993) node click
+handler:
+
 ```javascript
-const isFileNode = nodeType === 'source_file' || nodeType === 'header_file' ||
-                  nodeType === 'uncovered_source' || nodeType === 'uncovered_header';
+const isFileNode =
+  nodeType === "source_file" ||
+  nodeType === "header_file" ||
+  nodeType === "uncovered_source" ||
+  nodeType === "uncovered_header";
 
 if (isFileNode) {
-    const parentId = node.data('parent');
-    if (parentId) {
-        appLogger.info('File node clicked - redirecting to parent target:', {file: nodeId, parent: parentId});
-        nodeId = parentId;
-    }
+  const parentId = node.data("parent");
+  if (parentId) {
+    appLogger.info("File node clicked - redirecting to parent target:", {
+      file: nodeId,
+      parent: parentId,
+    });
+    nodeId = parentId;
+  }
 }
 ```
 
-Also added defensive filtering in navigation tree to prevent file nodes from appearing in the targets sidebar list (only packages, targets, and binaries should be listed there).
+Also added defensive filtering in navigation tree to prevent file nodes from
+appearing in the targets sidebar list (only packages, targets, and binaries
+should be listed there).
 
 **Example Behavior**:
+
 - Click on `engine.cc` file → automatically selects `//core:core` target instead
 - Click on uncovered `orphaned.cc` → selects `//util:util` target
-- The selected target's dependencies are then shown normally with proper visibility
+- The selected target's dependencies are then shown normally with proper
+  visibility
 - Works with both simple click and Ctrl+click (toggle)
 
-**Result**: File nodes can still be visible in the graph (when their parent target is selected), but clicking them now produces sensible behavior instead of breaking the visualization.
+**Result**: File nodes can still be visible in the graph (when their parent
+target is selected), but clicking them now produces sensible behavior instead of
+breaking the visualization.
 
 ## ✅ Uncovered files visibility fixes (DONE)
 
@@ -144,35 +244,63 @@ Fixed two related bugs with uncovered file visibility in the graph.
 
 **Problem 1: Files appeared at top level instead of in packages**
 
-Uncovered files (files discovered by git but not included in any Bazel target) were shown as orphaned nodes at the root level instead of being nested under their package nodes (e.g., `//util`, `//cycle_demo`).
+Uncovered files (files discovered by git but not included in any Bazel target)
+were shown as orphaned nodes at the root level instead of being nested under
+their package nodes (e.g., `//util`, `//cycle_demo`).
 
-**Root Cause 1**: The uncovered file handling code in `buildModuleGraph()` set parent references correctly, but the lens renderer's `extractParentID()` function only handled standard Bazel node IDs (starting with `//` and using `:` separators). When it encountered uncovered file IDs like `uncovered:cycle_demo/file_a.h`, it returned an empty string, clearing the parent field.
+**Root Cause 1**: The uncovered file handling code in `buildModuleGraph()` set
+parent references correctly, but the lens renderer's `extractParentID()`
+function only handled standard Bazel node IDs (starting with `//` and using `:`
+separators). When it encountered uncovered file IDs like
+`uncovered:cycle_demo/file_a.h`, it returned an empty string, clearing the
+parent field.
 
-**Fix 1**: Modified [pkg/lens/distance.go:173-201](pkg/lens/distance.go#L173-L201) `extractParentID()` function to handle uncovered file IDs specially:
+**Fix 1**: Modified
+[pkg/lens/distance.go:173-201](pkg/lens/distance.go#L173-L201)
+`extractParentID()` function to handle uncovered file IDs specially:
+
 - Detects IDs with `uncovered:` prefix
-- Extracts package path from file path (e.g., `uncovered:util/orphaned.cc` → `//util`)
+- Extracts package path from file path (e.g., `uncovered:util/orphaned.cc` →
+  `//util`)
 - Uses `strings.LastIndex("/")` to find package boundary
 - Returns empty string only for root-level files without a package
 
-Also updated [pkg/web/server.go:877-944](pkg/web/server.go#L877-L944) `buildModuleGraph()` to ensure package nodes exist for packages containing only uncovered files (no targets).
+Also updated [pkg/web/server.go:877-944](pkg/web/server.go#L877-L944)
+`buildModuleGraph()` to ensure package nodes exist for packages containing only
+uncovered files (no targets).
 
 **Problem 2: Files didn't show when package was selected**
 
-When a package like `//util` was selected, only the targets within that package were shown. Uncovered files (e.g., `orphaned.cc`) were not included in the selection expansion, so they remained hidden even though their parent package was selected.
+When a package like `//util` was selected, only the targets within that package
+were shown. Uncovered files (e.g., `orphaned.cc`) were not included in the
+selection expansion, so they remained hidden even though their parent package
+was selected.
 
-**Root Cause 2**: The `expandPackagesToTargets()` function only looked for target nodes (IDs with `:` separators) when expanding a package selection. It didn't consider uncovered files which have IDs like `uncovered:util/orphaned.cc`.
+**Root Cause 2**: The `expandPackagesToTargets()` function only looked for
+target nodes (IDs with `:` separators) when expanding a package selection. It
+didn't consider uncovered files which have IDs like
+`uncovered:util/orphaned.cc`.
 
-**Fix 2**: Modified [pkg/lens/distance.go:34-91](pkg/lens/distance.go#L34-L91) `expandPackagesToTargets()` to also include uncovered files when expanding package selections:
-- When package `//util` is selected, function now finds both targets (`//util:util`) and uncovered files (`uncovered:util/orphaned.cc`)
+**Fix 2**: Modified [pkg/lens/distance.go:34-91](pkg/lens/distance.go#L34-L91)
+`expandPackagesToTargets()` to also include uncovered files when expanding
+package selections:
+
+- When package `//util` is selected, function now finds both targets
+  (`//util:util`) and uncovered files (`uncovered:util/orphaned.cc`)
 - Adds both to the initial BFS queue at distance 0
-- Ensures uncovered files are visible alongside regular target files when exploring a package
+- Ensures uncovered files are visible alongside regular target files when
+  exploring a package
 
 **Result**:
-- All uncovered files correctly appear as children of their package nodes in the graph hierarchy ✓
+
+- All uncovered files correctly appear as children of their package nodes in the
+  graph hierarchy ✓
 - Uncovered files are visible when their package is selected ✓
-- Makes uncovered files much more discoverable and useful for understanding which files are not included in any Bazel targets
+- Makes uncovered files much more discoverable and useful for understanding
+  which files are not included in any Bazel targets
 
 **Testing**: Verified with example workspace:
+
 - `uncovered:cycle_demo/file_a.h` → parent: `//cycle_demo` ✓
 - `uncovered:cycle_demo/file_b.h` → parent: `//cycle_demo` ✓
 - `uncovered:util/orphaned.cc` → parent: `//util` ✓
@@ -183,20 +311,36 @@ When a package like `//util` was selected, only the targets within that package 
 
 Fixed missing edges when showing only packages in the graph (collapseLevel: 1).
 
-**Problem**: When the default lens was set to show only packages (hiding targets and files), no edges were displayed between packages. The graph showed 8 package nodes but 0 edges, making it impossible to understand the high-level dependency structure.
+**Problem**: When the default lens was set to show only packages (hiding targets
+and files), no edges were displayed between packages. The graph showed 8 package
+nodes but 0 edges, making it impossible to understand the high-level dependency
+structure.
 
-**Root Cause**: The `findVisibleAncestor()` function was designed to skip package nodes when aggregating edges (from an earlier bug fix to prevent synthetic package edges when targets are visible). However, when ONLY packages are visible, this caused all edges to be dropped since the function couldn't find any visible non-package ancestors.
+**Root Cause**: The `findVisibleAncestor()` function was designed to skip
+package nodes when aggregating edges (from an earlier bug fix to prevent
+synthetic package edges when targets are visible). However, when ONLY packages
+are visible, this caused all edges to be dropped since the function couldn't
+find any visible non-package ancestors.
 
-**Previous Context**: An earlier fix prevented package nodes from appearing in edges when their child targets were visible (e.g., preventing `//audio → //util:util` when `//audio:audio_impl` should be used instead). The fix skipped package nodes during edge aggregation by continuing to walk up the hierarchy past them. This worked correctly when targets were visible but broke the package-only view.
+**Previous Context**: An earlier fix prevented package nodes from appearing in
+edges when their child targets were visible (e.g., preventing
+`//audio → //util:util` when `//audio:audio_impl` should be used instead). The
+fix skipped package nodes during edge aggregation by continuing to walk up the
+hierarchy past them. This worked correctly when targets were visible but broke
+the package-only view.
 
-**Fix**: Modified [pkg/lens/renderer.go:660-703](pkg/lens/renderer.go#L660-L703) `findVisibleAncestor()` to use package nodes as fallback ancestors:
+**Fix**: Modified [pkg/lens/renderer.go:660-703](pkg/lens/renderer.go#L660-L703)
+`findVisibleAncestor()` to use package nodes as fallback ancestors:
+
 - Track the first visible package encountered while walking up the hierarchy
 - Continue walking up past packages to search for visible target ancestors
 - If a visible target is found above, use it (maintains previous bug fix)
-- If no visible target exists, fall back to using the package (fixes package-only view)
+- If no visible target exists, fall back to using the package (fixes
+  package-only view)
 - Only return empty string if no visible ancestor at all
 
 **Implementation Details**:
+
 ```go
 // Walk up the hierarchy, tracking the first visible package in case we need it
 var firstVisiblePackage string
@@ -220,11 +364,14 @@ if firstVisiblePackage != "" {
 ```
 
 **Result**: Package-level dependency visualization now works correctly:
+
 - **Before**: collapseLevel: 1 showed 8 packages, 0 edges ✗
 - **After**: collapseLevel: 1 shows 8 packages, 9 edges between packages ✓
-- **Maintains previous fix**: When targets are visible, edges skip package nodes and connect targets directly ✓
+- **Maintains previous fix**: When targets are visible, edges skip package nodes
+  and connect targets directly ✓
 
 **Example edges now visible in package-only view**:
+
 - `//main → //core` (static)
 - `//main → //graphics` (dynamic, static)
 - `//main → //util` (static)
@@ -234,20 +381,28 @@ if firstVisiblePackage != "" {
 - `//plugins → //util` (static)
 - `//foobar → //cycle_demo` (static)
 
-This makes the package-only view useful for understanding high-level architecture and identifying which packages depend on each other.
+This makes the package-only view useful for understanding high-level
+architecture and identifying which packages depend on each other.
 
 ## ✅ Workspace directory display (DONE)
 
-Added workspace directory path to the web UI header to help users identify which workspace is being analyzed.
+Added workspace directory path to the web UI header to help users identify which
+workspace is being analyzed.
 
 **Implementation**:
-- Added `WorkspacePath` field to `Module` struct in [pkg/model/model.go:103](pkg/model/model.go#L103)
-- Set workspace path using `filepath.Abs()` in [pkg/bazel/query.go:87-92](pkg/bazel/query.go#L87-L92)
-- Updated frontend `updateModuleName()` function in [pkg/web/static/app.js:231-242](pkg/web/static/app.js#L231-L242) to display both module name and absolute path
+
+- Added `WorkspacePath` field to `Module` struct in
+  [pkg/model/model.go:103](pkg/model/model.go#L103)
+- Set workspace path using `filepath.Abs()` in
+  [pkg/bazel/query.go:87-92](pkg/bazel/query.go#L87-L92)
+- Updated frontend `updateModuleName()` function in
+  [pkg/web/static/app.js:231-242](pkg/web/static/app.js#L231-L242) to display
+  both module name and absolute path
 - Format: `module_name • /absolute/path/to/workspace`
 - Falls back gracefully if either value is missing
 
 **Benefits**:
+
 - Users can immediately see which workspace is being analyzed
 - Especially helpful when using relative paths like "."
 - Absolute path helps distinguish between multiple workspaces
@@ -255,27 +410,38 @@ Added workspace directory path to the web UI header to help users identify which
 
 ## ✅ Frontend structured logging migration (DONE)
 
-Migrated all frontend JavaScript files to use the structured logger infrastructure.
+Migrated all frontend JavaScript files to use the structured logger
+infrastructure.
 
 **Implementation**:
-- Converted all console.* calls in app.js (66 statements), view-state.js (14 statements), and lens-controls.js (6 statements) to use appLogger, viewStateLogger, and lensLogger respectively
-- Fixed logger.js bug where strings were treated as character arrays due to Object.entries() iteration
-- Added _normalizeArgs() helper to handle both console.log-style arguments and structured data objects
+
+- Converted all console.\* calls in app.js (66 statements), view-state.js (14
+  statements), and lens-controls.js (6 statements) to use appLogger,
+  viewStateLogger, and lensLogger respectively
+- Fixed logger.js bug where strings were treated as character arrays due to
+  Object.entries() iteration
+- Added \_normalizeArgs() helper to handle both console.log-style arguments and
+  structured data objects
 - Downgraded 25+ log statements from INFO to DEBUG to reduce console noise
-- Changed large object logging to summary counts (e.g., log array length instead of full array)
+- Changed large object logging to summary counts (e.g., log array length instead
+  of full array)
 - Added HTML comments documenting runtime log level control via browser console
 
 **Benefits**:
+
 - Consistent structured logging format across frontend and backend
-- Appropriate log levels (DEBUG for internal details, INFO for user-facing operations)
+- Appropriate log levels (DEBUG for internal details, INFO for user-facing
+  operations)
 - Runtime log level control without rebuilding
 - Reduced console noise from internal operations
 
 ## ✅ Documentation consolidation (DONE)
 
-Consolidated multiple markdown files and added missing installation instructions.
+Consolidated multiple markdown files and added missing installation
+instructions.
 
 **Implementation**:
+
 - Added Quick Install section to README.md with `go install` command
 - Created comprehensive DEVELOPMENT.md merging:
   - ARCHITECTURE_DECISIONS.md (technology rationale, design decisions)
@@ -283,10 +449,12 @@ Consolidated multiple markdown files and added missing installation instructions
   - pkg/pubsub/README.md (SSE pub/sub documentation)
   - REMOVED_FEATURES.md (outdated content)
 - Deleted redundant markdown files
-- Added cross-references between README.md, DEVELOPMENT.md, and example/README.md
+- Added cross-references between README.md, DEVELOPMENT.md, and
+  example/README.md
 - Kept TODO.md separate as requested
 
 **Benefits**:
+
 - Single source for developer onboarding (DEVELOPMENT.md)
 - Standard Go installation method documented
 - Reduced documentation fragmentation
@@ -294,10 +462,13 @@ Consolidated multiple markdown files and added missing installation instructions
 
 ## ✅ CSS style refactoring (DONE)
 
-Refactored Cytoscape graph styles to reduce duplication and improve maintainability.
+Refactored Cytoscape graph styles to reduce duplication and improve
+maintainability.
 
 **Implementation**:
-- Added GRAPH_COLORS constant with semantic color definitions (node colors, edge colors, state colors, text/border colors)
+
+- Added GRAPH_COLORS constant with semantic color definitions (node colors, edge
+  colors, state colors, text/border colors)
 - Created helper functions:
   - edgeStyle(color, width, lineStyle) - generates complete edge styles
   - nodeStyle(bgColor, textColor, borderColor) - generates basic node styles
@@ -307,10 +478,12 @@ Refactored Cytoscape graph styles to reduce duplication and improve maintainabil
 - Improved code organization with section comments
 
 **Code Reduction**:
+
 - Before: 156 lines of style definitions
 - After: 121 lines (35 lines removed, 22% reduction)
 
 **Benefits**:
+
 - Easier to maintain consistent visual design
 - Change colors globally in one place
 - Better readability with semantic color names
@@ -319,9 +492,11 @@ Refactored Cytoscape graph styles to reduce duplication and improve maintainabil
 
 ## ✅ Structured logging infrastructure (PARTIALLY DONE)
 
-**Goal**: Implement consistent, structured logging across backend and frontend with request tracking, proper log levels, and request-response correlation.
+**Goal**: Implement consistent, structured logging across backend and frontend
+with request tracking, proper log levels, and request-response correlation.
 
 **Log Level Philosophy**:
+
 - **TRACE**: Very spammy, debug-time only
 - **DEBUG**: Internal component behavior
 - **INFO**: User-facing operations
@@ -330,15 +505,20 @@ Refactored Cytoscape graph styles to reduce duplication and improve maintainabil
 - **FATAL**: Unrecoverable bugs
 
 **Backend Implementation** ([pkg/logging](pkg/logging)):
+
 - Created logging package wrapping Go's standard library `log/slog`
 - Request ID middleware generates/extracts UUIDs for each HTTP request
 - Request ID stored in `context.Context` and automatically added to all logs
 - HTTP middleware logs every request start/completion with timing and status
-- Updated [pkg/web/server.go](pkg/web/server.go) to use structured logging with context
-- Updated [cmd/deps-analyzer/main.go](cmd/deps-analyzer/main.go) to use new logger
+- Updated [pkg/web/server.go](pkg/web/server.go) to use structured logging with
+  context
+- Updated [cmd/deps-analyzer/main.go](cmd/deps-analyzer/main.go) to use new
+  logger
 - All lens API operations now log with request IDs for tracing
 
-**Frontend Implementation** ([pkg/web/static/logger.js](pkg/web/static/logger.js)):
+**Frontend Implementation**
+([pkg/web/static/logger.js](pkg/web/static/logger.js)):
+
 - Created custom structured logger with same log levels as backend
 - Generates request IDs for fetch requests
 - Logs formatted as `[LEVEL] message | key=value key=value`
@@ -346,32 +526,42 @@ Refactored Cytoscape graph styles to reduce duplication and improve maintainabil
 - Console output with appropriate methods (debug, log, warn, error)
 
 **Request Tracking**:
-- Backend: UUID generated per request, stored in context, returned in `X-Request-ID` header
+
+- Backend: UUID generated per request, stored in context, returned in
+  `X-Request-ID` header
 - Frontend: Can send `X-Request-ID` header or backend generates one
 - All logs within a request lifecycle include the request ID
 - Enables end-to-end request tracing across frontend/backend boundary
 
 **Completed**:
+
 - ✅ Go logging package with slog wrapper
 - ✅ Request ID middleware for HTTP (with SSE Flusher support)
 - ✅ JavaScript structured logger
 - ✅ HTTP request/response logging with timing
 - ✅ Updated server.go and main.go to use new logging
-- ✅ Migrated all remaining Go files: `analysis/runner.go`, `watcher/*.go`, `lens/renderer.go`, `pubsub/sse.go`
+- ✅ Migrated all remaining Go files: `analysis/runner.go`, `watcher/*.go`,
+  `lens/renderer.go`, `pubsub/sse.go`
 - ✅ Logger script added to index.html
 - ✅ Fixed SSE streaming bug in logging middleware
-- ✅ **Compact console handler** with readable format: `[LEVEL] HH:MM:SS message | key=value`
-- ✅ Fixed all printf-style format strings to use proper structured key-value pairs
-- ✅ Appropriate log levels (Debug for internal details, Info for operations, Warn/Error for issues)
+- ✅ **Compact console handler** with readable format:
+  `[LEVEL] HH:MM:SS message | key=value`
+- ✅ Fixed all printf-style format strings to use proper structured key-value
+  pairs
+- ✅ Appropriate log levels (Debug for internal details, Info for operations,
+  Warn/Error for issues)
 
 **Remaining Work**:
-- ✅ ~~Update frontend JavaScript files to use new structured logger~~ (DONE - see above)
+
+- ✅ ~~Update frontend JavaScript files to use new structured logger~~ (DONE -
+  see above)
 - ⏸️ Add log level configuration via command-line flags
 - ⏸️ Consider JSON output mode for production log aggregation
 
 **Example Structured Logs**:
 
 Backend (compact format):
+
 ```
 [INFO]  21:54:51 starting web server | url=http://localhost:8080
 [INFO]  21:54:51 request started | req=eb419103 method=GET path=/ remoteAddr=[::1]:57427
@@ -380,6 +570,7 @@ Backend (compact format):
 ```
 
 Frontend:
+
 ```
 [INFO] fetch started | requestID="abc123" url="/api/module/graph/lens"
 [INFO] fetch completed | requestID="abc123" status=200 durationMs=45
@@ -387,21 +578,31 @@ Frontend:
 
 ## ✅ Info popups bug fixes (DONE)
 
-**Problem 1: Stuck popups accumulating in DOM**: Info popups (hover tooltips) were getting stuck on screen and accumulating in the DOM, causing visual clutter and memory leaks.
+**Problem 1: Stuck popups accumulating in DOM**: Info popups (hover tooltips)
+were getting stuck on screen and accumulating in the DOM, causing visual clutter
+and memory leaks.
 
 **Root Causes**:
-1. Each call to `displayDependencyGraph()` created a new tooltip element without removing old ones
+
+1. Each call to `displayDependencyGraph()` created a new tooltip element without
+   removing old ones
 2. No cleanup mechanism when window lost focus or graph layout changed
 3. No tracking of active popups for cleanup
 
-**Problem 2: Popups disappeared after initial fix**: After fixing the stuck popup bug by removing popups from DOM, they stopped appearing entirely because `clearInfoPopup()` was called on every graph re-render.
+**Problem 2: Popups disappeared after initial fix**: After fixing the stuck
+popup bug by removing popups from DOM, they stopped appearing entirely because
+`clearInfoPopup()` was called on every graph re-render.
 
-**Problem 3: Missing fade animations**: Popups were showing/hiding but without smooth transitions.
+**Problem 3: Missing fade animations**: Popups were showing/hiding but without
+smooth transitions.
 
-**Final Fix** (three iterations): Implemented proper info popup lifecycle management in [pkg/web/static/app.js](pkg/web/static/app.js):
+**Final Fix** (three iterations): Implemented proper info popup lifecycle
+management in [pkg/web/static/app.js](pkg/web/static/app.js):
+
 - Changed from create/destroy pattern to singleton pattern with show/hide
 - Global `infoPopup` reference persists in DOM for reuse
-- `clearInfoPopup(fade)` now hides popup with `display: 'none'` instead of removing from DOM
+- `clearInfoPopup(fade)` now hides popup with `display: 'none'` instead of
+  removing from DOM
 - Added fade-in animation (200ms ease-in, opacity 0→1) when showing popup
 - Added fade-out animation (200ms ease-out) on mouseout from edges/nodes
 - Immediate hide (no fade) on tap/click for responsive feel
@@ -409,6 +610,7 @@ Frontend:
 - Clear popups on graph re-render and window focus loss
 
 **Result**:
+
 - Only one info popup element exists at a time (singleton)
 - Popups are properly cleaned up on all appropriate events
 - Smooth visual transitions with fade animations
@@ -416,18 +618,34 @@ Frontend:
 
 ## ✅ Package node edge collision bug fix (DONE)
 
-**Problem**: When a target node was hidden by lens configuration (distance=infinite), edges would incorrectly point to its parent package node instead of being hidden. This caused synthetic package nodes (like `//audio`) to appear in the dependency graph with edges, even though package nodes are not real targets.
+**Problem**: When a target node was hidden by lens configuration
+(distance=infinite), edges would incorrectly point to its parent package node
+instead of being hidden. This caused synthetic package nodes (like `//audio`) to
+appear in the dependency graph with edges, even though package nodes are not
+real targets.
 
 **Example**: With `//main:test_app` selected:
+
 - Bug: `//audio → //util:util` (package node incorrectly used)
 - Bug: `//audio:audio → //audio` (edge to package instead of real target)
-- Expected: These edges should be hidden when the real targets (`//audio:audio_impl`) are at infinite distance
+- Expected: These edges should be hidden when the real targets
+  (`//audio:audio_impl`) are at infinite distance
 
-**Root Cause**: In `findVisibleAncestor()`, when walking up the node hierarchy to find a visible ancestor for edge aggregation, the function would stop at package nodes (`//audio`) if they were visible, even though package nodes are synthetic grouping nodes that should never appear in edges.
+**Root Cause**: In `findVisibleAncestor()`, when walking up the node hierarchy
+to find a visible ancestor for edge aggregation, the function would stop at
+package nodes (`//audio`) if they were visible, even though package nodes are
+synthetic grouping nodes that should never appear in edges.
 
-**Fix**: Modified [pkg/lens/renderer.go:656-688](pkg/lens/renderer.go#L656-L688) `findVisibleAncestor()` to skip package nodes when aggregating edges. Package nodes are identified by having no colon in their ID (e.g., `//audio` vs `//audio:audio`). When a package node is encountered as a potential ancestor, the function continues walking up the hierarchy instead of using it, ultimately returning empty string if no non-package ancestor is found, which causes the edge to be dropped.
+**Fix**: Modified [pkg/lens/renderer.go:656-688](pkg/lens/renderer.go#L656-L688)
+`findVisibleAncestor()` to skip package nodes when aggregating edges. Package
+nodes are identified by having no colon in their ID (e.g., `//audio` vs
+`//audio:audio`). When a package node is encountered as a potential ancestor,
+the function continues walking up the hierarchy instead of using it, ultimately
+returning empty string if no non-package ancestor is found, which causes the
+edge to be dropped.
 
 **Implementation**:
+
 ```go
 if includedNodeIds[parentID] {
     // Skip package nodes - they're synthetic grouping nodes, not real targets
@@ -441,7 +659,9 @@ if includedNodeIds[parentID] {
 }
 ```
 
-**Result**: Edges now only connect real target nodes. When a target's children are hidden, edges to/from those hidden nodes are correctly dropped instead of being incorrectly aggregated to the parent package node.
+**Result**: Edges now only connect real target nodes. When a target's children
+are hidden, edges to/from those hidden nodes are correctly dropped instead of
+being incorrectly aggregated to the parent package node.
 
 ## ✅ "Focus" to "Select" terminology refactoring (DONE)
 
