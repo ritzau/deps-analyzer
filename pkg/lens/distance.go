@@ -171,6 +171,17 @@ func getInheritedDistance(nodeID string, parentID string, distances map[string]i
 //   //package:target -> //package
 //   //package -> ""
 func extractParentID(nodeID string) string {
+	// Handle uncovered files specially: uncovered:path/file.cc -> //path
+	if strings.HasPrefix(nodeID, "uncovered:") {
+		filePath := strings.TrimPrefix(nodeID, "uncovered:")
+		if idx := strings.LastIndex(filePath, "/"); idx >= 0 {
+			packagePath := filePath[:idx]
+			return "//" + packagePath
+		}
+		// No slash means file at root, no parent
+		return ""
+	}
+
 	// Remove leading //
 	if !strings.HasPrefix(nodeID, "//") {
 		return ""

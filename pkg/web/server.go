@@ -876,6 +876,44 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 
 	// Add uncovered files as nodes (files not in any target)
 	if uncoveredFiles != nil && len(uncoveredFiles) > 0 {
+		// Track which packages contain uncovered files so we can create package nodes
+		packagesWithUncovered := make(map[string]bool)
+
+		for _, uncoveredFile := range uncoveredFiles {
+			// Extract package from file path (e.g., "core/engine.cc" -> "core")
+			packagePath := ""
+			if idx := strings.LastIndex(uncoveredFile, "/"); idx >= 0 {
+				packagePath = uncoveredFile[:idx]
+			}
+
+			if packagePath != "" {
+				packagesWithUncovered[packagePath] = true
+			}
+		}
+
+		// Create package nodes for packages with uncovered files (if they don't already have targets)
+		for packagePath := range packagesWithUncovered {
+			packageLabel := "//" + packagePath
+			// Check if this package already has any targets
+			hasTargets := false
+			for _, target := range module.Targets {
+				if target.Package == packageLabel {
+					hasTargets = true
+					break
+				}
+			}
+
+			// Only create package node if no targets exist in this package
+			if !hasTargets {
+				graphData.Nodes = append(graphData.Nodes, GraphNode{
+					ID:    packageLabel,
+					Label: packageLabel,
+					Type:  "package",
+				})
+			}
+		}
+
+		// Now add the uncovered file nodes
 		for _, uncoveredFile := range uncoveredFiles {
 			// Determine if source or header
 			nodeType := "uncovered_source"
