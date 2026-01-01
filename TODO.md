@@ -2,7 +2,7 @@
 
 ## Prioritized backlog
 
-1. Complete logging migration in analysis/runner.go, watcher/*.go, lens/renderer.go, pubsub/sse.go
+1. Update frontend JavaScript files to use structured logger
 
 2. Make sure docs are up to date.
 
@@ -142,15 +142,16 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 **Completed**:
 - ✅ Go logging package with slog wrapper
-- ✅ Request ID middleware for HTTP
+- ✅ Request ID middleware for HTTP (with SSE Flusher support)
 - ✅ JavaScript structured logger
 - ✅ HTTP request/response logging with timing
 - ✅ Updated server.go and main.go to use new logging
+- ✅ Migrated all remaining Go files: `analysis/runner.go`, `watcher/*.go`, `lens/renderer.go`, `pubsub/sse.go`
 - ✅ Logger script added to index.html
+- ✅ Fixed SSE streaming bug in logging middleware
 
 **Remaining Work**:
-- ⏸️ Migrate remaining Go files: `analysis/runner.go`, `watcher/*.go`, `lens/renderer.go`, `pubsub/sse.go`
-- ⏸️ Update frontend JavaScript files to use new structured logger
+- ⏸️ Update frontend JavaScript files to use new structured logger (infrastructure in place)
 - ⏸️ Add log level configuration via command-line flags
 - ⏸️ Consider JSON output mode for production log aggregation
 
