@@ -2,9 +2,9 @@
 
 ## Prioritized backlog
 
-1. BUG: Some tooltips (need a better name for these) get stuck. We should track
-   all created tooltips and clear them when layout changes, when the window
-   loses focus, and other times when appropriate.
+1. BUG: Some info popups get stuck. We should track all created info popups
+   and clear them when layout changes, when the window loses focus, and other
+   times when appropriate.
 
 2. Ensure consistent logging in backend and frontend.
 
