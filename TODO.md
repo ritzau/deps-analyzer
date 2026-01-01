@@ -149,6 +149,9 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 - ✅ Migrated all remaining Go files: `analysis/runner.go`, `watcher/*.go`, `lens/renderer.go`, `pubsub/sse.go`
 - ✅ Logger script added to index.html
 - ✅ Fixed SSE streaming bug in logging middleware
+- ✅ **Compact console handler** with readable format: `[LEVEL] HH:MM:SS message | key=value`
+- ✅ Fixed all printf-style format strings to use proper structured key-value pairs
+- ✅ Appropriate log levels (Debug for internal details, Info for operations, Warn/Error for issues)
 
 **Remaining Work**:
 - ⏸️ Update frontend JavaScript files to use new structured logger (infrastructure in place)
@@ -157,10 +160,12 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 **Example Structured Logs**:
 
-Backend:
+Backend (compact format):
 ```
-time=2026-01-01T12:00:00.000Z level=INFO msg="request started" requestID=abc123 method=POST path=/api/module/graph/lens
-time=2026-01-01T12:00:00.045Z level=INFO msg="request completed" requestID=abc123 method=POST path=/api/module/graph/lens status=200 durationMs=45
+[INFO]  21:54:51 starting web server | url=http://localhost:8080
+[INFO]  21:54:51 request started | req=eb419103 method=GET path=/ remoteAddr=[::1]:57427
+[INFO]  21:54:51 request completed | req=eb419103 method=GET path=/ status=200 duration=3ms
+[INFO]  21:54:55 analysis complete | targets=10 dependencies=25 packages=8
 ```
 
 Frontend:
