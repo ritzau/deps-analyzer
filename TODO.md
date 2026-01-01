@@ -2,15 +2,11 @@
 
 ## Prioritized backlog
 
-1. Set up the frontend logger to log the events back to the backend and there
-   they are logged with the backend logs. But make sure it is easy to separate
-   them.
-
-2. If a node has a single nested node, we should be able to collapse the
+1. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-3. External packages: May require support of .a files. These packages can be
+2. External packages: May require support of .a files. These packages can be
    added using cc_foreign_rule, bazel_dep, or cc_import. They typically result
    in static or dynamic libraries, alternatively being header only. Add a
    special configuration step for their visualization much like the system libs.
@@ -163,6 +159,52 @@ Fixed redundant backend requests when changing default lens settings.
 - Updated binary selector change handler in [pkg/web/static/lens-controls.js:298](pkg/web/static/lens-controls.js#L298)
 
 **Result**: Changing hierarchy level or other major lens settings now triggers exactly 1 backend request instead of 3-4, improving performance and reducing server load.
+
+## ✅ Frontend-to-backend logging integration (DONE)
+
+Implemented centralized logging that sends frontend logs to the backend for monitoring and debugging.
+
+**Implementation**:
+
+Backend ([pkg/web/server.go](pkg/web/server.go)):
+- Added `/api/logs` POST endpoint to receive frontend logs
+- Added `FrontendLogEntry` and `FrontendLogsRequest` structs for JSON parsing
+- Handler logs each frontend entry with `source=frontend` tag for easy filtering
+- Maps frontend log levels (TRACE/DEBUG/INFO/WARN/ERROR) to slog levels
+- Includes all frontend data attributes in backend logs
+- Uses request context for request ID correlation
+
+Frontend ([pkg/web/static/logger.js](pkg/web/static/logger.js)):
+- Added `enableBackendLogging(enabled)` method to turn on/off backend logging
+- Implemented log batching: sends after 10 logs or 5 second timeout
+- Uses `fetch()` to POST batched logs to `/api/logs` endpoint
+- Fails silently on errors to avoid infinite error loops
+- Non-blocking: logs sent asynchronously without blocking UI
+- Disabled by default for minimal overhead
+
+Documentation ([pkg/web/static/index.html](pkg/web/static/index.html)):
+- Added configuration comments explaining how to enable backend logging
+- Documented batching behavior and filtering approach
+
+**Usage**:
+```javascript
+// In browser console
+logger.enableBackendLogging(true);  // Start sending logs to backend
+appLogger.info("Test message", {foo: "bar"});  // Will appear in backend logs
+logger.enableBackendLogging(false); // Stop sending logs
+```
+
+**Backend log format**:
+```
+[INFO] 12:34:56 Test message | source=frontend foo="bar" requestID=abc123
+```
+
+**Benefits**:
+- Easy to filter backend logs: `grep "source=frontend"` in logs
+- Batching reduces backend load and network overhead
+- Useful for debugging production issues or CI environments
+- Request ID correlation between frontend and backend
+- All frontend context (component, data) preserved in backend logs
 
 ## ✅ File node selection redirect to parent target (DONE)
 
