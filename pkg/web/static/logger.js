@@ -99,10 +99,34 @@ class Logger {
   }
 
   /**
+   * Normalize arguments to structured data object
+   * Handles both console.log-style args and structured data objects
+   * @private
+   */
+  _normalizeArgs(args) {
+    if (args.length === 0) {
+      return {};
+    }
+
+    // If single argument is a plain object (not array, not null), use it directly
+    if (args.length === 1 &&
+        typeof args[0] === 'object' &&
+        args[0] !== null &&
+        !Array.isArray(args[0])) {
+      return args[0];
+    }
+
+    // Otherwise, wrap all args in a data field
+    // This handles primitives, arrays, and multiple arguments
+    return { data: args.length === 1 ? args[0] : args };
+  }
+
+  /**
    * Log at TRACE level (very verbose, debug-time only)
    */
-  trace(message, data = {}) {
+  trace(message, ...args) {
     if (this.level <= LogLevel.TRACE) {
+      const data = this._normalizeArgs(args);
       const logData = this._format(LogLevel.TRACE, message, data);
       this._output(LogLevel.TRACE, logData);
     }
@@ -111,8 +135,9 @@ class Logger {
   /**
    * Log at DEBUG level (internal component behavior)
    */
-  debug(message, data = {}) {
+  debug(message, ...args) {
     if (this.level <= LogLevel.DEBUG) {
+      const data = this._normalizeArgs(args);
       const logData = this._format(LogLevel.DEBUG, message, data);
       this._output(LogLevel.DEBUG, logData);
     }
@@ -121,8 +146,9 @@ class Logger {
   /**
    * Log at INFO level (user-facing operations)
    */
-  info(message, data = {}) {
+  info(message, ...args) {
     if (this.level <= LogLevel.INFO) {
+      const data = this._normalizeArgs(args);
       const logData = this._format(LogLevel.INFO, message, data);
       this._output(LogLevel.INFO, logData);
     }
@@ -131,8 +157,9 @@ class Logger {
   /**
    * Log at WARN level (should be monitored)
    */
-  warn(message, data = {}) {
+  warn(message, ...args) {
     if (this.level <= LogLevel.WARN) {
+      const data = this._normalizeArgs(args);
       const logData = this._format(LogLevel.WARN, message, data);
       this._output(LogLevel.WARN, logData);
     }
@@ -141,8 +168,9 @@ class Logger {
   /**
    * Log at ERROR level (logical bugs that shouldn't happen)
    */
-  error(message, data = {}) {
+  error(message, ...args) {
     if (this.level <= LogLevel.ERROR) {
+      const data = this._normalizeArgs(args);
       const logData = this._format(LogLevel.ERROR, message, data);
       this._output(LogLevel.ERROR, logData);
     }
