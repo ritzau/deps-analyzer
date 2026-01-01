@@ -20,8 +20,8 @@
    The "source" files they share are the headers and libs. We can either show
    them collapsed or with those files, alternatively we can hide them.
 
-5. BUG: Uncovered files are shown at top level, they should be shown in the
-   package where they reside.
+5. ~~BUG: Uncovered files are shown at top level, they should be shown in the
+   package where they reside.~~ ✅ DONE
 
 6. ~~Add something in the web ui indicating the directory that we ran the
    analysis in~~ ✅ DONE
@@ -99,6 +99,46 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Uncovered files package grouping fix (DONE)
+
+Fixed bug where uncovered files appeared at the top level of the graph instead of being grouped in their respective packages.
+
+**Problem**: Uncovered files (files discovered by git but not included in any Bazel target) were shown as orphaned nodes at the root level instead of being nested under their package nodes (e.g., `//util`, `//cycle_demo`).
+
+**Root Cause**: The uncovered file handling code in `buildModuleGraph()` set parent references correctly, but the lens renderer's `extractParentID()` function only handled standard Bazel node IDs (starting with `//` and using `:` separators). When it encountered uncovered file IDs like `uncovered:cycle_demo/file_a.h`, it returned an empty string, clearing the parent field.
+
+**Fix**: Modified [pkg/lens/distance.go:173-201](pkg/lens/distance.go#L173-L201) `extractParentID()` function to handle uncovered file IDs specially:
+- Detects IDs with `uncovered:` prefix
+- Extracts package path from file path (e.g., `uncovered:util/orphaned.cc` → `//util`)
+- Uses `strings.LastIndex("/")` to find package boundary
+- Returns empty string only for root-level files without a package
+
+Also updated [pkg/web/server.go:877-944](pkg/web/server.go#L877-L944) `buildModuleGraph()` to ensure package nodes exist for packages containing only uncovered files (no targets).
+
+**Result**: All uncovered files now correctly appear as children of their package nodes in the graph hierarchy, making them easier to locate and understand in the context of the codebase structure.
+
+**Testing**: Verified with example workspace:
+- `uncovered:cycle_demo/file_a.h` → parent: `//cycle_demo` ✓
+- `uncovered:cycle_demo/file_b.h` → parent: `//cycle_demo` ✓
+- `uncovered:util/orphaned.cc` → parent: `//util` ✓
+
+## ✅ Workspace directory display (DONE)
+
+Added workspace directory path to the web UI header to help users identify which workspace is being analyzed.
+
+**Implementation**:
+- Added `WorkspacePath` field to `Module` struct in [pkg/model/model.go:103](pkg/model/model.go#L103)
+- Set workspace path using `filepath.Abs()` in [pkg/bazel/query.go:87-92](pkg/bazel/query.go#L87-L92)
+- Updated frontend `updateModuleName()` function in [pkg/web/static/app.js:231-242](pkg/web/static/app.js#L231-L242) to display both module name and absolute path
+- Format: `module_name • /absolute/path/to/workspace`
+- Falls back gracefully if either value is missing
+
+**Benefits**:
+- Users can immediately see which workspace is being analyzed
+- Especially helpful when using relative paths like "."
+- Absolute path helps distinguish between multiple workspaces
+- No ambiguity when switching between projects
 
 ## ✅ Frontend structured logging migration (DONE)
 
