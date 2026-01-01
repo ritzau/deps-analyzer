@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/lens"
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"github.com/ritzau/deps-analyzer/pkg/model"
 	"github.com/ritzau/deps-analyzer/pkg/pubsub"
 	"github.com/ritzau/deps-analyzer/pkg/symbols"
@@ -211,7 +211,7 @@ func (s *Server) setupRoutes() {
 	// Serve static files
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal("failed to setup static file server", "error", err)
 	}
 	s.router.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 }
@@ -240,7 +240,7 @@ func (s *Server) handleSubscribeWorkspaceStatus(w http.ResponseWriter, r *http.R
 	// Stream events
 	for event := range sub.Events() {
 		if err := pubsub.WriteSSE(w, event); err != nil {
-			log.Printf("Error writing SSE event: %v", err)
+			logging.WarnContext(r.Context(), "SSE write failed", "error", err)
 			return
 		}
 		if flusher, ok := w.(http.Flusher); ok {
@@ -273,7 +273,7 @@ func (s *Server) handleSubscribeTargetGraph(w http.ResponseWriter, r *http.Reque
 	// Stream events
 	for event := range sub.Events() {
 		if err := pubsub.WriteSSE(w, event); err != nil {
-			log.Printf("Error writing SSE event: %v", err)
+			logging.WarnContext(r.Context(), "SSE write failed", "error", err)
 			return
 		}
 		if flusher, ok := w.(http.Flusher); ok {
@@ -378,7 +378,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 
 	// If cache hit and frontend's previousHash matches requestHash, return cached result
 	if cacheHit && req.PreviousHash == requestHash {
-		log.Printf("[LensAPI] Cache hit for request hash %s, returning cached graph", requestHash[:12])
+		logging.DebugContext(r.Context(), "lens cache hit", "requestHash", requestHash[:12])
 
 		// Reconstruct full graph from cached snapshot
 		cachedGraphData := &GraphData{
@@ -433,10 +433,10 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 		for _, node := range resultGraphData.Nodes {
 			if node.Type == "package" {
 				packageCount++
-				log.Printf("[LensAPI] Sending package to frontend: ID=%s, Label=%s", node.ID, node.Label)
+				logging.TraceContext(r.Context(), "sending package to frontend", "nodeID", node.ID, "label", node.Label)
 			}
 		}
-		log.Printf("[LensAPI] Total packages being sent: %d", packageCount)
+		logging.DebugContext(r.Context(), "total packages sent", "count", packageCount)
 	}
 
 	// Create snapshot of new graph
@@ -449,20 +449,20 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	// Look up previous snapshot using the frontend's previousHash (not requestHash!)
 	var previousSnapshot *lens.GraphSnapshot
 	if req.PreviousHash != "" {
-		log.Printf("[LensAPI] Looking for previous snapshot with hash %s", req.PreviousHash[:12])
+		logging.DebugContext(r.Context(), "looking for previous snapshot", "previousHash", req.PreviousHash[:12])
 		if prevSnap, exists := s.lensCache[req.PreviousHash]; exists {
 			previousSnapshot = prevSnap
-			log.Printf("[LensAPI] Found previous snapshot for hash %s, will compute diff", req.PreviousHash[:12])
+			logging.DebugContext(r.Context(), "found previous snapshot for diff", "previousHash", req.PreviousHash[:12])
 		} else {
-			log.Printf("[LensAPI] Previous hash %s not found in cache (cache has %d entries)", req.PreviousHash[:12], len(s.lensCache))
+			logging.DebugContext(r.Context(), "previous hash not in cache", "previousHash", req.PreviousHash[:12], "cacheSize", len(s.lensCache))
 		}
 	} else {
-		log.Printf("[LensAPI] No previousHash provided in request")
+		logging.DebugContext(r.Context(), "no previousHash provided in request")
 	}
 
 	// Store new snapshot in cache
 	s.lensCache[requestHash] = newSnapshot
-	log.Printf("[LensAPI] Stored snapshot in cache with hash %s (cache now has %d entries)", requestHash[:12], len(s.lensCache))
+	logging.DebugContext(r.Context(), "stored snapshot in cache", "requestHash", requestHash[:12], "cacheSize", len(s.lensCache))
 
 	// Compute diff if we have a previous snapshot
 	if previousSnapshot != nil {
@@ -484,15 +484,18 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 
 		// If diff is larger than 50% of full graph, send full graph instead
 		if diffSize > fullSize/2 {
-			log.Printf("[LensAPI] Diff too large (%d changes vs %d total), sending full graph", diffSize, fullSize)
+			logging.DebugContext(r.Context(), "diff too large, sending full graph", "diffSize", diffSize, "fullSize", fullSize)
 			json.NewEncoder(w).Encode(&LensRenderResponse{
 				Hash:      newSnapshot.Hash,
 				FullGraph: resultGraphData,
 			})
 		} else {
-			log.Printf("[LensAPI] Sending diff: %d added, %d removed, %d modified nodes; %d added, %d removed edges",
-				len(webDiff.AddedNodes), len(webDiff.RemovedNodes), len(webDiff.ModifiedNodes),
-				len(webDiff.AddedEdges), len(webDiff.RemovedEdges))
+			logging.DebugContext(r.Context(), "sending diff",
+				"addedNodes", len(webDiff.AddedNodes),
+				"removedNodes", len(webDiff.RemovedNodes),
+				"modifiedNodes", len(webDiff.ModifiedNodes),
+				"addedEdges", len(webDiff.AddedEdges),
+				"removedEdges", len(webDiff.RemovedEdges))
 			json.NewEncoder(w).Encode(&LensRenderResponse{
 				Hash: newSnapshot.Hash,
 				Diff: webDiff,
@@ -500,8 +503,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 		}
 	} else {
 		// No previous snapshot, send full graph
-		log.Printf("[LensAPI] No previous snapshot, sending full graph (%d nodes, %d edges)",
-			len(resultGraphData.Nodes), len(resultGraphData.Edges))
+		logging.InfoContext(r.Context(), "sending full graph", "nodes", len(resultGraphData.Nodes), "edges", len(resultGraphData.Edges))
 		json.NewEncoder(w).Encode(&LensRenderResponse{
 			Hash:      newSnapshot.Hash,
 			FullGraph: resultGraphData,
@@ -1419,6 +1421,9 @@ func convertLensEdgesToWeb(lensEdges []lens.GraphEdge, rawGraph *GraphData) []Gr
 // Start starts the web server on the specified port
 func (s *Server) Start(port int) error {
 	addr := fmt.Sprintf(":%d", port)
-	log.Printf("Starting web server on http://localhost%s", addr)
-	return http.ListenAndServe(addr, s.router)
+	logging.Info("starting web server", "url", fmt.Sprintf("http://localhost%s", addr))
+
+	// Wrap router with logging middleware
+	handler := logging.RequestIDMiddleware(s.router)
+	return http.ListenAndServe(addr, handler)
 }

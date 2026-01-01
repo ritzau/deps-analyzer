@@ -2,7 +2,7 @@
 
 ## Prioritized backlog
 
-1. Ensure consistent logging in backend and frontend.
+1. Complete logging migration in analysis/runner.go, watcher/*.go, lens/renderer.go, pubsub/sse.go
 
 2. Make sure docs are up to date.
 
@@ -105,6 +105,68 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Structured logging infrastructure (PARTIALLY DONE)
+
+**Goal**: Implement consistent, structured logging across backend and frontend with request tracking, proper log levels, and request-response correlation.
+
+**Log Level Philosophy**:
+- **TRACE**: Very spammy, debug-time only
+- **DEBUG**: Internal component behavior
+- **INFO**: User-facing operations
+- **WARN**: Should be monitored
+- **ERROR**: Logical bugs that shouldn't happen
+- **FATAL**: Unrecoverable bugs
+
+**Backend Implementation** ([pkg/logging](pkg/logging)):
+- Created logging package wrapping Go's standard library `log/slog`
+- Request ID middleware generates/extracts UUIDs for each HTTP request
+- Request ID stored in `context.Context` and automatically added to all logs
+- HTTP middleware logs every request start/completion with timing and status
+- Updated [pkg/web/server.go](pkg/web/server.go) to use structured logging with context
+- Updated [cmd/deps-analyzer/main.go](cmd/deps-analyzer/main.go) to use new logger
+- All lens API operations now log with request IDs for tracing
+
+**Frontend Implementation** ([pkg/web/static/logger.js](pkg/web/static/logger.js)):
+- Created custom structured logger with same log levels as backend
+- Generates request IDs for fetch requests
+- Logs formatted as `[LEVEL] message | key=value key=value`
+- Child logger support for adding persistent context (e.g., component name)
+- Console output with appropriate methods (debug, log, warn, error)
+
+**Request Tracking**:
+- Backend: UUID generated per request, stored in context, returned in `X-Request-ID` header
+- Frontend: Can send `X-Request-ID` header or backend generates one
+- All logs within a request lifecycle include the request ID
+- Enables end-to-end request tracing across frontend/backend boundary
+
+**Completed**:
+- ✅ Go logging package with slog wrapper
+- ✅ Request ID middleware for HTTP
+- ✅ JavaScript structured logger
+- ✅ HTTP request/response logging with timing
+- ✅ Updated server.go and main.go to use new logging
+- ✅ Logger script added to index.html
+
+**Remaining Work**:
+- ⏸️ Migrate remaining Go files: `analysis/runner.go`, `watcher/*.go`, `lens/renderer.go`, `pubsub/sse.go`
+- ⏸️ Update frontend JavaScript files to use new structured logger
+- ⏸️ Add log level configuration via command-line flags
+- ⏸️ Consider JSON output mode for production log aggregation
+
+**Example Structured Logs**:
+
+Backend:
+```
+time=2026-01-01T12:00:00.000Z level=INFO msg="request started" requestID=abc123 method=POST path=/api/module/graph/lens
+time=2026-01-01T12:00:00.045Z level=INFO msg="request completed" requestID=abc123 method=POST path=/api/module/graph/lens status=200 durationMs=45
+```
+
+Frontend:
+```
+[INFO] fetch started | requestID="abc123" url="/api/module/graph/lens"
+[INFO] fetch completed | requestID="abc123" status=200 durationMs=45
+```
 
 ## ✅ Info popups bug fixes (DONE)
 

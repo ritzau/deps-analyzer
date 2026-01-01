@@ -4,13 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"runtime"
 	"time"
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"github.com/ritzau/deps-analyzer/pkg/watcher"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 )
@@ -47,7 +47,7 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 	// Start server in background
 	go func() {
 		if err := server.Start(port); err != nil {
-			log.Fatalf("Failed to start server: %v", err)
+			logging.Fatal("failed to start server", "error", err)
 		}
 	}()
 
@@ -73,7 +73,7 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 			Reason:       "initial analysis",
 		})
 		if err != nil {
-			log.Printf("Initial analysis failed: %v", err)
+			logging.Error("initial analysis failed", "error", err)
 			return
 		}
 
@@ -88,7 +88,7 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 }
 
 func startFileWatcher(ctx context.Context, workspace string, runner *analysis.AnalysisRunner, server *web.Server) {
-	log.Println("[WATCHER] Starting file watcher...")
+	logging.Info("starting file watcher", "workspace", workspace)
 
 	// Notify UI that watching is active
 	server.SetWatching(true)
@@ -97,13 +97,13 @@ func startFileWatcher(ctx context.Context, workspace string, runner *analysis.An
 	// Create watcher
 	fw, err := watcher.NewFileWatcher(workspace)
 	if err != nil {
-		log.Printf("[WATCHER] Failed to create file watcher: %v", err)
+		logging.Error("failed to create file watcher", "error", err)
 		return
 	}
 
 	// Start watcher
 	if err := fw.Start(ctx); err != nil {
-		log.Printf("[WATCHER] Failed to start file watcher: %v", err)
+		logging.Error("failed to start file watcher", "error", err)
 		return
 	}
 
@@ -115,19 +115,19 @@ func startFileWatcher(ctx context.Context, workspace string, runner *analysis.An
 	)
 	debouncer.Start(ctx)
 
-	log.Println("[WATCHER] File watcher started - monitoring for changes")
+	logging.Info("file watcher ready - monitoring for changes")
 
 	// Process debounced events
 	go func() {
 		for event := range debouncer.Output() {
-			log.Printf("[WATCHER] File changes detected: %d files changed", len(event.Paths))
+			logging.Info("file changes detected", "filesChanged", len(event.Paths))
 
 			// Analyze what changed
 			changeAnalysis := watcher.AnalyzeChanges(event, workspace)
 
 			// Determine reason for re-analysis
 			reason := formatReason(event)
-			log.Printf("[WATCHER] Triggering re-analysis: %s", reason)
+			logging.Info("triggering re-analysis", "reason", reason)
 
 			// Build analysis options
 			opts := analysis.AnalysisOptions{
@@ -142,7 +142,7 @@ func startFileWatcher(ctx context.Context, workspace string, runner *analysis.An
 			// Run re-analysis
 			err := runner.Run(ctx, opts)
 			if err != nil {
-				log.Printf("[WATCHER] Re-analysis failed: %v", err)
+				logging.Error("re-analysis failed", "error", err)
 				// Don't crash - just log and continue watching
 			}
 
@@ -180,11 +180,11 @@ func openBrowser(url string) {
 		cmd = "cmd"
 		args = []string{"/c", "start", url}
 	default:
-		log.Printf("Cannot open browser on platform: %s", runtime.GOOS)
+		logging.Warn("cannot open browser on unsupported platform", "platform", runtime.GOOS)
 		return
 	}
 
 	if err := exec.Command(cmd, args...).Start(); err != nil {
-		log.Printf("Failed to open browser: %v", err)
+		logging.Warn("failed to open browser", "error", err)
 	}
 }
