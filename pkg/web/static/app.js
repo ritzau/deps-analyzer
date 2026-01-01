@@ -215,7 +215,7 @@ function displayUncoveredFiles(files) {
 // Nodes that already exist keep their positions automatically when we only add/remove changed elements
 
 function displayDependencyGraph(graphData) {
-    appLogger.info('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
+    appLogger.debug('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
 
     // Clear any visible info popups when graph is re-rendered
     clearInfoPopup();
@@ -240,7 +240,7 @@ function displayDependencyGraph(graphData) {
         ...graphData.nodes.map(node => {
             // TEMPORARY DEBUG: Log package labels
             if (node.type === 'package' && node.label.includes('(d=')) {
-                appLogger.info(`[Frontend] Package node: id=${node.id}, original label="${node.label}", simplified="${simplifyLabel(node.label)}"`);
+                appLogger.debug(`[Frontend] Package node: id=${node.id}, original label="${node.label}", simplified="${simplifyLabel(node.label)}"`);
             }
 
             const nodeData = {
@@ -299,8 +299,8 @@ function displayDependencyGraph(graphData) {
     // Debug: Log overlapping flags
     const overlappingNodes = elements.filter(e => e.data.hasOverlap === true);
     const overlappingEdges = elements.filter(e => e.data.isOverlapping === true);
-    appLogger.info('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.label || n.data.id));
-    appLogger.info('Edges with isOverlapping=true:', overlappingEdges.map(e => `${e.data.source} -> ${e.data.target}`));
+    appLogger.debug('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.label || n.data.id));
+    appLogger.debug('Edges with isOverlapping=true:', overlappingEdges.map(e => `${e.data.source} -> ${e.data.target}`));
 
     // Cytoscape stylesheet (shared between initial and incremental updates)
     const cytoscapeStylesheet = [
@@ -650,7 +650,7 @@ function displayDependencyGraph(graphData) {
 
     if (isInitialLoad) {
         // Initial creation - create new cytoscape instance
-        appLogger.info('Creating new cytoscape instance with', elements.length, 'elements');
+        appLogger.debug('Creating new cytoscape instance with', elements.length, 'elements');
 
         cy = cytoscape({
             container: document.getElementById('cy'),
@@ -668,7 +668,7 @@ function displayDependencyGraph(graphData) {
         runStableDagreLayout(false, true);
     } else {
         // Incremental update - update only changed elements
-        appLogger.info('Incrementally updating cytoscape with', elements.length, 'elements');
+        appLogger.debug('Incrementally updating cytoscape with', elements.length, 'elements');
 
         cy.startBatch();
 
@@ -684,7 +684,7 @@ function displayDependencyGraph(graphData) {
         const nodesToRemove = Array.from(currentNodeIds).filter(id => !newNodeIds.has(id));
         const edgesToRemove = Array.from(currentEdgeIds).filter(id => !newEdgeIds.has(id));
 
-        appLogger.info(`[Cytoscape] Removing ${nodesToRemove.length} nodes, ${edgesToRemove.length} edges`);
+        appLogger.debug(`[Cytoscape] Removing ${nodesToRemove.length} nodes, ${edgesToRemove.length} edges`);
         nodesToRemove.forEach(id => cy.getElementById(id).remove());
         edgesToRemove.forEach(id => {
             const [source, target, type] = id.split('|');
@@ -718,7 +718,7 @@ function displayDependencyGraph(graphData) {
             }
         });
 
-        appLogger.info(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges, updated ${updatedNodes} node labels`);
+        appLogger.debug(`[Cytoscape] Adding ${elementsToAdd.filter(e => !e.data.source).length} nodes, ${elementsToAdd.filter(e => e.data.source).length} edges, updated ${updatedNodes} node labels`);
         if (elementsToAdd.length > 0) {
             cy.add(elementsToAdd);
 
@@ -732,7 +732,7 @@ function displayDependencyGraph(graphData) {
                     // Position at parent's current location
                     const parentPos = parent.position();
                     node.position({ x: parentPos.x, y: parentPos.y });
-                    appLogger.info(`[Cytoscape] Positioned new node ${nodeData.data.id} at parent location`);
+                    appLogger.debug(`[Cytoscape] Positioned new node ${nodeData.data.id} at parent location`);
                 }
             });
         }
@@ -744,10 +744,10 @@ function displayDependencyGraph(graphData) {
         const nodesChanged = nodesToRemove.length > 0 || elementsToAdd.some(e => !e.data.source);
 
         if (nodesChanged) {
-            appLogger.info('[Cytoscape] Running layout because nodes changed');
+            appLogger.debug('[Cytoscape] Running layout because nodes changed');
             runStableDagreLayout(true, false);  // Animate, don't reset viewport
         } else {
-            appLogger.info('[Cytoscape] Skipping layout - only edges changed, nodes stay in place');
+            appLogger.debug('[Cytoscape] Skipping layout - only edges changed, nodes stay in place');
         }
     }
 }
@@ -1030,7 +1030,7 @@ function setupEventHandlers() {
 function applyCollapseStates(nodeStates) {
     if (!cy || !nodeStates) return;
 
-    appLogger.info('[CollapseStates] Applying collapse states to graph');
+    appLogger.debug('[CollapseStates] Applying collapse states to graph');
 
     // First, show all nodes (reset state)
     cy.nodes().show();
@@ -1044,7 +1044,7 @@ function applyCollapseStates(nodeStates) {
             // Hide all descendants (children and their children recursively)
             const descendants = parentNode.descendants();
             descendants.hide();
-            appLogger.info(`[CollapseStates] Collapsed ${parentId}, hiding ${descendants.length} descendants`);
+            appLogger.debug(`[CollapseStates] Collapsed ${parentId}, hiding ${descendants.length} descendants`);
         }
     });
 }
@@ -1196,7 +1196,7 @@ function startHealthCheck() {
 
         // Only check if analysis is complete and it's been a while
         if (analysisComplete && timeSinceLastSuccess > 3000 && !connectionLost) {
-            appLogger.info('Performing health check...');
+            appLogger.debug('Performing health check...');
             fetch('/api/module', { method: 'HEAD' })
                 .then(response => {
                     if (response.ok) {
@@ -1281,18 +1281,18 @@ function setupActivityListeners() {
 
 // Subscribe to workspace status events
 function subscribeToWorkspaceStatus() {
-    appLogger.info('Creating EventSource for workspace_status...');
+    appLogger.debug('Creating EventSource for workspace_status...');
     workspaceStatusSource = new EventSource('/api/subscribe/workspace_status');
 
     workspaceStatusSource.onopen = function() {
-        appLogger.info('workspace_status EventSource connected, readyState:', workspaceStatusSource.readyState);
+        appLogger.debug('workspace_status EventSource connected, readyState:', workspaceStatusSource.readyState);
     };
 
     workspaceStatusSource.onmessage = function(event) {
-        appLogger.info('Raw workspace_status event data:', event.data);
+        appLogger.debug('Raw workspace_status event data:', event.data);
         try {
             const sseEvent = JSON.parse(event.data);
-            appLogger.info('Parsed SSE event:', sseEvent);
+            appLogger.debug('Parsed SSE event:', sseEvent);
 
             // sseEvent.data is json.RawMessage (already a JSON string), parse it
             let status;
@@ -1301,7 +1301,7 @@ function subscribeToWorkspaceStatus() {
             } else {
                 status = sseEvent.data; // Already an object (shouldn't happen with json.RawMessage)
             }
-            appLogger.info('Parsed status:', status);
+            appLogger.debug('Parsed status:', status);
 
             appLogger.info('Workspace status:', status.state, '-', status.message);
 
@@ -1393,7 +1393,7 @@ function subscribeToTargetGraph() {
                 graphData = sseEvent.data;
             }
 
-            appLogger.info('Target graph update:', sseEvent.type, 'complete:', graphData.complete);
+            appLogger.debug('Target graph update:', sseEvent.type, 'complete:', graphData.complete);
 
             // Load full graph data when available
             if (sseEvent.type === 'complete' && !graphDataLoaded) {
@@ -1433,7 +1433,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
         }
     });
 
-    appLogger.info('Overlapping targets found:', Array.from(allOverlappingTargets.keys()));
+    appLogger.debug('Overlapping targets found:', Array.from(allOverlappingTargets.keys()));
 
     // Mark nodes that have overlapping dependencies
     graph.nodes.forEach(node => {
@@ -1441,7 +1441,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
         if (allOverlappingTargets.has(nodeLabel)) {
             node.hasOverlap = true;
             node.overlappingWith = Array.from(allOverlappingTargets.get(nodeLabel));
-            appLogger.info('Marked node as overlapping:', nodeLabel, 'with:', node.overlappingWith);
+            appLogger.debug('Marked node as overlapping:', nodeLabel, 'with:', node.overlappingWith);
         }
     });
 
@@ -1454,7 +1454,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
                 if (node) {
                     node.hasOverlap = true;
                     node.overlappingTargets = Object.values(binary.overlappingDeps).flat();
-                    appLogger.info('Marked shared library as overlapping:', binary.label);
+                    appLogger.debug('Marked shared library as overlapping:', binary.label);
                 }
             }
         }
@@ -1463,7 +1463,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
 
 // Load full graph data from API
 async function loadGraphData() {
-    appLogger.info('loadGraphData() called');
+    appLogger.debug('loadGraphData() called');
     try {
         // Fetch module graph
         const graphResponse = await monitoredFetch('/api/module/graph');
@@ -1808,7 +1808,7 @@ async function fetchRenderedGraphFromBackend(viewState) {
     previousHash: currentGraphHash  // Send previous hash for diff-based updates
   };
 
-  appLogger.info('[App] Request body:', JSON.stringify(requestBody, null, 2));
+  appLogger.debug('[App] Request body:', JSON.stringify(requestBody, null, 2));
 
   const response = await fetch('/api/module/graph/lens', {
     method: 'POST',
