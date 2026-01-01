@@ -110,6 +110,27 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ Stuck info popups bug fix (DONE)
+
+**Problem**: Info popups (hover tooltips) were getting stuck on screen and accumulating in the DOM, causing visual clutter and memory leaks.
+
+**Root Causes**:
+1. Each call to `displayDependencyGraph()` created a new tooltip element without removing old ones
+2. No cleanup mechanism when window lost focus or graph layout changed
+3. No tracking of active popups for cleanup
+
+**Fix**: Implemented proper info popup lifecycle management in [pkg/web/static/app.js](pkg/web/static/app.js):
+- Added global `activeInfoPopups` array to track all active popups
+- Created `clearAllInfoPopups(fade)` function with optional fade animation
+- Modified tooltip creation to reuse existing element instead of creating duplicates
+- Clear popups on graph re-render (layout changes)
+- Clear popups when window loses focus (with smooth fade-out animation)
+
+**Result**:
+- Only one info popup element exists at a time
+- Popups are properly cleaned up on all appropriate events
+- Smooth visual transitions with fade animations
+
 ## ✅ Package node edge collision bug fix (DONE)
 
 **Problem**: When a target node was hidden by lens configuration (distance=infinite), edges would incorrectly point to its parent package node instead of being hidden. This caused synthetic package nodes (like `//audio`) to appear in the dependency graph with edges, even though package nodes are not real targets.
