@@ -100,15 +100,17 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
-## ✅ Uncovered files package grouping fix (DONE)
+## ✅ Uncovered files visibility fixes (DONE)
 
-Fixed bug where uncovered files appeared at the top level of the graph instead of being grouped in their respective packages.
+Fixed two related bugs with uncovered file visibility in the graph.
 
-**Problem**: Uncovered files (files discovered by git but not included in any Bazel target) were shown as orphaned nodes at the root level instead of being nested under their package nodes (e.g., `//util`, `//cycle_demo`).
+**Problem 1: Files appeared at top level instead of in packages**
 
-**Root Cause**: The uncovered file handling code in `buildModuleGraph()` set parent references correctly, but the lens renderer's `extractParentID()` function only handled standard Bazel node IDs (starting with `//` and using `:` separators). When it encountered uncovered file IDs like `uncovered:cycle_demo/file_a.h`, it returned an empty string, clearing the parent field.
+Uncovered files (files discovered by git but not included in any Bazel target) were shown as orphaned nodes at the root level instead of being nested under their package nodes (e.g., `//util`, `//cycle_demo`).
 
-**Fix**: Modified [pkg/lens/distance.go:173-201](pkg/lens/distance.go#L173-L201) `extractParentID()` function to handle uncovered file IDs specially:
+**Root Cause 1**: The uncovered file handling code in `buildModuleGraph()` set parent references correctly, but the lens renderer's `extractParentID()` function only handled standard Bazel node IDs (starting with `//` and using `:` separators). When it encountered uncovered file IDs like `uncovered:cycle_demo/file_a.h`, it returned an empty string, clearing the parent field.
+
+**Fix 1**: Modified [pkg/lens/distance.go:173-201](pkg/lens/distance.go#L173-L201) `extractParentID()` function to handle uncovered file IDs specially:
 - Detects IDs with `uncovered:` prefix
 - Extracts package path from file path (e.g., `uncovered:util/orphaned.cc` → `//util`)
 - Uses `strings.LastIndex("/")` to find package boundary
@@ -116,12 +118,85 @@ Fixed bug where uncovered files appeared at the top level of the graph instead o
 
 Also updated [pkg/web/server.go:877-944](pkg/web/server.go#L877-L944) `buildModuleGraph()` to ensure package nodes exist for packages containing only uncovered files (no targets).
 
-**Result**: All uncovered files now correctly appear as children of their package nodes in the graph hierarchy, making them easier to locate and understand in the context of the codebase structure.
+**Problem 2: Files didn't show when package was selected**
+
+When a package like `//util` was selected, only the targets within that package were shown. Uncovered files (e.g., `orphaned.cc`) were not included in the selection expansion, so they remained hidden even though their parent package was selected.
+
+**Root Cause 2**: The `expandPackagesToTargets()` function only looked for target nodes (IDs with `:` separators) when expanding a package selection. It didn't consider uncovered files which have IDs like `uncovered:util/orphaned.cc`.
+
+**Fix 2**: Modified [pkg/lens/distance.go:34-91](pkg/lens/distance.go#L34-L91) `expandPackagesToTargets()` to also include uncovered files when expanding package selections:
+- When package `//util` is selected, function now finds both targets (`//util:util`) and uncovered files (`uncovered:util/orphaned.cc`)
+- Adds both to the initial BFS queue at distance 0
+- Ensures uncovered files are visible alongside regular target files when exploring a package
+
+**Result**:
+- All uncovered files correctly appear as children of their package nodes in the graph hierarchy ✓
+- Uncovered files are visible when their package is selected ✓
+- Makes uncovered files much more discoverable and useful for understanding which files are not included in any Bazel targets
 
 **Testing**: Verified with example workspace:
 - `uncovered:cycle_demo/file_a.h` → parent: `//cycle_demo` ✓
 - `uncovered:cycle_demo/file_b.h` → parent: `//cycle_demo` ✓
 - `uncovered:util/orphaned.cc` → parent: `//util` ✓
+- Selecting `//util` shows `orphaned.cc` ✓
+- Selecting `//cycle_demo` shows both `file_a.h` and `file_b.h` ✓
+
+## ✅ Package-only view edge aggregation fix (DONE)
+
+Fixed missing edges when showing only packages in the graph (collapseLevel: 1).
+
+**Problem**: When the default lens was set to show only packages (hiding targets and files), no edges were displayed between packages. The graph showed 8 package nodes but 0 edges, making it impossible to understand the high-level dependency structure.
+
+**Root Cause**: The `findVisibleAncestor()` function was designed to skip package nodes when aggregating edges (from an earlier bug fix to prevent synthetic package edges when targets are visible). However, when ONLY packages are visible, this caused all edges to be dropped since the function couldn't find any visible non-package ancestors.
+
+**Previous Context**: An earlier fix prevented package nodes from appearing in edges when their child targets were visible (e.g., preventing `//audio → //util:util` when `//audio:audio_impl` should be used instead). The fix skipped package nodes during edge aggregation by continuing to walk up the hierarchy past them. This worked correctly when targets were visible but broke the package-only view.
+
+**Fix**: Modified [pkg/lens/renderer.go:660-703](pkg/lens/renderer.go#L660-L703) `findVisibleAncestor()` to use package nodes as fallback ancestors:
+- Track the first visible package encountered while walking up the hierarchy
+- Continue walking up past packages to search for visible target ancestors
+- If a visible target is found above, use it (maintains previous bug fix)
+- If no visible target exists, fall back to using the package (fixes package-only view)
+- Only return empty string if no visible ancestor at all
+
+**Implementation Details**:
+```go
+// Walk up the hierarchy, tracking the first visible package in case we need it
+var firstVisiblePackage string
+for ... {
+    if includedNodeIds[parentID] {
+        isPackage := !strings.Contains(parentID, ":")
+        if isPackage {
+            if firstVisiblePackage == "" {
+                firstVisiblePackage = parentID
+            }
+            // Continue walking up to see if there's a visible target above
+            continue
+        }
+        return parentID  // Found visible target
+    }
+}
+// Fall back to package if no target found
+if firstVisiblePackage != "" {
+    return firstVisiblePackage
+}
+```
+
+**Result**: Package-level dependency visualization now works correctly:
+- **Before**: collapseLevel: 1 showed 8 packages, 0 edges ✗
+- **After**: collapseLevel: 1 shows 8 packages, 9 edges between packages ✓
+- **Maintains previous fix**: When targets are visible, edges skip package nodes and connect targets directly ✓
+
+**Example edges now visible in package-only view**:
+- `//main → //core` (static)
+- `//main → //graphics` (dynamic, static)
+- `//main → //util` (static)
+- `//audio → //util` (static)
+- `//core → //util` (static)
+- `//plugins → //core` (static)
+- `//plugins → //util` (static)
+- `//foobar → //cycle_demo` (static)
+
+This makes the package-only view useful for understanding high-level architecture and identifying which packages depend on each other.
 
 ## ✅ Workspace directory display (DONE)
 
