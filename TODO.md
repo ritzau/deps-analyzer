@@ -2,34 +2,28 @@
 
 ## Prioritized backlog
 
-1. ~~Update frontend JavaScript files to use structured logger~~ ✅ DONE
-
-2. ~~Make sure docs are up to date~~ ✅ DONE
-
-3. ~~Collect styles in the CSS (if possible with the graph library)~~ ✅ DONE
-
-4. Node selection should also work in the targets list (including ctrl+click).
+1. Node selection should also work in the targets list (including ctrl+click).
    While doing this we need an alternative to ctrl+click since ctrl+click on
    macOS is equivalent to secondary click.
 
-5. If a node has a single nested node, we should be able to collapse the
+2. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-6. BUG: If a file node is selected we end up in a weird state where no files are
+3. BUG: If a file node is selected we end up in a weird state where no files are
    visible and neighbour packages remain visible (but no targets).
 
-7. External packages: May require support of .a files. These packages can be
+4. External packages: May require support of .a files. These packages can be
    added using cc_foreign_rule, bazel_dep, or cc_import. They typically result
    in static or dynamic libraries, alternatively being header only. Add a
    special configuration step for their visualization much like the system libs.
    The "source" files they share are the headers and libs. We can either show
    them collapsed or with those files, alternatively we can hide them.
 
-8. BUG: Uncovered files are shown at top level, they should be shown in the
+5. BUG: Uncovered files are shown at top level, they should be shown in the
    package where they reside.
 
-9. Add something in the web ui indicating the directory that we ran the
+6. Add something in the web ui indicating the directory that we ran the
    analysis in.
 
 ## Unclear
@@ -106,6 +100,70 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ Frontend structured logging migration (DONE)
+
+Migrated all frontend JavaScript files to use the structured logger infrastructure.
+
+**Implementation**:
+- Converted all console.* calls in app.js (66 statements), view-state.js (14 statements), and lens-controls.js (6 statements) to use appLogger, viewStateLogger, and lensLogger respectively
+- Fixed logger.js bug where strings were treated as character arrays due to Object.entries() iteration
+- Added _normalizeArgs() helper to handle both console.log-style arguments and structured data objects
+- Downgraded 25+ log statements from INFO to DEBUG to reduce console noise
+- Changed large object logging to summary counts (e.g., log array length instead of full array)
+- Added HTML comments documenting runtime log level control via browser console
+
+**Benefits**:
+- Consistent structured logging format across frontend and backend
+- Appropriate log levels (DEBUG for internal details, INFO for user-facing operations)
+- Runtime log level control without rebuilding
+- Reduced console noise from internal operations
+
+## ✅ Documentation consolidation (DONE)
+
+Consolidated multiple markdown files and added missing installation instructions.
+
+**Implementation**:
+- Added Quick Install section to README.md with `go install` command
+- Created comprehensive DEVELOPMENT.md merging:
+  - ARCHITECTURE_DECISIONS.md (technology rationale, design decisions)
+  - DEVELOPMENT_GUIDE.md (project structure, algorithms)
+  - pkg/pubsub/README.md (SSE pub/sub documentation)
+  - REMOVED_FEATURES.md (outdated content)
+- Deleted redundant markdown files
+- Added cross-references between README.md, DEVELOPMENT.md, and example/README.md
+- Kept TODO.md separate as requested
+
+**Benefits**:
+- Single source for developer onboarding (DEVELOPMENT.md)
+- Standard Go installation method documented
+- Reduced documentation fragmentation
+- Easier to maintain and keep up-to-date
+
+## ✅ CSS style refactoring (DONE)
+
+Refactored Cytoscape graph styles to reduce duplication and improve maintainability.
+
+**Implementation**:
+- Added GRAPH_COLORS constant with semantic color definitions (node colors, edge colors, state colors, text/border colors)
+- Created helper functions:
+  - edgeStyle(color, width, lineStyle) - generates complete edge styles
+  - nodeStyle(bgColor, textColor, borderColor) - generates basic node styles
+  - fileNodeStyle(bgColor, borderColor) - generates ellipse file node styles
+- Refactored all node and edge type styles to use helpers and color constants
+- Combined duplicate uncovered node styles into single selector
+- Improved code organization with section comments
+
+**Code Reduction**:
+- Before: 156 lines of style definitions
+- After: 121 lines (35 lines removed, 22% reduction)
+
+**Benefits**:
+- Easier to maintain consistent visual design
+- Change colors globally in one place
+- Better readability with semantic color names
+- Less duplication in edge/node style definitions
+- No visual changes - purely maintainability improvement
+
 ## ✅ Structured logging infrastructure (PARTIALLY DONE)
 
 **Goal**: Implement consistent, structured logging across backend and frontend with request tracking, proper log levels, and request-response correlation.
@@ -154,7 +212,7 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 - ✅ Appropriate log levels (Debug for internal details, Info for operations, Warn/Error for issues)
 
 **Remaining Work**:
-- ⏸️ Update frontend JavaScript files to use new structured logger (infrastructure in place)
+- ✅ ~~Update frontend JavaScript files to use new structured logger~~ (DONE - see above)
 - ⏸️ Add log level configuration via command-line flags
 - ⏸️ Consider JSON output mode for production log aggregation
 
