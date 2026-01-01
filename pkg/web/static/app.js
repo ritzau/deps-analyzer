@@ -1493,7 +1493,7 @@ async function loadGraphData() {
         const binariesResponse = await monitoredFetch('/api/binaries');
         if (binariesResponse.ok) {
             binaryData = await binariesResponse.json();
-            appLogger.info('Loaded binary data:', binaryData);
+            appLogger.info('Loaded binary data:', { count: binaryData.length });
 
             // Enrich the displayed graph with overlapping dependency information
             if (packageGraph && packageGraph.nodes) {
@@ -1904,9 +1904,9 @@ let previousViewState = null;
 viewStateManager.addListener(async (newState) => {
   if (!packageGraph) return; // Wait for initial load
 
-  appLogger.info('[App] State changed, rendering with backend API');
-  appLogger.info('[App] BaseSet:', newState.defaultLens.baseSet);
-  appLogger.info('[App] Selected nodes:', Array.from(newState.selectedNodes));
+  appLogger.debug('[App] State changed, rendering with backend API');
+  appLogger.debug('[App] BaseSet:', newState.defaultLens.baseSet);
+  appLogger.debug('[App] Selected nodes:', Array.from(newState.selectedNodes));
 
   // Deep clone the state to avoid reference issues
   previousViewState = {
