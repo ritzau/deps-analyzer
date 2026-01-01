@@ -31,9 +31,9 @@ type distanceQueueNode struct {
 	distance int
 }
 
-// expandPackagesToTargets expands package IDs into all their target IDs
-// For example, "//main" becomes ["//main:test_app", "//main:other_target", ...]
-// This allows selecting a package to select all targets within it
+// expandPackagesToTargets expands package IDs into all their target IDs and uncovered files
+// For example, "//main" becomes ["//main:test_app", "//main:other_target", "uncovered:main/file.cc", ...]
+// This allows selecting a package to select all targets and uncovered files within it
 func expandPackagesToTargets(selectedNodes []string, graph *GraphData) []string {
 	expanded := make(map[string]bool)
 
@@ -54,8 +54,24 @@ func expandPackagesToTargets(selectedNodes []string, graph *GraphData) []string 
 					}
 				}
 			}
-			// If we found targets, don't add the package itself
-			// If no targets found, add the package (in case it's a valid node)
+
+			// Also find uncovered files in this package
+			// Extract package path from package label (e.g., "//util" -> "util")
+			packagePath := strings.TrimPrefix(nodeID, "//")
+			for _, node := range graph.Nodes {
+				if strings.HasPrefix(node.ID, "uncovered:") {
+					filePath := strings.TrimPrefix(node.ID, "uncovered:")
+					// Check if this file belongs to the package
+					// E.g., "util/orphaned.cc" belongs to package "util"
+					if strings.HasPrefix(filePath, packagePath+"/") {
+						expanded[node.ID] = true
+						foundTargets = true  // Mark that we found something in this package
+					}
+				}
+			}
+
+			// If we found targets or uncovered files, don't add the package itself
+			// If nothing found, add the package (in case it's a valid node)
 			if !foundTargets {
 				expanded[nodeID] = true
 			}
