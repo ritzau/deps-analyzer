@@ -1,24 +1,20 @@
-// Global list of active info popups for cleanup
-let activeInfoPopups = [];
+// Global reference to the info popup element (singleton)
+let infoPopup = null;
 
-// Clear all active info popups (with optional fade animation)
-function clearAllInfoPopups(fade = false) {
-    activeInfoPopups.forEach(popup => {
-        if (popup && popup.parentNode) {
-            if (fade) {
-                popup.style.opacity = '0';
-                popup.style.transition = 'opacity 0.2s ease-out';
-                setTimeout(() => {
-                    if (popup.parentNode) {
-                        popup.parentNode.removeChild(popup);
-                    }
-                }, 200);
-            } else {
-                popup.parentNode.removeChild(popup);
-            }
+// Clear/hide the info popup (with optional fade animation)
+function clearInfoPopup(fade = false) {
+    if (infoPopup) {
+        if (fade) {
+            infoPopup.style.opacity = '0';
+            infoPopup.style.transition = 'opacity 0.2s ease-out';
+            setTimeout(() => {
+                infoPopup.style.display = 'none';
+                infoPopup.style.opacity = '1';  // Reset for next show
+            }, 200);
+        } else {
+            infoPopup.style.display = 'none';
         }
-    });
-    activeInfoPopups = [];
+    }
 }
 
 // Update loading checklist progress
@@ -219,7 +215,7 @@ function displayDependencyGraph(graphData) {
     console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
 
     // Clear any visible info popups when graph is re-rendered
-    clearAllInfoPopups();
+    clearInfoPopup();
 
     // Show the graph section (in case it's hidden)
     const graphSection = document.getElementById('graphSection');
@@ -760,27 +756,28 @@ function displayDependencyGraph(graphData) {
 function setupEventHandlers() {
     if (!cy) return;
 
-    // Reuse existing tooltip or create new one
-    let tooltip = document.getElementById('edge-tooltip');
-    if (!tooltip) {
-        tooltip = document.createElement('div');
-        tooltip.id = 'edge-tooltip';
-        tooltip.style.position = 'absolute';
-        tooltip.style.display = 'none';
-        tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
-        tooltip.style.color = 'white';
-        tooltip.style.padding = '8px 12px';
-        tooltip.style.borderRadius = '4px';
-        tooltip.style.fontSize = '12px';
-        tooltip.style.maxWidth = '400px';
-        tooltip.style.zIndex = '10000';
-        tooltip.style.pointerEvents = 'none';
-        tooltip.style.whiteSpace = 'pre-wrap';
-        tooltip.style.fontFamily = 'monospace';
-        tooltip.style.opacity = '1';  // For fade animations
-        document.body.appendChild(tooltip);
-        activeInfoPopups.push(tooltip);  // Track for cleanup
+    // Create info popup element if it doesn't exist (singleton pattern)
+    if (!infoPopup) {
+        infoPopup = document.createElement('div');
+        infoPopup.id = 'edge-tooltip';
+        infoPopup.style.position = 'absolute';
+        infoPopup.style.display = 'none';
+        infoPopup.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+        infoPopup.style.color = 'white';
+        infoPopup.style.padding = '8px 12px';
+        infoPopup.style.borderRadius = '4px';
+        infoPopup.style.fontSize = '12px';
+        infoPopup.style.maxWidth = '400px';
+        infoPopup.style.zIndex = '10000';
+        infoPopup.style.pointerEvents = 'none';
+        infoPopup.style.whiteSpace = 'pre-wrap';
+        infoPopup.style.fontFamily = 'monospace';
+        infoPopup.style.opacity = '1';  // For fade animations
+        document.body.appendChild(infoPopup);
     }
+
+    // Use local reference for convenience
+    const tooltip = infoPopup;
 
     // Tooltip hover delay
     let tooltipTimeout = null;
@@ -2059,6 +2056,6 @@ window.addEventListener('resize', function() {
 
     // Clear info popups when window loses focus
     window.addEventListener('blur', function() {
-        clearAllInfoPopups(true); // Use fade animation
+        clearInfoPopup(true); // Use fade animation
     });
 })();
