@@ -137,10 +137,13 @@ bazel run //main:test_app
 
 ```bash
 # Run analyzer on this workspace
-./bazel_analyzer --workspace=/path/to/test_bazel_workspace --port=8080
+../deps-analyzer --web --workspace=. --port=8080
 
-# View results in browser
-open http://localhost:8080
+# Or with live file watching
+../deps-analyzer --web --watch --workspace=. --port=8080
+
+# View results in browser (opens automatically)
+# http://localhost:8080
 ```
 
 The analyzer should detect all the issues listed above and provide actionable refactoring suggestions.
