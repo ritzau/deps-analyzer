@@ -1,3 +1,26 @@
+// Global list of active info popups for cleanup
+let activeInfoPopups = [];
+
+// Clear all active info popups (with optional fade animation)
+function clearAllInfoPopups(fade = false) {
+    activeInfoPopups.forEach(popup => {
+        if (popup && popup.parentNode) {
+            if (fade) {
+                popup.style.opacity = '0';
+                popup.style.transition = 'opacity 0.2s ease-out';
+                setTimeout(() => {
+                    if (popup.parentNode) {
+                        popup.parentNode.removeChild(popup);
+                    }
+                }, 200);
+            } else {
+                popup.parentNode.removeChild(popup);
+            }
+        }
+    });
+    activeInfoPopups = [];
+}
+
 // Update loading checklist progress
 // completedStep: the step that just finished (will show ✓)
 // activeStep: the step that is now running (will show spinner), or null if all done
@@ -194,6 +217,9 @@ function displayUncoveredFiles(files) {
 
 function displayDependencyGraph(graphData) {
     console.log('displayDependencyGraph called with', graphData.nodes?.length, 'nodes');
+
+    // Clear any visible info popups when graph is re-rendered
+    clearAllInfoPopups();
 
     // Show the graph section (in case it's hidden)
     const graphSection = document.getElementById('graphSection');
@@ -734,22 +760,27 @@ function displayDependencyGraph(graphData) {
 function setupEventHandlers() {
     if (!cy) return;
 
-    // Add tooltip for edges and nodes
-    const tooltip = document.createElement('div');
-    tooltip.id = 'edge-tooltip';
-    tooltip.style.position = 'absolute';
-    tooltip.style.display = 'none';
-    tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
-    tooltip.style.color = 'white';
-    tooltip.style.padding = '8px 12px';
-    tooltip.style.borderRadius = '4px';
-    tooltip.style.fontSize = '12px';
-    tooltip.style.maxWidth = '400px';
-    tooltip.style.zIndex = '10000';
-    tooltip.style.pointerEvents = 'none';
-    tooltip.style.whiteSpace = 'pre-wrap';
-    tooltip.style.fontFamily = 'monospace';
-    document.body.appendChild(tooltip);
+    // Reuse existing tooltip or create new one
+    let tooltip = document.getElementById('edge-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'edge-tooltip';
+        tooltip.style.position = 'absolute';
+        tooltip.style.display = 'none';
+        tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+        tooltip.style.color = 'white';
+        tooltip.style.padding = '8px 12px';
+        tooltip.style.borderRadius = '4px';
+        tooltip.style.fontSize = '12px';
+        tooltip.style.maxWidth = '400px';
+        tooltip.style.zIndex = '10000';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.whiteSpace = 'pre-wrap';
+        tooltip.style.fontFamily = 'monospace';
+        tooltip.style.opacity = '1';  // For fade animations
+        document.body.appendChild(tooltip);
+        activeInfoPopups.push(tooltip);  // Track for cleanup
+    }
 
     // Tooltip hover delay
     let tooltipTimeout = null;
@@ -2024,5 +2055,10 @@ window.addEventListener('resize', function() {
                 cy.fit(undefined, 50);
             }
         }
+    });
+
+    // Clear info popups when window loses focus
+    window.addEventListener('blur', function() {
+        clearAllInfoPopups(true); // Use fade animation
     });
 })();
