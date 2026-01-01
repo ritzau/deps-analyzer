@@ -84,10 +84,10 @@ func (p *SSEPublisher) Subscribe(ctx context.Context, topic string) (Subscriptio
 			case sub.events <- event:
 				// Event sent successfully
 			default:
-				logging.Info("Warning: could not replay event to new subscriber for topic %s", topic)
+				logging.Warn("could not replay event to new subscriber", "topic", topic)
 			}
 		}
-		logging.Info("Replayed %d event(s) for topic %s to new subscriber", len(eventsToReplay), topic)
+		logging.Info("replayed events to new subscriber", "count", len(eventsToReplay), "topic", topic)
 	}
 
 	// Handle context cancellation
@@ -147,7 +147,7 @@ func (p *SSEPublisher) Publish(topic string, eventType string, data interface{})
 			// Event sent successfully
 		default:
 			// Channel full, log warning but don't block
-			logging.Info("Warning: subscription channel full for topic %s, dropping event", topic)
+			logging.Warn("subscription channel full, dropping event", "topic", topic)
 		}
 	}
 

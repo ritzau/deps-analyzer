@@ -59,15 +59,15 @@ func NewFileWatcher(workspace string) (*FileWatcher, error) {
 func (fw *FileWatcher) Start(ctx context.Context) error {
 	// Find and watch all directories containing BUILD files
 	if err := fw.watchBuildFiles(); err != nil {
-		logging.Info("[WATCHER] Warning: Failed to watch BUILD files: %v", err)
+		logging.Warn("failed to watch BUILD files", "error", err)
 	}
 
 	// Watch bazel-out directory if it exists
 	if err := fw.watchBazelOut(); err != nil {
-		logging.Info("[WATCHER] Warning: Failed to watch bazel-out: %v", err)
+		logging.Warn("failed to watch bazel-out", "error", err)
 	}
 
-	logging.Info("[WATCHER] Started watching workspace: %s", fw.workspace)
+	logging.Info("started watching workspace", "path", fw.workspace)
 
 	// Process events
 	go fw.processEvents(ctx)
@@ -105,11 +105,11 @@ func (fw *FileWatcher) watchBuildFiles() error {
 	// Add all directories to watcher
 	for dir := range buildDirs {
 		if err := fw.watcher.Add(dir); err != nil {
-			logging.Info("[WATCHER] Warning: Failed to watch directory %s: %v", dir, err)
+			logging.Warn("failed to watch directory", "path", dir, "error", err)
 		}
 	}
 
-	logging.Info("[WATCHER] Monitoring %d directories for BUILD files", len(buildDirs))
+	logging.Info("monitoring directories for BUILD files", "count", len(buildDirs))
 	return nil
 }
 
@@ -134,7 +134,7 @@ func (fw *FileWatcher) watchBazelOut() error {
 		return fmt.Errorf("failed to watch bazel-out: %w", err)
 	}
 
-	logging.Info("[WATCHER] Monitoring bazel-out at: %s", resolvedPath)
+	logging.Info("monitoring bazel-out", "path", resolvedPath)
 	return nil
 }
 
@@ -209,7 +209,7 @@ func (fw *FileWatcher) processEvents(ctx context.Context) {
 			if !ok {
 				return
 			}
-			logging.Info("[WATCHER] Error: %v", err)
+			logging.Error("watcher error", "error", err)
 		}
 	}
 }

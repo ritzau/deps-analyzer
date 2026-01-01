@@ -45,7 +45,7 @@ func (d *Debouncer) run(ctx context.Context) {
 			return
 		}
 
-		logging.Info("[DEBOUNCE] Flushing %d accumulated events", eventCount)
+		logging.Debug("flushing accumulated events", "count", eventCount)
 
 		// Send events in order: BUILD files first (need full analysis), then others
 		if paths, ok := accumulated[ChangeTypeBuildFile]; ok && len(paths) > 0 {

@@ -10,8 +10,8 @@ import (
 // RenderGraph applies lens transformations to raw graph data
 // This is the main entry point for the lens rendering pipeline
 func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selectedNodes []string) (*GraphData, error) {
-	logging.Info("[LensRenderer] Rendering graph with %d nodes", len(rawGraph.Nodes))
-	logging.Info("[LensRenderer] Selected nodes: %v", selectedNodes)
+	logging.Debug("rendering graph", "nodeCount", len(rawGraph.Nodes))
+	logging.Debug("selected nodes", "nodes", selectedNodes)
 
 	// 1. Compute distances from selected nodes using BFS
 	distances := ComputeDistances(rawGraph, selectedNodes)
@@ -25,7 +25,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 			detailCount++
 		}
 	}
-	logging.Info("[LensRenderer] Nodes using detail lens: %d", detailCount)
+	logging.Debug("nodes using detail lens", "count", detailCount)
 
 	// 3. Apply lens rules to determine visibility and collapse state
 	nodeStates := applyLensRules(rawGraph, nodeLensMap, distances, defaultLens, detailLens)
@@ -64,8 +64,9 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 			if rule != nil {
 				targetTypes = rule.NodeVisibility.TargetTypes
 			}
-			logging.Info("[SyntheticPackage] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
-				pkgNode.ID, distance, lensType, rule != nil, targetTypes, visible)
+			logging.Debug("synthetic package visibility",
+				"package", pkgNode.ID, "distance", distance, "lensType", lensType,
+				"ruleFound", rule != nil, "targetTypes", targetTypes, "visible", visible)
 
 			nodeStates[pkgNode.ID] = &NodeState{
 				Visible:     visible,
@@ -84,7 +85,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 	// 6. Filter to only visible nodes
 	visibleNodes := filterVisibleNodes(allNodes, nodeStates)
 
-	logging.Info("[LensRenderer] Visible nodes after filtering: %d", len(visibleNodes))
+	logging.Debug("visible nodes after filtering", "count", len(visibleNodes))
 
 	// 7. Build hierarchy relationships for visible nodes
 	hierarchicalNodes := buildHierarchy(visibleNodes, nodeStates)
@@ -92,7 +93,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 	// 8. Filter out children of collapsed nodes
 	expandedNodes := filterCollapsedChildren(hierarchicalNodes, nodeStates)
 
-	logging.Info("[LensRenderer] Nodes after collapse filtering: %d", len(expandedNodes))
+	logging.Debug("nodes after collapse filtering", "count", len(expandedNodes))
 
 	// 9. Rebuild hierarchy with filtered nodes
 	finalNodes := buildHierarchy(expandedNodes, nodeStates)
@@ -132,18 +133,18 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 				}
 			} else {
 				// Log nodes without state
-				logging.Info("[LensRenderer] WARNING: Node %s (type=%s) has no state!", finalNodes[i].ID, finalNodes[i].Type)
+				logging.Warn("node has no state", "nodeID", finalNodes[i].ID, "type", finalNodes[i].Type)
 				if finalNodes[i].Type == "package" {
 					packagesWithoutState++
 				}
 			}
 		}
 		if packagesWithDistance > 0 || packagesWithoutState > 0 {
-			logging.Info("[LensRenderer] Package distance labels: %d with state, %d without state", packagesWithDistance, packagesWithoutState)
+			logging.Debug("package distance labels", "withState", packagesWithDistance, "withoutState", packagesWithoutState)
 		}
 	}
 
-	logging.Info("[LensRenderer] Final result: %d nodes, %d edges", len(finalNodes), len(visibleEdges))
+	logging.Debug("final result", "nodes", len(finalNodes), "edges", len(visibleEdges))
 
 	return &GraphData{
 		Nodes: finalNodes,
@@ -207,8 +208,9 @@ func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances m
 			if rule != nil {
 				targetTypes = rule.NodeVisibility.TargetTypes
 			}
-			logging.Info("[ApplyLensRules] Package %s: distance=%v, lensType=%s, ruleFound=%v, targetTypes=%v, visible=%v",
-				node.ID, distance, lensType, rule != nil, targetTypes, visible)
+			logging.Debug("applying lens rules to package",
+				"package", node.ID, "distance", distance, "lensType", lensType,
+				"ruleFound", rule != nil, "targetTypes", targetTypes, "visible", visible)
 		}
 
 		// Check collapse state
@@ -525,7 +527,7 @@ func filterCollapsedChildren(nodes []GraphNode, nodeStates map[string]*NodeState
 	}
 
 	if filtered > 0 {
-		logging.Info("[Lens] Filtered out %d nodes with collapsed/invisible ancestors (kept %d nodes)", filtered, len(result))
+		logging.Debug("filtered collapsed/invisible ancestors", "filtered", filtered, "kept", len(result))
 	}
 
 	return result

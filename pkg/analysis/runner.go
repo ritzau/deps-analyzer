@@ -185,7 +185,7 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		ar.server.SetBinaries(binaryInfos)
 
 		logging.Info("analysis complete",
-			len(module.Targets), len(module.Dependencies), module.GetPackageCount())
+			"targets", len(module.Targets), "dependencies", len(module.Dependencies), "packages", module.GetPackageCount())
 	}
 
 	// Publish final ready state
