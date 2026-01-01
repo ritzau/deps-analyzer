@@ -2,39 +2,35 @@
 
 ## Prioritized backlog
 
-1. BUG: Some info popups get stuck. We should track all created info popups
-   and clear them when layout changes, when the window loses focus, and other
-   times when appropriate.
+1. Ensure consistent logging in backend and frontend.
 
-2. Ensure consistent logging in backend and frontend.
+2. Make sure docs are up to date.
 
-3. Make sure docs are up to date.
+3. Collect styles in the CSS (if possible with the graph library).
 
-4. Collect styles in the CSS (if possible with the graph library).
-
-5. Node selection should also work in the targets list (including ctrl+click).
+4. Node selection should also work in the targets list (including ctrl+click).
    While doing this we need an alternative to ctrl+click since ctrl+click on
    macOS is equivalent to secondary click.
 
-6. If a node has a single nested node, we should be able to collapse the
+5. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-7. BUG: If a file node is selected we end up in a weird state where no files are
+6. BUG: If a file node is selected we end up in a weird state where no files are
    visible and neighbour packages remain visible (but no targets).
 
-8. External packages: May require support of .a files. These packages can be
+7. External packages: May require support of .a files. These packages can be
    added using cc_foreign_rule, bazel_dep, or cc_import. They typically result
    in static or dynamic libraries, alternatively being header only. Add a
    special configuration step for their visualization much like the system libs.
    The "source" files they share are the headers and libs. We can either show
    them collapsed or with those files, alternatively we can hide them.
 
-10. BUG: Uncovered files are shown at top level, they should be shown in the
-    package where they reside.
+8. BUG: Uncovered files are shown at top level, they should be shown in the
+   package where they reside.
 
-11. Add something in the web ui indicating the directory that we ran the
-    analysis in.
+9. Add something in the web ui indicating the directory that we ran the
+   analysis in.
 
 ## Unclear
 
@@ -110,26 +106,34 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
-## ✅ Stuck info popups bug fix (DONE)
+## ✅ Info popups bug fixes (DONE)
 
-**Problem**: Info popups (hover tooltips) were getting stuck on screen and accumulating in the DOM, causing visual clutter and memory leaks.
+**Problem 1: Stuck popups accumulating in DOM**: Info popups (hover tooltips) were getting stuck on screen and accumulating in the DOM, causing visual clutter and memory leaks.
 
 **Root Causes**:
 1. Each call to `displayDependencyGraph()` created a new tooltip element without removing old ones
 2. No cleanup mechanism when window lost focus or graph layout changed
 3. No tracking of active popups for cleanup
 
-**Fix**: Implemented proper info popup lifecycle management in [pkg/web/static/app.js](pkg/web/static/app.js):
-- Added global `activeInfoPopups` array to track all active popups
-- Created `clearAllInfoPopups(fade)` function with optional fade animation
-- Modified tooltip creation to reuse existing element instead of creating duplicates
-- Clear popups on graph re-render (layout changes)
-- Clear popups when window loses focus (with smooth fade-out animation)
+**Problem 2: Popups disappeared after initial fix**: After fixing the stuck popup bug by removing popups from DOM, they stopped appearing entirely because `clearInfoPopup()` was called on every graph re-render.
+
+**Problem 3: Missing fade animations**: Popups were showing/hiding but without smooth transitions.
+
+**Final Fix** (three iterations): Implemented proper info popup lifecycle management in [pkg/web/static/app.js](pkg/web/static/app.js):
+- Changed from create/destroy pattern to singleton pattern with show/hide
+- Global `infoPopup` reference persists in DOM for reuse
+- `clearInfoPopup(fade)` now hides popup with `display: 'none'` instead of removing from DOM
+- Added fade-in animation (200ms ease-in, opacity 0→1) when showing popup
+- Added fade-out animation (200ms ease-out) on mouseout from edges/nodes
+- Immediate hide (no fade) on tap/click for responsive feel
+- Used forced reflow (`offsetHeight`) to ensure CSS transitions work correctly
+- Clear popups on graph re-render and window focus loss
 
 **Result**:
-- Only one info popup element exists at a time
+- Only one info popup element exists at a time (singleton)
 - Popups are properly cleaned up on all appropriate events
 - Smooth visual transitions with fade animations
+- Better performance (reusing DOM element instead of create/destroy)
 
 ## ✅ Package node edge collision bug fix (DONE)
 
