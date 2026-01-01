@@ -23,8 +23,8 @@
 5. BUG: Uncovered files are shown at top level, they should be shown in the
    package where they reside.
 
-6. Add something in the web ui indicating the directory that we ran the
-   analysis in.
+6. ~~Add something in the web ui indicating the directory that we ran the
+   analysis in~~ ✅ DONE
 
 ## Unclear
 
