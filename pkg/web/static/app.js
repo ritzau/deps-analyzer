@@ -1,6 +1,71 @@
 // Use structured logger (loaded from logger.js)
 const appLogger = new Logger();
 
+// ===== Cytoscape Graph Style Configuration =====
+// Centralized color palette and style definitions to reduce duplication
+
+const GRAPH_COLORS = {
+    // Node colors
+    library: '#4fc1ff',
+    binary: '#ff8c00',
+    sharedLib: '#c586c0',
+    systemLib: '#d7ba7d',
+    source: '#89d185',
+    header: '#4fc1ff',
+    uncovered: '#ff6b6b',
+    external: '#6a6a6a',
+    package: '#4a4a4e',
+    targetGroup: '#2d2d30',
+
+    // Edge colors
+    teal: '#4ec9b0',
+    blue: '#4fc1ff',
+    purple: '#c586c0',
+    gold: '#d7ba7d',
+    lightBlue: '#9cdcfe',
+    gray: '#6a6a6a',
+
+    // State colors
+    selected: '#ff8c00',
+    overlap: '#ff4444',
+    publicVis: '#ffd700',
+
+    // Text colors
+    textLight: '#1e1e1e',
+    textDark: '#cccccc',
+    textWhite: 'white',
+    textGray: '#969696',
+
+    // Border colors
+    borderDark: '#3e3e42',
+    borderGray: '#666666',
+    borderMedium: '#696969',
+    borderTargetGroup: '#4a4a4e',
+};
+
+// Helper to create edge style with common properties
+const edgeStyle = (color, width = 2, lineStyle = 'solid') => ({
+    'line-color': color,
+    'target-arrow-color': color,
+    'width': width,
+    'line-style': lineStyle
+});
+
+// Helper to create basic node style
+const nodeStyle = (bgColor, textColor, borderColor = null) => ({
+    'background-color': bgColor,
+    'color': textColor,
+    'border-color': borderColor || GRAPH_COLORS.borderDark
+});
+
+// Helper for ellipse file nodes
+const fileNodeStyle = (bgColor, borderColor) => ({
+    ...nodeStyle(bgColor, GRAPH_COLORS.textLight, borderColor),
+    'shape': 'ellipse',
+    'width': '60px',
+    'height': '60px'
+});
+
 // Global reference to the info popup element (singleton)
 let infoPopup = null;
 
@@ -343,140 +408,87 @@ function displayDependencyGraph(graphData) {
                     'min-height': '100px'
                 }
             },
+            // Target node types
             {
                 selector: 'node[type = "cc_binary"]',
-                style: {
-                    'background-color': '#ff8c00',
-                    'color': 'white',
-                    'border-color': '#cc7000'
-                }
+                style: nodeStyle(GRAPH_COLORS.binary, GRAPH_COLORS.textWhite, '#cc7000')
             },
             {
                 selector: 'node[type = "cc_shared_library"]',
-                style: {
-                    'background-color': '#c586c0',
-                    'color': 'white',
-                    'border-color': '#9d6b99'
-                }
+                style: nodeStyle(GRAPH_COLORS.sharedLib, GRAPH_COLORS.textWhite, '#9d6b99')
             },
             {
                 selector: 'node[type = "system_library"]',
                 style: {
-                    'background-color': '#d7ba7d',
-                    'color': '#1e1e1e',
-                    'border-color': '#b89b5d',
+                    ...nodeStyle(GRAPH_COLORS.systemLib, GRAPH_COLORS.textLight, '#b89b5d'),
                     'shape': 'hexagon'
                 }
             },
+            // File nodes
             {
                 selector: 'node[type = "source"], node[type ^= "source"]',
-                style: {
-                    'background-color': '#89d185',
-                    'color': '#1e1e1e',
-                    'border-color': '#6fb06b',
-                    'shape': 'ellipse',
-                    'width': '60px',
-                    'height': '60px'
-                }
+                style: fileNodeStyle(GRAPH_COLORS.source, '#6fb06b')
             },
             {
                 selector: 'node[type = "header"], node[type ^= "header"]',
-                style: {
-                    'background-color': '#4fc1ff',
-                    'color': '#1e1e1e',
-                    'border-color': '#3fa0d9',
-                    'shape': 'ellipse',
-                    'width': '60px',
-                    'height': '60px'
-                }
+                style: fileNodeStyle(GRAPH_COLORS.header, '#3fa0d9')
             },
+            // Uncovered file nodes (shared style)
             {
-                selector: 'node[type = "uncovered_source"]',
+                selector: 'node[type = "uncovered_source"], node[type = "uncovered_header"]',
                 style: {
-                    'background-color': '#ff6b6b',
+                    ...fileNodeStyle(GRAPH_COLORS.uncovered, GRAPH_COLORS.overlap),
                     'border-width': '3px',
-                    'border-color': '#ff4444',
                     'border-style': 'double',
                     'opacity': 0.7,
-                    'color': '#ffffff',
-                    'shape': 'ellipse',
-                    'width': '60px',
-                    'height': '60px',
+                    'color': GRAPH_COLORS.textWhite,
                     'font-size': '10px'
                 }
             },
-            {
-                selector: 'node[type = "uncovered_header"]',
-                style: {
-                    'background-color': '#ff6b6b',
-                    'border-width': '3px',
-                    'border-color': '#ff4444',
-                    'border-style': 'double',
-                    'opacity': 0.7,
-                    'color': '#ffffff',
-                    'shape': 'ellipse',
-                    'width': '60px',
-                    'height': '60px',
-                    'font-size': '10px'
-                }
-            },
+            // Other node types
             {
                 selector: 'node[type = "external"]',
-                style: {
-                    'background-color': '#6a6a6a',
-                    'color': '#cccccc',
-                    'border-color': '#505050'
-                }
+                style: nodeStyle(GRAPH_COLORS.external, GRAPH_COLORS.textDark, '#505050')
             },
             {
                 selector: 'node[type = "package"]',
                 style: {
-                    'background-color': '#4a4a4e',
-                    'color': '#cccccc',
-                    'border-color': '#696969',
+                    ...nodeStyle(GRAPH_COLORS.package, GRAPH_COLORS.textDark, GRAPH_COLORS.borderMedium),
                     'shape': 'roundrectangle',
                     'font-weight': 'bold',
                     'font-size': '14px',
                     'padding': '18px'
                 }
             },
+            // Node state modifiers
             {
                 selector: 'node[type $= "_selected"]',
                 style: {
-                    'background-color': '#ff8c00',
-                    'color': 'white',
-                    'border-color': '#ff8c00',
+                    ...nodeStyle(GRAPH_COLORS.selected, GRAPH_COLORS.textWhite, GRAPH_COLORS.selected),
                     'border-width': '4px',
                     'font-weight': 'bold'
                 }
             },
             {
                 selector: 'node[type $= "_incoming"]',
-                style: {
-                    'background-color': '#4ec9b0',
-                    'color': '#1e1e1e',
-                    'border-color': '#3da889'
-                }
+                style: nodeStyle(GRAPH_COLORS.teal, GRAPH_COLORS.textLight, '#3da889')
             },
             {
                 selector: 'node[type $= "_outgoing"]',
-                style: {
-                    'background-color': '#c586c0',
-                    'color': 'white',
-                    'border-color': '#9d6b99'
-                }
+                style: nodeStyle(GRAPH_COLORS.sharedLib, GRAPH_COLORS.textWhite, '#9d6b99')
             },
+            // Target groups
             {
                 selector: 'node[type = "target-group"]',
                 style: {
                     'shape': 'roundrectangle',
-                    'background-color': '#2d2d30',
+                    'background-color': GRAPH_COLORS.targetGroup,
                     'background-opacity': 0.3,
                     'border-width': '2px',
-                    'border-color': '#4a4a4e',
+                    'border-color': GRAPH_COLORS.borderTargetGroup,
                     'border-style': 'solid',
                     'label': 'data(label)',
-                    'color': '#969696',
+                    'color': GRAPH_COLORS.textGray,
                     'text-valign': 'top',
                     'text-halign': 'center',
                     'font-size': '14px',
@@ -488,29 +500,28 @@ function displayDependencyGraph(graphData) {
                 selector: 'node[type = "target-group"][selected]',
                 style: {
                     'border-width': '4px',
-                    'border-color': '#ff8c00',
+                    'border-color': GRAPH_COLORS.selected,
                     'background-opacity': 0.4,
-                    'color': '#ff8c00'
+                    'color': GRAPH_COLORS.selected
                 }
             },
+            // ===== Edge Styles =====
+            // Base edge style
             {
                 selector: 'edge',
                 style: {
-                    'width': 2,
-                    'line-color': '#6a6a6a',
-                    'target-arrow-color': '#6a6a6a',
+                    ...edgeStyle(GRAPH_COLORS.gray, 2),
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
                     'arrow-scale': 1.5
                 }
             },
+            // File edges (use default gray)
             {
                 selector: 'edge[type = "file"]',
-                style: {
-                    'line-color': '#6a6a6a',
-                    'target-arrow-color': '#6a6a6a'
-                }
+                style: edgeStyle(GRAPH_COLORS.gray, 2)
             },
+            // Symbol edges (base style: dashed, thin)
             {
                 selector: 'edge[type = "symbol"]',
                 style: {
@@ -518,114 +529,68 @@ function displayDependencyGraph(graphData) {
                     'width': 1.5
                 }
             },
+            // Symbol edges by linkage type
             {
                 selector: 'edge[type = "symbol"][linkage = "static"]',
-                style: {
-                    'line-color': '#4ec9b0',
-                    'target-arrow-color': '#4ec9b0'
-                }
+                style: edgeStyle(GRAPH_COLORS.teal)
             },
             {
                 selector: 'edge[type = "symbol"][linkage = "dynamic"]',
-                style: {
-                    'line-color': '#c586c0',
-                    'target-arrow-color': '#c586c0'
-                }
+                style: edgeStyle(GRAPH_COLORS.purple)
             },
             {
                 selector: 'edge[type = "symbol"][linkage = "cross"]',
-                style: {
-                    'line-color': '#d7ba7d',
-                    'target-arrow-color': '#d7ba7d'
-                }
+                style: edgeStyle(GRAPH_COLORS.gold)
             },
-            {
-                selector: 'edge[type = "dynamic_link"]',
-                style: {
-                    'line-color': '#c586c0',
-                    'target-arrow-color': '#c586c0',
-                    'width': 3,
-                    'line-style': 'solid'
-                }
-            },
-            {
-                selector: 'edge[type = "data"]',
-                style: {
-                    'line-color': '#4ec9b0',
-                    'target-arrow-color': '#4ec9b0',
-                    'width': 2,
-                    'line-style': 'dotted'
-                }
-            },
-            {
-                selector: 'edge[type = "system_link"]',
-                style: {
-                    'line-color': '#4ec9b0',
-                    'target-arrow-color': '#4ec9b0',
-                    'width': 2,
-                    'line-style': 'dashed'
-                }
-            },
-            {
-                selector: 'edge[type = "compile"]',
-                style: {
-                    'line-color': '#4fc1ff',
-                    'target-arrow-color': '#4fc1ff',
-                    'width': 2,
-                    'line-style': 'solid'
-                }
-            },
+            // Dependency edge types
             {
                 selector: 'edge[type = "static"]',
-                style: {
-                    'line-color': '#4ec9b0',
-                    'target-arrow-color': '#4ec9b0',
-                    'width': 2,
-                    'line-style': 'solid'
-                }
+                style: edgeStyle(GRAPH_COLORS.teal, 2, 'solid')
             },
             {
                 selector: 'edge[type = "dynamic"]',
-                style: {
-                    'line-color': '#4ec9b0',
-                    'target-arrow-color': '#4ec9b0',
-                    'width': 2,
-                    'line-style': 'dashed'
-                }
+                style: edgeStyle(GRAPH_COLORS.teal, 2, 'dashed')
+            },
+            {
+                selector: 'edge[type = "dynamic_link"]',
+                style: edgeStyle(GRAPH_COLORS.purple, 3, 'solid')
+            },
+            {
+                selector: 'edge[type = "data"]',
+                style: edgeStyle(GRAPH_COLORS.teal, 2, 'dotted')
+            },
+            {
+                selector: 'edge[type = "system_link"]',
+                style: edgeStyle(GRAPH_COLORS.teal, 2, 'dashed')
+            },
+            {
+                selector: 'edge[type = "compile"]',
+                style: edgeStyle(GRAPH_COLORS.blue, 2, 'solid')
             },
             {
                 selector: 'edge[type = "multi"]',
-                style: {
-                    'line-color': '#9cdcfe',
-                    'target-arrow-color': '#9cdcfe',
-                    'width': 3,
-                    'line-style': 'solid'
-                }
+                style: edgeStyle(GRAPH_COLORS.lightBlue, 3, 'solid')
             },
-            // Overlapping dependencies - MUST be after type-specific selectors to override
-            // Note: Only nodes/edges with hasOverlap/isOverlapping set to true will have this attribute
+            // ===== State Overlays (must come after base styles) =====
+            // Overlapping dependencies
             {
                 selector: 'node[hasOverlap][type = "cc_binary"], node[hasOverlap][type = "cc_shared_library"], node[hasOverlap][type = "cc_library"]',
                 style: {
                     'border-width': '8px',
-                    'border-color': '#ff4444',
+                    'border-color': GRAPH_COLORS.overlap,
                     'border-style': 'double'
                 }
             },
             {
                 selector: 'edge[isOverlapping]',
-                style: {
-                    'line-color': '#ff4444',
-                    'target-arrow-color': '#ff4444',
-                    'width': 4,
-                    'line-style': 'solid'
-                }
+                style: edgeStyle(GRAPH_COLORS.overlap, 4, 'solid')
             },
+            // Selection indicators
             {
                 selector: 'node:selected',
                 style: {
                     'border-width': '3px',
-                    'border-color': '#ff8c00'
+                    'border-color': GRAPH_COLORS.selected
                 }
             },
             // Public visibility indicator (solid gold border)
@@ -634,7 +599,7 @@ function displayDependencyGraph(graphData) {
                 style: {
                     'border-style': 'solid',
                     'border-width': '3px',
-                    'border-color': '#ffd700'
+                    'border-color': GRAPH_COLORS.publicVis
                 }
             },
             // Selected node styling - MUST come after isPublic to override it
@@ -642,7 +607,7 @@ function displayDependencyGraph(graphData) {
                 selector: 'node[selected]',
                 style: {
                     'border-width': '4px',
-                    'border-color': '#ff8c00',
+                    'border-color': GRAPH_COLORS.selected,
                     'border-style': 'solid'
                 }
             }

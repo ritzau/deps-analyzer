@@ -4,9 +4,9 @@
 
 1. ~~Update frontend JavaScript files to use structured logger~~ ✅ DONE
 
-2. Make sure docs are up to date.
+2. ~~Make sure docs are up to date~~ ✅ DONE
 
-3. Collect styles in the CSS (if possible with the graph library).
+3. ~~Collect styles in the CSS (if possible with the graph library)~~ ✅ DONE
 
 4. Node selection should also work in the targets list (including ctrl+click).
    While doing this we need an alternative to ctrl+click since ctrl+click on
