@@ -654,6 +654,7 @@ func aggregateEdgesForCollapsedNodes(rawGraph *GraphData, nodeStates map[string]
 }
 
 // findVisibleAncestor finds the nearest visible ancestor of a node
+// Skips package nodes (synthetic grouping nodes) - edges should only connect real targets
 func findVisibleAncestor(nodeID string, includedNodeIds map[string]bool, childToParentMap map[string]string) string {
 	// Check if node itself is visible
 	if includedNodeIds[nodeID] {
@@ -669,12 +670,20 @@ func findVisibleAncestor(nodeID string, includedNodeIds map[string]bool, childTo
 		}
 
 		if includedNodeIds[parentID] {
+			// Skip package nodes - they're synthetic grouping nodes, not real targets
+			// A node is a package if it has no colon (e.g., "//audio" vs "//audio:audio")
+			if !strings.Contains(parentID, ":") {
+				// Continue walking up past the package node
+				currentID = parentID
+				continue
+			}
 			return parentID
 		}
 
 		currentID = parentID
 	}
 
+	// No visible non-package ancestor found
 	return ""
 }
 

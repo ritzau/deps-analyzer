@@ -2,80 +2,82 @@
 
 ## Prioritized backlog
 
-1. BUG: If a package has two targets, and one is the default, it seems as the
-   package itself has a colliding ID. Dependencies sometimes look wrong. This is
-   only visiblein some cases. One such is when the package is a neighbour to a
-   selected node.
-
-2. BUG: Some tooltips (need a better name for these) get stuck. We should track
+1. BUG: Some tooltips (need a better name for these) get stuck. We should track
    all created tooltips and clear them when layout changes, when the window
    loses focus, and other times when appropriate.
 
-3. If a node has a single nested node, we should be able to collapse the
+2. Ensure consistent logging in backend and frontend.
+
+3. Make sure docs are up to date.
+
+4. Collect styles in the CSS (if possible with the graph library).
+
+5. Node selection should also work in the targets list (including ctrl+click).
+   While doing this we need an alternative to ctrl+click since ctrl+click on
+   macOS is equivalent to secondary click.
+
+6. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
-4. BUG: If a file node is selected we end up in a weird state where no files are
+7. BUG: If a file node is selected we end up in a weird state where no files are
    visible and neighbour packages remain visible (but no targets).
 
-5. Node selection should also work in the targets list (including ctrl+click).
+8. External packages: May require support of .a files. These packages can be
+   added using cc_foreign_rule, bazel_dep, or cc_import. They typically result
+   in static or dynamic libraries, alternatively being header only. Add a
+   special configuration step for their visualization much like the system libs.
+   The "source" files they share are the headers and libs. We can either show
+   them collapsed or with those files, alternatively we can hide them.
+
+10. BUG: Uncovered files are shown at top level, they should be shown in the
+    package where they reside.
+
+11. Add something in the web ui indicating the directory that we ran the
+    analysis in.
+
+## Unclear
+
+1. What can we do with a CLI in this case. Can it be used to find
+   warnings/errors much like a linter?
+
+2. Detect eliminated symbols: Analyze the built artifacts to see which symbols
+   made it into the final binary.
+
+3. Simplify the legend. Try to find a smaller set of categories. One example is
+   to say that the border always indicate warnings and errors. For example
+   indicating uncovered files (warning), or duplicated symbols (error). We can
+   also say that the structure of arrows indicate when they are bound (as in
+   compile time, link time, runtime). We need to consider what we don't cover
+   with a scheme like this. For example visiboity. Language is another thing we
+   likely can not use colors to show. That will not scale. I like that files
+   have another shape, but round does not scale with longer file names.
+
+4. **Add stress tests and unit tests for concurrent requests**: Create automated
+   tests to verify request handling under load:
+
+   - Stress test: Rapidly trigger 50-100 settings changes in quick succession
+   - Unit tests: Mock fetch() and verify only the last request completes
+   - Race condition test: Verify responses arriving out-of-order don't corrupt
+     state
+   - Test both atomic lens updates and request cancellation mechanisms
+   - Could use headless browser testing (Playwright/Puppeteer) for full E2E
+     tests
+
+5. Consider TypeScript.
 
 6. Improve symbol dependency analysis and presentation. Better distinguish
    between static and dynamic symbol linkage, and improve how symbol
    dependencies are visualized in the graph and tooltips.
 
-7. Add collapsible external dependencies in detail view. Give users control
-   over detail level:
-
-   - Level 1: Hide external dependencies completely (only show files within
-     selected target)
-   - Level 2: Show external targets as collapsed nodes (hide individual files)
-   - Level 3: Show all files in external targets (current behavior)
-
-8. Detect eliminated symbols: Analyze the built artifacts to see which symbols
-   made it into the final binary.
-
-9. Ensure consistent logging in backend and frontend.
-
-10. Make sure docs are up to date.
-
-11. External packages: May require support of .a files.
-
-12. Collect styles in the CSS (if possible with the graph library).
-
-13. **Uncovered files hierarchical expansion edge case**: When starting at
-    "Targets (hide files)" hierarchy level, manually expanding a target doesn't
-    show uncovered files because uncovered files are children of packages, not
-    targets. User must collapse and re-expand the parent package to see them.
-    This is technically correct behavior (uncovered files aren't part of
-    targets), but UX could be improved by either:
-
-    - Showing uncovered files when any sibling target is expanded
-    - Adding visual indication that package has uncovered files
-    - Auto-expanding package when last target is manually expanded
-
-14. **Consider adding request debouncing**: Currently, rapid UI changes trigger
-    rapid backend requests. While we have request cancellation (AbortController)
-    to prevent race conditions, we could further reduce server load by adding
-    debouncing (e.g., 50-100ms delay before sending request). This would batch
-    rapid changes like dragging a slider or quickly toggling multiple
-    checkboxes. Trade-off: Adds slight latency but reduces backend load and
-    potential flickering. Current approach (immediate requests + cancellation)
-    is simpler and gives instant feedback, so debouncing is optional
-    optimization.
-
-15. **Add stress tests and unit tests for concurrent requests**: Create
-    automated tests to verify request handling under load:
-
-    - Stress test: Rapidly trigger 50-100 settings changes in quick succession
-    - Unit tests: Mock fetch() and verify only the last request completes
-    - Race condition test: Verify responses arriving out-of-order don't corrupt
-      state
-    - Test both atomic lens updates and request cancellation mechanisms
-    - Could use headless browser testing (Playwright/Puppeteer) for full E2E
-      tests
-
-16. Consider TypeScript.
+7. **Consider adding request debouncing**: Currently, rapid UI changes trigger
+   rapid backend requests. While we have request cancellation (AbortController)
+   to prevent race conditions, we could further reduce server load by adding
+   debouncing (e.g., 50-100ms delay before sending request). This would batch
+   rapid changes like dragging a slider or quickly toggling multiple checkboxes.
+   Trade-off: Adds slight latency but reduces backend load and potential
+   flickering. Current approach (immediate requests + cancellation) is simpler
+   and gives instant feedback, so debouncing is optional optimization.
 
 ---
 
@@ -108,23 +110,57 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ Package node edge collision bug fix (DONE)
+
+**Problem**: When a target node was hidden by lens configuration (distance=infinite), edges would incorrectly point to its parent package node instead of being hidden. This caused synthetic package nodes (like `//audio`) to appear in the dependency graph with edges, even though package nodes are not real targets.
+
+**Example**: With `//main:test_app` selected:
+- Bug: `//audio → //util:util` (package node incorrectly used)
+- Bug: `//audio:audio → //audio` (edge to package instead of real target)
+- Expected: These edges should be hidden when the real targets (`//audio:audio_impl`) are at infinite distance
+
+**Root Cause**: In `findVisibleAncestor()`, when walking up the node hierarchy to find a visible ancestor for edge aggregation, the function would stop at package nodes (`//audio`) if they were visible, even though package nodes are synthetic grouping nodes that should never appear in edges.
+
+**Fix**: Modified [pkg/lens/renderer.go:656-688](pkg/lens/renderer.go#L656-L688) `findVisibleAncestor()` to skip package nodes when aggregating edges. Package nodes are identified by having no colon in their ID (e.g., `//audio` vs `//audio:audio`). When a package node is encountered as a potential ancestor, the function continues walking up the hierarchy instead of using it, ultimately returning empty string if no non-package ancestor is found, which causes the edge to be dropped.
+
+**Implementation**:
+```go
+if includedNodeIds[parentID] {
+    // Skip package nodes - they're synthetic grouping nodes, not real targets
+    // A node is a package if it has no colon (e.g., "//audio" vs "//audio:audio")
+    if !strings.Contains(parentID, ":") {
+        // Continue walking up past the package node
+        currentID = parentID
+        continue
+    }
+    return parentID
+}
+```
+
+**Result**: Edges now only connect real target nodes. When a target's children are hidden, edges to/from those hidden nodes are correctly dropped instead of being incorrectly aggregated to the parent package node.
+
 ## ✅ "Focus" to "Select" terminology refactoring (DONE)
 
-Comprehensive refactoring to rename all "focus" terminology to "select" throughout the codebase and simplify the interaction model.
+Comprehensive refactoring to rename all "focus" terminology to "select"
+throughout the codebase and simplify the interaction model.
 
 **Implementation**:
 
 **Backend changes (Go)**:
+
 - Renamed `focusedNodes` → `selectedNodes` in all backend files
 - Renamed `focusLens` → `detailLens` throughout
 - Updated API struct fields in [pkg/web/server.go](pkg/web/server.go):
   - `LensRenderRequest` now uses `DetailLens` and `SelectedNodes`
-- Removed `ManualOverride` struct and functionality from [pkg/lens/lens.go](pkg/lens/lens.go)
+- Removed `ManualOverride` struct and functionality from
+  [pkg/lens/lens.go](pkg/lens/lens.go)
 - Updated distance computation in [pkg/lens/distance.go](pkg/lens/distance.go)
 - Updated hash computation in [pkg/lens/diff.go](pkg/lens/diff.go)
-- Updated lens rendering pipeline in [pkg/lens/renderer.go](pkg/lens/renderer.go)
+- Updated lens rendering pipeline in
+  [pkg/lens/renderer.go](pkg/lens/renderer.go)
 
 **Frontend changes (JavaScript)**:
+
 - Updated state management in [view-state.js](pkg/web/static/view-state.js):
   - Renamed `focusedNodes` → `selectedNodes`
   - Removed `focusMode` and `manualOverrides` state
@@ -145,11 +181,14 @@ Comprehensive refactoring to rename all "focus" terminology to "select" througho
 - Updated HTML in [index.html](pkg/web/static/index.html):
   - Renamed "Focus" tab to "Detail"
   - Removed focus mode toggle (single/multi-select radio buttons)
-  - Removed "Clear Selection" and "Reset All" buttons (redundant with background click)
-  - Updated element IDs: `focusTab` → `detailTab`, `focusD0Files` → `detailD0Files`, etc.
+  - Removed "Clear Selection" and "Reset All" buttons (redundant with background
+    click)
+  - Updated element IDs: `focusTab` → `detailTab`, `focusD0Files` →
+    `detailD0Files`, etc.
   - Updated hint text to explain new interaction model
 
 **Simplified Interaction Model**:
+
 - **Click**: Clear selection and select only the clicked node
 - **Ctrl+Click** (Cmd+Click on Mac): Toggle node in selection
 - **Background click**: Clear all selections
@@ -158,6 +197,7 @@ Comprehensive refactoring to rename all "focus" terminology to "select" througho
 - **Removed**: Redundant "Clear Selection" and "Reset All" buttons
 
 **Benefits**:
+
 - More intuitive terminology: "select" is more user-friendly than "focus"
 - Simpler interaction model: always multi-select with Ctrl modifier
 - Reduced UI clutter: removed 3 UI elements (focus mode toggle, 2 buttons)
