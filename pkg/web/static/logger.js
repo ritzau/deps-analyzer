@@ -21,7 +21,7 @@ class Logger {
   constructor() {
     this.level = LogLevel.INFO; // Default level
     this.requestIDCounter = 0;
-    this.sendToBackend = false; // Whether to send logs to backend
+    this.sendToBackend = true; // Whether to send logs to backend (enabled by default)
     this.logBuffer = []; // Buffer for batching logs
     this.batchSize = 10; // Send after this many logs
     this.batchTimeout = 5000; // Send after this many milliseconds

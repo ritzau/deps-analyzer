@@ -310,7 +310,8 @@
     <!-- Structured logging configuration:
          To enable DEBUG logs in console: appLogger.setLevel(LogLevel.DEBUG)
          To disable DEBUG logs: appLogger.setLevel(LogLevel.INFO)
-         To send logs to backend: logger.enableBackendLogging(true)
+         Backend logging is ENABLED by default:
+           - To disable: logger.enableBackendLogging(false)
            - Logs are batched (10 logs or 5s timeout)
            - Backend logs include source=frontend tag for filtering
            - Useful for debugging production issues
