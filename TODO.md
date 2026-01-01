@@ -2,7 +2,7 @@
 
 ## Prioritized backlog
 
-1. Update frontend JavaScript files to use structured logger
+1. ~~Update frontend JavaScript files to use structured logger~~ ✅ DONE
 
 2. Make sure docs are up to date.
 
