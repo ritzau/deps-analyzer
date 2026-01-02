@@ -1476,26 +1476,6 @@ async function loadGraphData() {
             appLogger.error('Failed to fetch module graph:', graphResponse.status, graphResponse.statusText);
         }
 
-        // Fetch binary data
-        const binariesResponse = await monitoredFetch('/api/binaries');
-        if (binariesResponse.ok) {
-            binaryData = await binariesResponse.json();
-            appLogger.info('Loaded binary data:', { count: binaryData.length });
-
-            // Enrich the displayed graph with overlapping dependency information
-            if (packageGraph && packageGraph.nodes) {
-                enrichGraphWithOverlappingInfo(packageGraph, binaryData);
-                // Redisplay the graph with overlapping info through backend lens API
-                try {
-                    const currentState = viewStateManager.getState();
-                    const renderedGraph = await fetchRenderedGraphFromBackend(currentState);
-                    displayDependencyGraph(renderedGraph);
-                } catch (error) {
-                    appLogger.error('Error rendering graph via backend:', error);
-                }
-            }
-        }
-
         // Fetch module data for tree browser
         const moduleResponse = await monitoredFetch('/api/module');
         if (moduleResponse.ok) {
@@ -1515,11 +1495,6 @@ async function loadGraphData() {
 
             // Initialize lens controls (after DOM is ready and data is loaded)
             initializeLensControls();
-
-            // Populate binary selector for lens controls
-            if (binaryData && binaryData.length > 0) {
-                populateBinarySelector(binaryData);
-            }
 
             // Trigger initial render with backend lens API
             try {
@@ -1551,9 +1526,90 @@ window.addEventListener('beforeunload', function() {
     }
 });
 
+// ===== Navigation Filter Setup =====
+// Timeout for debouncing search input
+let searchTimeout = null;
+
+/**
+ * Set up event handlers for navigation filter controls
+ */
+function setupNavigationFilters() {
+    appLogger.debug('[App] Setting up navigation filters');
+
+    // Dropdown toggle
+    const dropdownBtn = document.getElementById('ruleTypeDropdown');
+    const dropdownMenu = document.getElementById('ruleTypeMenu');
+
+    if (!dropdownBtn || !dropdownMenu) {
+        appLogger.warn('[App] Filter controls not found in DOM');
+        return;
+    }
+
+    dropdownBtn.onclick = (e) => {
+        const isVisible = dropdownMenu.style.display !== 'none';
+        dropdownMenu.style.display = isVisible ? 'none' : 'block';
+        e.stopPropagation();
+        appLogger.trace('[App] Toggled filter dropdown', { isVisible: !isVisible });
+    };
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+        if (dropdownMenu.style.display !== 'none') {
+            dropdownMenu.style.display = 'none';
+            appLogger.trace('[App] Closed filter dropdown (click outside)');
+        }
+    });
+
+    // Checkbox changes trigger filter update
+    document.querySelectorAll('#ruleTypeMenu input[type="checkbox"]').forEach(checkbox => {
+        checkbox.onchange = () => {
+            const selectedTypes = new Set(
+                Array.from(document.querySelectorAll('#ruleTypeMenu input:checked'))
+                    .map(cb => cb.value)
+            );
+            const searchText = document.getElementById('targetSearch').value;
+
+            appLogger.debug('[App] Rule type filter changed', {
+                selectedTypes: Array.from(selectedTypes),
+                searchText
+            });
+
+            viewStateManager.updateNavigationFilters(selectedTypes, searchText);
+        };
+    });
+
+    // Search input with debounce
+    const searchInput = document.getElementById('targetSearch');
+    if (searchInput) {
+        searchInput.oninput = () => {
+            clearTimeout(searchTimeout);
+            const searchText = searchInput.value;
+
+            searchTimeout = setTimeout(() => {
+                const selectedTypes = new Set(
+                    Array.from(document.querySelectorAll('#ruleTypeMenu input:checked'))
+                        .map(cb => cb.value)
+                );
+
+                appLogger.debug('[App] Search filter changed', {
+                    selectedTypes: Array.from(selectedTypes),
+                    searchText
+                });
+
+                viewStateManager.updateNavigationFilters(selectedTypes, searchText);
+            }, 300); // 300ms debounce
+        };
+    }
+
+    appLogger.info('[App] Navigation filters initialized');
+}
+
 // Initialize subscriptions when page loads
 document.addEventListener('DOMContentLoaded', function() {
     appLogger.info('Starting SSE subscriptions...');
+
+    // Set up navigation filter event handlers
+    setupNavigationFilters();
 
     // Close any existing connections first (in case of reload)
     if (workspaceStatusSource) {
@@ -1704,8 +1760,8 @@ let treeData = null;
 let analysisData = null; // Store full analysis data
 let packageGraph = null; // Store the original package-level graph
 let binaryGraph = null; // Store the binary-level graph
-let binaryData = null; // Store binary information
 let cy = null; // Store the Cytoscape instance
+let allTargetNodes = []; // Store all target nodes for client-side filtering
 
 // Global configuration object
 const GRAPH_CONFIG = {
@@ -1891,9 +1947,22 @@ let previousViewState = null;
 function updateNavigationHighlighting(selectedNodes) {
   const navItems = document.querySelectorAll('.nav-item');
   navItems.forEach(item => {
-    // Check if this item's node ID is in the selection
     const nodeId = item.dataset.nodeId;
-    const isSelected = nodeId && selectedNodes.has(nodeId);
+    if (!nodeId) return;
+
+    // Check if this item's node ID is directly in the selection
+    let isSelected = selectedNodes.has(nodeId);
+
+    // If not directly selected, check if its parent package is selected
+    // Navigation shows targets (//package:target), selection might contain packages (//package)
+    if (!isSelected) {
+      // Extract package from target ID (//package:target -> //package)
+      const colonIndex = nodeId.indexOf(':');
+      if (colonIndex !== -1) {
+        const packageId = nodeId.substring(0, colonIndex);
+        isSelected = selectedNodes.has(packageId);
+      }
+    }
 
     if (isSelected) {
       item.classList.add('selected');
@@ -1956,67 +2025,100 @@ viewStateManager.addListener(async (newState) => {
 // - showBinaryFocusedGraph() -> handled by lens renderer
 // - buildBinaryFocusedGraphData() -> handled by lens renderer
 
-// Populate the tree browser
+// Populate the tree browser (stores all targets and renders with current filters)
 function populateTreeBrowser(data) {
     appLogger.debug('Populating navigation with data:', { nodeCount: data.graph?.nodes?.length, edgeCount: data.graph?.edges?.length });
 
-    // Populate binaries list
-    const binariesItems = document.getElementById('binariesItems');
-    if (binariesItems && binaryData && binaryData.length > 0) {
-        binariesItems.innerHTML = '';
-        binaryData.forEach(binary => {
-            const item = document.createElement('div');
-            item.className = 'nav-item';
-            item.dataset.nodeId = binary.label;  // Store full node ID for selection matching
-            const icon = binary.kind === 'cc_binary' ? '🔧' : '📚';
-            item.textContent = `${icon} ${simplifyLabel(binary.label)}`;
+    if (!data.graph || !data.graph.nodes) return;
 
-            // Click selects this binary (Cmd/Ctrl+click for multi-select)
-            item.onclick = (e) => {
-                if (e.ctrlKey || e.metaKey) {
-                    // Multi-select: toggle this item
-                    viewStateManager.toggleSelection(binary.label);
-                } else {
-                    // Single select: replace selection
-                    viewStateManager.setSelection([binary.label]);
-                }
-            };
+    // Store all target nodes for client-side filtering
+    allTargetNodes = data.graph.nodes.filter(node => {
+        const allowedTypes = ['cc_binary', 'cc_library', 'cc_shared_library'];
+        return allowedTypes.includes(node.type);
+    });
 
-            binariesItems.appendChild(item);
-        });
+    appLogger.debug('Stored target nodes:', { count: allTargetNodes.length });
+
+    // Render the filtered list
+    filterAndRenderNavigationList();
+}
+
+// Filter and render navigation list based on current filter state (exposed globally for view-state.js)
+window.filterAndRenderNavigationList = function filterAndRenderNavigationList() {
+    const targetsItems = document.getElementById('targetsItems');
+    if (!targetsItems) return;
+
+    targetsItems.innerHTML = '';
+
+    // Get current filters from state
+    const filters = viewStateManager.state.navigationFilters;
+    const ruleTypes = filters.ruleTypes || new Set(['cc_binary', 'cc_library', 'cc_shared_library']);
+    const searchText = (filters.searchText || '').toLowerCase();
+
+    // Apply client-side filtering
+    const filteredNodes = allTargetNodes.filter(node => {
+        // Filter by rule type
+        if (!ruleTypes.has(node.type)) {
+            return false;
+        }
+
+        // Filter by search text
+        if (searchText && !node.label.toLowerCase().includes(searchText)) {
+            return false;
+        }
+
+        return true;
+    });
+
+    appLogger.debug('Filtered navigation list:', {
+        total: allTargetNodes.length,
+        filtered: filteredNodes.length,
+        ruleTypes: Array.from(ruleTypes),
+        searchText
+    });
+
+    if (filteredNodes.length === 0) {
+        const msg = document.createElement('div');
+        msg.className = 'nav-empty-message';
+        msg.textContent = 'No targets match filters';
+        targetsItems.appendChild(msg);
+        return;
     }
 
-    // Populate targets list (exclude system libraries and file nodes)
-    const targetsItems = document.getElementById('targetsItems');
-    if (targetsItems && data.graph && data.graph.nodes) {
-        targetsItems.innerHTML = '';
-        data.graph.nodes
-            .filter(node => {
-                // Exclude system libraries and file nodes
-                const isSystemLib = node.type === 'system_library';
-                const isFile = node.type === 'source_file' || node.type === 'header_file' ||
-                              node.type === 'uncovered_source' || node.type === 'uncovered_header';
-                return !isSystemLib && !isFile;
-            })
-            .forEach(node => {
-                const item = document.createElement('div');
-                item.className = 'nav-item';
-                item.dataset.nodeId = node.label;  // Store full node ID for selection matching
-                item.textContent = `📦 ${simplifyLabel(node.label)}`;
+    filteredNodes.forEach(node => {
+        const item = document.createElement('div');
+        item.className = 'nav-item';
+        item.dataset.nodeId = node.label;  // Store full node ID for selection matching
 
-                // Click selects this target (Cmd/Ctrl+click for multi-select)
-                item.onclick = (e) => {
-                    if (e.ctrlKey || e.metaKey) {
-                        // Multi-select: toggle this item
-                        viewStateManager.toggleSelection(node.label);
-                    } else {
-                        // Single select: replace selection
-                        viewStateManager.setSelection([node.label]);
-                    }
-                };
+        // Icon based on type
+        const icon = getIconForType(node.type);
+        item.textContent = `${icon} ${simplifyLabel(node.label)}`;
 
-                targetsItems.appendChild(item);
-            });
+        // Click selects this target (Cmd/Ctrl+click for multi-select)
+        item.onclick = (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                // Multi-select: toggle this item
+                viewStateManager.toggleSelection(node.label);
+            } else {
+                // Single select: replace selection
+                viewStateManager.setSelection([node.label]);
+            }
+        };
+
+        targetsItems.appendChild(item);
+    });
+
+    // Update highlighting to match current selection
+    updateNavigationHighlighting(viewStateManager.state.selectedNodes);
+};
+
+// Helper function to get icon for node type
+function getIconForType(type) {
+    switch(type) {
+        case 'cc_binary': return '🔧';
+        case 'cc_shared_library': return '📦';
+        case 'cc_library': return '📚';
+        default: return '•';
     }
 }
 

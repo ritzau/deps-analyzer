@@ -22,6 +22,12 @@ class ViewStateManager {
       detailLens: cloneLens(DEFAULT_DETAIL_LENS),
       selectedNodes: new Set(),
 
+      // Navigation filters
+      navigationFilters: {
+        ruleTypes: new Set(['cc_binary', 'cc_library', 'cc_shared_library']),
+        searchText: ''
+      },
+
       // UI state
       activeTab: 'tree'  // 'tree' | 'default' | 'detail'
     };
@@ -35,6 +41,25 @@ class ViewStateManager {
    */
   getState() {
     return this.state;
+  }
+
+  /**
+   * Update navigation filters (client-side only, does NOT trigger graph re-fetch)
+   * @param {Set<string>} ruleTypes - Set of rule types to show
+   * @param {string} searchText - Search text for filtering by label
+   */
+  updateNavigationFilters(ruleTypes, searchText) {
+    viewStateLogger.debug('[ViewState] Updating navigation filters', {
+      ruleTypes: Array.from(ruleTypes),
+      searchText
+    });
+    this.state.navigationFilters.ruleTypes = ruleTypes;
+    this.state.navigationFilters.searchText = searchText;
+
+    // Re-render navigation list only (don't trigger graph re-fetch)
+    if (window.filterAndRenderNavigationList) {
+      window.filterAndRenderNavigationList();
+    }
   }
 
   /**

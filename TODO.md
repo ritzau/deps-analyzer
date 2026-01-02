@@ -2,16 +2,16 @@
 
 ## Prioritized backlog
 
-1. If a node has a single nested node, we should be able to collapse the
-   hierarchy (recursively). We need to determine what the label should be
-   though.
-
-2. External packages: May require support of .a files. These packages can be
+1. External packages: May require support of .a files. These packages can be
    added using cc_foreign_rule, bazel_dep, or cc_import. They typically result
    in static or dynamic libraries, alternatively being header only. Add a
    special configuration step for their visualization much like the system libs.
    The "source" files they share are the headers and libs. We can either show
    them collapsed or with those files, alternatively we can hide them.
+
+2. If a node has a single nested node, we should be able to collapse the
+   hierarchy (recursively). We need to determine what the label should be
+   though.
 
 ## Unclear
 
@@ -87,35 +87,99 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ Unified navigation list with filtering and highlighting fixes (DONE)
+
+Consolidated binaries and targets into a single filterable navigation list, and fixed
+navigation highlighting to properly reflect graph selections.
+
+**Implementation (TODO #1)**:
+
+- Merged separate binaries and targets lists into unified "Targets" navigation section
+- Added filter controls: rule type checkboxes (cc_binary, cc_library, cc_shared_library)
+  and free text search
+- Implemented client-side filtering (300ms debounce on search)
+- Removed `/api/binaries` endpoint (use graph nodes as single source of truth)
+- All three rule types checked by default
+
+**Navigation highlighting bug fixes**:
+
+**Problem 1**: When selecting nodes in the graph view, the navigation sidebar items
+were not being highlighted to show what was selected.
+
+**Root Cause 1**: After `filterAndRenderNavigationList()` re-created the navigation
+DOM elements, it wasn't applying the selection highlighting to match the current state.
+
+**Fix 1**: Added call to `updateNavigationHighlighting(viewStateManager.state.selectedNodes)`
+at the end of `filterAndRenderNavigationList()` in
+[app.js:2099](pkg/web/static/app.js#L2099).
+
+**Problem 2**: When selecting a package node (e.g., `//core`) in the graph, the targets
+within that package (e.g., `//core:core`) were not being highlighted in the navigation
+sidebar.
+
+**Root Cause 2**: The highlighting logic only checked for direct node ID matches, but
+didn't check if a navigation item's parent package was selected. Since the backend
+expands package selections to include all child targets, the navigation should reflect
+this.
+
+**Fix 2**: Updated `updateNavigationHighlighting()` in
+[app.js:1946-1973](pkg/web/static/app.js#L1946-L1973) to check both:
+- Direct target selection (`//core:core` in selectedNodes)
+- Parent package selection (`//core` in selectedNodes)
+
+Extracts package prefix from target IDs (`//package:target` → `//package`) and checks
+if that package is selected.
+
+**Files modified**:
+- [pkg/web/static/app.js](pkg/web/static/app.js) - Navigation highlighting fixes
+
+**Result**:
+- Navigation sidebar properly highlights selected targets ✓
+- Package selections correctly highlight all child targets in navigation ✓
+- Highlighting updates immediately when filters change ✓
+- Works with both single and multi-select (Cmd/Ctrl+click) ✓
+
 ## ✅ Navigation multi-select and mixed-level edge fix (DONE)
 
 Fixed two issues with node selection and edge rendering.
 
 **Problem 1: No multi-select in navigation lists**
 
-Navigation sidebar (binaries and targets lists) only supported single-select, and Ctrl+click on macOS triggers right-click menu instead of multi-select.
+Navigation sidebar (binaries and targets lists) only supported single-select,
+and Ctrl+click on macOS triggers right-click menu instead of multi-select.
 
 **Solution**: Added Cmd/Ctrl+click support for multi-select in navigation lists:
+
 - Simple click replaces selection with clicked item
 - Cmd+click (⌘ on macOS) or Ctrl+click toggles item in/out of selection
 - Added `data-node-id` attribute to navigation items for accurate matching
-- Implemented `updateNavigationHighlighting()` to sync `.selected` class with view state
+- Implemented `updateNavigationHighlighting()` to sync `.selected` class with
+  view state
 - Visual feedback shows which items are currently selected
 
 **Implementation**: Modified [pkg/web/static/app.js](pkg/web/static/app.js):
+
 - Updated binaries list click handler (lines 1975-1982)
 - Updated targets list click handler (lines 2008-2015)
 - Added navigation highlighting sync (lines 1891-1904)
 
 **Problem 2: Mixed-level edges (package→target)**
 
-When selecting `//main:test_app`, saw edge from `//audio` (package) to `//util:util` (target), which is inconsistent. Edges should connect nodes at the same hierarchy level.
+When selecting `//main:test_app`, saw edge from `//audio` (package) to
+`//util:util` (target), which is inconsistent. Edges should connect nodes at the
+same hierarchy level.
 
-**Root Cause**: When finding visible ancestors for edge endpoints during aggregation, one endpoint might resolve to a package while the other resolves to a target, creating mixed-level edges like `//audio → //util:util`.
+**Root Cause**: When finding visible ancestors for edge endpoints during
+aggregation, one endpoint might resolve to a package while the other resolves to
+a target, creating mixed-level edges like `//audio → //util:util`.
 
-**Solution**: Added endpoint normalization after ancestor resolution. If one endpoint is a package and the other is a target, elevate the target to its package level to ensure consistency.
+**Solution**: Added endpoint normalization after ancestor resolution. If one
+endpoint is a package and the other is a target, elevate the target to its
+package level to ensure consistency.
 
-**Implementation**: Modified [pkg/lens/renderer.go:588-610](pkg/lens/renderer.go#L588-L610):
+**Implementation**: Modified
+[pkg/lens/renderer.go:588-610](pkg/lens/renderer.go#L588-L610):
+
 ```go
 // Normalize endpoints to same level (package vs target)
 sourceIsPackage := !strings.Contains(actualSource, ":")
@@ -137,36 +201,54 @@ if sourceIsPackage && !targetIsPackage {
 ```
 
 **Result**:
+
 - Navigation lists support Cmd/Ctrl+click multi-select with visual feedback ✓
 - macOS users can use Cmd+click (standard macOS modifier) ✓
-- Edges are always at consistent hierarchy levels (package→package or target→target) ✓
-- Fixed edge: `//audio → //util` (both packages) instead of `//audio → //util:util` ✓
+- Edges are always at consistent hierarchy levels (package→package or
+  target→target) ✓
+- Fixed edge: `//audio → //util` (both packages) instead of
+  `//audio → //util:util` ✓
 
 ## ✅ Atomic state updates for performance (DONE)
 
 Fixed redundant backend requests when changing default lens settings.
 
-**Problem**: When changing hierarchy level, base set type, or binary selection, the UI triggered 3-4 backend requests instead of 1, causing unnecessary load and delays.
+**Problem**: When changing hierarchy level, base set type, or binary selection,
+the UI triggered 3-4 backend requests instead of 1, causing unnecessary load and
+delays.
 
-**Root Cause**: `clearSelection()` and `updateDefaultLens()` each called `notifyListeners()` separately, triggering independent backend fetches. These operations needed to happen atomically but were executed as two separate state mutations.
+**Root Cause**: `clearSelection()` and `updateDefaultLens()` each called
+`notifyListeners()` separately, triggering independent backend fetches. These
+operations needed to happen atomically but were executed as two separate state
+mutations.
 
-**Solution**: Added `updateDefaultLensAndClearSelection()` method that batches both state updates before calling `notifyListeners()` once.
+**Solution**: Added `updateDefaultLensAndClearSelection()` method that batches
+both state updates before calling `notifyListeners()` once.
 
 **Implementation**:
-- Added atomic update method to [pkg/web/static/view-state.js:109-119](pkg/web/static/view-state.js#L109-L119)
-- Updated base set change handler in [pkg/web/static/lens-controls.js:93](pkg/web/static/lens-controls.js#L93)
-- Updated collapse level change handler in [pkg/web/static/lens-controls.js:187](pkg/web/static/lens-controls.js#L187)
-- Updated binary selector change handler in [pkg/web/static/lens-controls.js:298](pkg/web/static/lens-controls.js#L298)
 
-**Result**: Changing hierarchy level or other major lens settings now triggers exactly 1 backend request instead of 3-4, improving performance and reducing server load.
+- Added atomic update method to
+  [pkg/web/static/view-state.js:109-119](pkg/web/static/view-state.js#L109-L119)
+- Updated base set change handler in
+  [pkg/web/static/lens-controls.js:93](pkg/web/static/lens-controls.js#L93)
+- Updated collapse level change handler in
+  [pkg/web/static/lens-controls.js:187](pkg/web/static/lens-controls.js#L187)
+- Updated binary selector change handler in
+  [pkg/web/static/lens-controls.js:298](pkg/web/static/lens-controls.js#L298)
+
+**Result**: Changing hierarchy level or other major lens settings now triggers
+exactly 1 backend request instead of 3-4, improving performance and reducing
+server load.
 
 ## ✅ Frontend-to-backend logging integration (DONE)
 
-Implemented centralized logging that sends frontend logs to the backend for monitoring and debugging.
+Implemented centralized logging that sends frontend logs to the backend for
+monitoring and debugging.
 
 **Implementation**:
 
 Backend ([pkg/web/server.go](pkg/web/server.go)):
+
 - Added `/api/logs` POST endpoint to receive frontend logs
 - Added `FrontendLogEntry` and `FrontendLogsRequest` structs for JSON parsing
 - Handler logs each frontend entry with `source=frontend` tag for easy filtering
@@ -175,6 +257,7 @@ Backend ([pkg/web/server.go](pkg/web/server.go)):
 - Uses request context for request ID correlation
 
 Frontend ([pkg/web/static/logger.js](pkg/web/static/logger.js)):
+
 - Added `enableBackendLogging(enabled)` method to turn on/off backend logging
 - Implemented log batching: sends after 10 logs or 5 second timeout
 - Uses `fetch()` to POST batched logs to `/api/logs` endpoint
@@ -183,23 +266,27 @@ Frontend ([pkg/web/static/logger.js](pkg/web/static/logger.js)):
 - Disabled by default for minimal overhead
 
 Documentation ([pkg/web/static/index.html](pkg/web/static/index.html)):
+
 - Added configuration comments explaining how to enable backend logging
 - Documented batching behavior and filtering approach
 
 **Usage**:
+
 ```javascript
 // In browser console
-logger.enableBackendLogging(true);  // Start sending logs to backend
-appLogger.info("Test message", {foo: "bar"});  // Will appear in backend logs
+logger.enableBackendLogging(true); // Start sending logs to backend
+appLogger.info("Test message", { foo: "bar" }); // Will appear in backend logs
 logger.enableBackendLogging(false); // Stop sending logs
 ```
 
 **Backend log format**:
+
 ```
 [INFO] 12:34:56 Test message | source=frontend foo="bar" requestID=abc123
 ```
 
 **Benefits**:
+
 - Easy to filter backend logs: `grep "source=frontend"` in logs
 - Batching reduces backend load and network overhead
 - Useful for debugging production issues or CI environments

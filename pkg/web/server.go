@@ -206,7 +206,6 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/module", s.handleModule).Methods("GET", "HEAD") // HEAD for health checks
 	s.router.HandleFunc("/api/module/graph", s.handleModuleGraph).Methods("GET")
 	s.router.HandleFunc("/api/module/graph/lens", s.handleModuleGraphWithLens).Methods("POST")
-	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
 	s.router.HandleFunc("/api/target/{label}/selected", s.handleTargetSelected).Methods("GET")
 	s.router.HandleFunc("/api/logs", s.handleFrontendLogs).Methods("POST")
 
@@ -282,17 +281,6 @@ func (s *Server) handleSubscribeTargetGraph(w http.ResponseWriter, r *http.Reque
 			flusher.Flush()
 		}
 	}
-}
-
-func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if s.binaries == nil {
-		json.NewEncoder(w).Encode([]*binaries.BinaryInfo{})
-		return
-	}
-
-	json.NewEncoder(w).Encode(s.binaries)
 }
 
 func (s *Server) handleModule(w http.ResponseWriter, r *http.Request) {

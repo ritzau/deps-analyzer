@@ -59,17 +59,33 @@
                 <div class="tab-content">
                     <!-- Tree Tab -->
                     <div id="treeTab" class="tab-pane active">
-                        <!-- Navigation Lists -->
-                        <div id="binariesList" class="nav-section">
-                            <div class="nav-section-title">🔧 Binaries</div>
-                            <div id="binariesItems" class="nav-items"></div>
-                        </div>
-                        <div id="targetsList" class="nav-section">
-                            <div class="nav-section-title">📦 Targets</div>
+                        <!-- Unified Navigation List with Filters -->
+                        <div id="navigationPanel" class="nav-section">
+                            <div class="nav-section-title">🎯 Targets</div>
+
+                            <!-- Filter Controls -->
+                            <div class="nav-filters">
+                                <!-- Rule Type Dropdown -->
+                                <div class="filter-group">
+                                    <button id="ruleTypeDropdown" class="filter-dropdown-btn">
+                                        Rule Types ▾
+                                    </button>
+                                    <div id="ruleTypeMenu" class="filter-dropdown-menu" style="display: none;">
+                                        <label><input type="checkbox" value="cc_binary" checked> 🔧 cc_binary</label>
+                                        <label><input type="checkbox" value="cc_library" checked> 📚 cc_library</label>
+                                        <label><input type="checkbox" value="cc_shared_library" checked> 📦 cc_shared_library</label>
+                                    </div>
+                                </div>
+
+                                <!-- Text Search -->
+                                <input type="text" id="targetSearch" class="filter-search" placeholder="Search labels...">
+                            </div>
+
+                            <!-- Navigation Items -->
                             <div id="targetsItems" class="nav-items"></div>
                         </div>
 
-                        <p class="hint">💡 Click to select, Ctrl+Click to toggle, click background to clear</p>
+                        <p class="hint">💡 Click to select, Cmd+Click to toggle, click background to clear</p>
                     </div>
 
                     <!-- Default Config Tab -->

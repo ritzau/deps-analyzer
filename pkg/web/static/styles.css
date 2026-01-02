@@ -278,6 +278,81 @@ header h1 {
     font-weight: 600;
 }
 
+/* Navigation Filters */
+.nav-filters {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter-group {
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.filter-dropdown-btn {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.filter-dropdown-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+.filter-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 8px;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    margin-top: 2px;
+}
+
+.filter-dropdown-menu label {
+    display: block;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.filter-dropdown-menu label:hover {
+    background: var(--bg-tertiary);
+}
+
+.filter-search {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.filter-search::placeholder {
+    color: var(--text-secondary);
+}
+
+.nav-empty-message {
+    padding: 16px 8px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-style: italic;
+}
+
 /* Tree Nodes */
 .tree-node {
     padding: 6px 16px;
