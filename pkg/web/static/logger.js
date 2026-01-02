@@ -135,7 +135,17 @@ class Logger {
    * @private
    */
   _output(level, logData) {
-    const formatted = `[${logData.level}] ${logData.message}`;
+    // Format: HH:MM:SS/L/C message | key=value
+    // Where L = level initial (T/D/I/W/E), C = Client
+    const time = new Date(logData.timestamp).toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    const levelInitial = logData.level.charAt(0); // T, D, I, W, or E
+    const formatted = `${time}/${levelInitial}/C ${logData.message}`;
+
     const attrs = { ...logData };
     delete attrs.timestamp;
     delete attrs.level;

@@ -10,7 +10,8 @@ import (
 )
 
 // CompactHandler formats logs in a compact, readable format for console output
-// Format: [LEVEL] HH:MM:SS message key=value key=value
+// Format: HH:MM:SS/L/S message | key=value key=value
+// Where L = level initial (D/I/W/E), S = source (S for Server, C for Client)
 type CompactHandler struct {
 	opts  slog.HandlerOptions
 	mu    sync.Mutex
@@ -41,24 +42,34 @@ func (h *CompactHandler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *CompactHandler) Handle(ctx context.Context, r slog.Record) error {
 	buf := make([]byte, 0, 1024)
 
-	// Level with fixed width
-	level := r.Level.String()
-	switch r.Level {
-	case slog.LevelDebug:
-		buf = append(buf, "[DEBUG] "...)
-	case slog.LevelInfo:
-		buf = append(buf, "[INFO]  "...)
-	case slog.LevelWarn:
-		buf = append(buf, "[WARN]  "...)
-	case slog.LevelError:
-		buf = append(buf, "[ERROR] "...)
-	default:
-		buf = append(buf, fmt.Sprintf("[%-5s] ", level)...)
-	}
-
-	// Time (just HH:MM:SS for readability)
+	// Time (HH:MM:SS)
 	t := r.Time.Format("15:04:05")
 	buf = append(buf, t...)
+	buf = append(buf, '/')
+
+	// Level initial (D/I/W/E)
+	switch r.Level {
+	case slog.LevelDebug:
+		buf = append(buf, 'D')
+	case slog.LevelInfo:
+		buf = append(buf, 'I')
+	case slog.LevelWarn:
+		buf = append(buf, 'W')
+	case slog.LevelError:
+		buf = append(buf, 'E')
+	default:
+		// For custom levels (like TRACE), use first letter of level string
+		level := r.Level.String()
+		if len(level) > 0 {
+			buf = append(buf, level[0])
+		} else {
+			buf = append(buf, '?')
+		}
+	}
+	buf = append(buf, '/')
+
+	// Source indicator (S for Server)
+	buf = append(buf, 'S')
 	buf = append(buf, ' ')
 
 	// Message
