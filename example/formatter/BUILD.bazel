@@ -1,0 +1,9 @@
+cc_library(
+    name = "formatter",
+    srcs = ["formatter.cc"],
+    hdrs = ["formatter.h"],
+    deps = [
+        "@fmt//:fmt",
+    ],
+    visibility = ["//visibility:public"],
+)

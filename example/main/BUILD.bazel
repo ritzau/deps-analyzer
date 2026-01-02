@@ -14,7 +14,9 @@ cc_binary(
         "-ldl",  # System library for dynamic loading
     ],
     deps = [
+        "//config",  # JSON config using nlohmann/json
         "//core",
+        "//formatter",  # External dependency via fmt library
         "//graphics:graphics_impl",  # Link against graphics implementation
         "//util",
     ],

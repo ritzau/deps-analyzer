@@ -99,13 +99,108 @@ func QueryWorkspace(workspacePath string) (*model.Module, error) {
 		}
 	}
 
-	// Second pass: create typed dependencies
+	// Collect all external dependencies referenced by workspace targets
+	externalDeps := collectExternalDependencies(result.Rules)
+
+	// Query external dependencies and add them to the module
+	var externalRules []RuleXML
+	if len(externalDeps) > 0 {
+		externalTargets, rules, err := queryExternalTargets(workspacePath, externalDeps)
+		if err != nil {
+			// Log warning but don't fail - external deps are optional
+			fmt.Printf("Warning: failed to query external dependencies: %v\n", err)
+		} else {
+			// Add external targets to module
+			for _, target := range externalTargets {
+				module.Targets[target.Label] = target
+			}
+			externalRules = rules
+		}
+	}
+
+	// Second pass: create typed dependencies from workspace targets
 	for _, rule := range result.Rules {
 		deps := parseDependencies(rule, module.Targets)
 		module.Dependencies = append(module.Dependencies, deps...)
 	}
 
+	// Third pass: create typed dependencies from external targets
+	for _, rule := range externalRules {
+		deps := parseDependencies(rule, module.Targets)
+		module.Dependencies = append(module.Dependencies, deps...)
+	}
+
 	return module, nil
+}
+
+// collectExternalDependencies extracts all external dependency labels from rules
+func collectExternalDependencies(rules []RuleXML) []string {
+	externalDeps := make(map[string]bool)
+
+	for _, rule := range rules {
+		for _, list := range rule.Lists {
+			// Check deps, dynamic_deps, and data lists
+			if list.Name == "deps" || list.Name == "dynamic_deps" || list.Name == "data" {
+				for _, label := range list.Labels {
+					// External dependencies start with @
+					if strings.HasPrefix(label.Value, "@") {
+						// Skip bazel_tools and other system repos
+						if !strings.HasPrefix(label.Value, "@bazel_tools//") &&
+							!strings.HasPrefix(label.Value, "@local_config_") &&
+							!strings.HasPrefix(label.Value, "@platforms//") {
+							externalDeps[label.Value] = true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]string, 0, len(externalDeps))
+	for dep := range externalDeps {
+		result = append(result, dep)
+	}
+	return result
+}
+
+// queryExternalTargets queries Bazel for details about external targets
+// Returns targets, rules, and error
+func queryExternalTargets(workspacePath string, externalLabels []string) ([]*model.Target, []RuleXML, error) {
+	if len(externalLabels) == 0 {
+		return nil, nil, nil
+	}
+
+	// Build query expression: label1 + label2 + label3...
+	queryExpr := strings.Join(externalLabels, " + ")
+
+	cmd := exec.Command("bazel", "query", "--output=xml", queryExpr)
+	cmd.Dir = workspacePath
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, nil, fmt.Errorf("bazel query for external targets failed: %w\nOutput: %s", err, string(output))
+	}
+
+	// Parse XML
+	xmlStr := string(output)
+	xmlStr = strings.Replace(xmlStr, `<?xml version="1.1"`, `<?xml version="1.0"`, 1)
+
+	var result QueryResult
+	if err := xml.Unmarshal([]byte(xmlStr), &result); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse external targets XML: %w", err)
+	}
+
+	// Parse targets
+	targets := make([]*model.Target, 0, len(result.Rules))
+	for _, rule := range result.Rules {
+		target := parseTarget(rule)
+		if target != nil {
+			targets = append(targets, target)
+		}
+	}
+
+	return targets, result.Rules, nil
 }
 
 // parseTarget converts RuleXML to Target
@@ -132,21 +227,29 @@ func parseTarget(rule RuleXML) *model.Target {
 		Name:    targetName,
 	}
 
+	// Skip file parsing for external targets (labels starting with @)
+	// External packages don't have file-level dependency information
+	isExternalTarget := strings.HasPrefix(label, "@")
+
 	// Extract attributes from lists
 	for _, list := range rule.Lists {
 		switch list.Name {
 		case "srcs":
-			for _, label := range list.Labels {
-				if strings.HasSuffix(label.Value, ".cc") {
-					target.Sources = append(target.Sources, label.Value)
-				} else if strings.HasSuffix(label.Value, ".h") || strings.HasSuffix(label.Value, ".hpp") {
-					target.Headers = append(target.Headers, label.Value)
+			if !isExternalTarget {
+				for _, label := range list.Labels {
+					if strings.HasSuffix(label.Value, ".cc") {
+						target.Sources = append(target.Sources, label.Value)
+					} else if strings.HasSuffix(label.Value, ".h") || strings.HasSuffix(label.Value, ".hpp") {
+						target.Headers = append(target.Headers, label.Value)
+					}
 				}
 			}
 		case "hdrs":
-			for _, label := range list.Labels {
-				if strings.HasSuffix(label.Value, ".h") || strings.HasSuffix(label.Value, ".hpp") {
-					target.Headers = append(target.Headers, label.Value)
+			if !isExternalTarget {
+				for _, label := range list.Labels {
+					if strings.HasSuffix(label.Value, ".h") || strings.HasSuffix(label.Value, ".hpp") {
+						target.Headers = append(target.Headers, label.Value)
+					}
 				}
 			}
 		case "linkopts":

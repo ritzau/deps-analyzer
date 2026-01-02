@@ -1,6 +1,7 @@
 package lens
 
 import (
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"strings"
 )
 
@@ -106,6 +107,14 @@ func ComputeDistances(graph *GraphData, selectedNodes []string) map[string]inter
 	// Build adjacency list (undirected graph for distance computation)
 	adjacency := buildAdjacencyList(graph)
 
+	// Debug logging for external node selection
+	for _, nodeID := range selectedNodes {
+		if strings.HasPrefix(nodeID, "@") {
+			neighbors := adjacency[nodeID]
+			logging.Debug("external node selected", "node", nodeID, "neighborCount", len(neighbors), "neighbors", neighbors)
+		}
+	}
+
 	// Expand selected nodes: if a package is selected (e.g., "//main"), include all its targets
 	// This ensures that clicking on a package selects all targets within it
 	expandedSelectedNodes := expandPackagesToTargets(selectedNodes, graph)
@@ -198,7 +207,21 @@ func extractParentID(nodeID string) string {
 		return ""
 	}
 
-	// Remove leading //
+	// Handle external targets: @repo//:target:file
+	if strings.HasPrefix(nodeID, "@") {
+		// Split by ':'
+		parts := strings.Split(nodeID, ":")
+		if len(parts) <= 1 {
+			// No colons, no parent (e.g., just "@repo")
+			return ""
+		}
+
+		// Remove the last component
+		parentParts := parts[:len(parts)-1]
+		return strings.Join(parentParts, ":")
+	}
+
+	// Handle workspace targets: //package:target:file
 	if !strings.HasPrefix(nodeID, "//") {
 		return ""
 	}

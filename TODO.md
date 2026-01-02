@@ -9,7 +9,11 @@
    The "source" files they share are the headers and libs. We can either show
    them collapsed or with those files, alternatively we can hide them.
 
-2. If a node has a single nested node, we should be able to collapse the
+   - BUG: Selecting an external package does not show deps into //...
+
+2. Sort the targets alphabetically (in navigation).
+
+3. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
@@ -87,6 +91,58 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ External dependency support (DONE)
+
+Added comprehensive support for querying and visualizing external Bazel dependencies in the dependency analyzer.
+
+**Implementation**:
+
+Backend ([pkg/bazel/query.go](pkg/bazel/query.go)):
+- Added `collectExternalDependencies()` function to extract external dependency labels from workspace target deps
+- Added `queryExternalTargets()` function to query Bazel for external target details using `bazel query "label1 + label2 + ..." --output=xml`
+- Modified `QueryWorkspace()` to perform three-pass parsing:
+  1. Parse workspace targets from `//...` query
+  2. Query and parse external targets referenced by workspace
+  3. Parse dependencies from both workspace and external rules
+- Filters out system repositories (`@bazel_tools//`, `@local_config_*`, `@platforms//`)
+
+Hierarchy handling ([pkg/lens/distance.go](pkg/lens/distance.go)):
+- Updated `extractParentID()` to handle external target label format (`@repo//:target:file`)
+- Added special case for `@` prefix: splits by `:` and removes last component
+- External files now properly collapse under their parent targets
+
+Frontend visibility ([pkg/web/static/lens-config.js](pkg/web/static/lens-config.js)):
+- Updated default lens configurations to show external dependencies by default
+- Changed `showExternal: false` to `showExternal: true` in both DEFAULT_PACKAGE_LENS and DEFAULT_DETAIL_LENS
+
+**Example dependencies added to test workspace**:
+- `@fmt//:fmt` - Modern C++ formatting library via bzlmod `bazel_dep`
+- `@nlohmann_json//:json` - JSON library via `http_archive` with custom BUILD file
+- Created wrapper packages `//formatter` and `//config` to demonstrate usage
+
+**Label formats**:
+- Workspace targets: `//package:target` or `//package:target:file`
+- External targets: `@repo//:target` or `@repo//:target:file`
+- External files properly nest under parent: `@fmt//:fmt:@fmt/src/format.cc` → parent `@fmt//:fmt`
+
+**Result**:
+- External targets appear in target list and navigation sidebar ✓
+- Dependency edges from workspace to external targets display correctly ✓
+- External targets visible in graph by default ✓
+- External files properly collapse under parent targets at collapseLevel: 2 ✓
+- Works with both bzlmod (`bazel_dep`) and legacy (`http_archive`) integration methods ✓
+
+**Files modified**:
+- [pkg/bazel/query.go](pkg/bazel/query.go) - External dependency querying
+- [pkg/lens/distance.go](pkg/lens/distance.go) - External target hierarchy
+- [pkg/web/static/lens-config.js](pkg/web/static/lens-config.js) - Visibility defaults
+- [example/MODULE.bazel](example/MODULE.bazel) - Test dependencies
+- [example/formatter/](example/formatter/) - Wrapper for fmt library (new package)
+- [example/config/](example/config/) - Wrapper for nlohmann/json (new package)
+- [example/third_party/nlohmann_json.BUILD](example/third_party/nlohmann_json.BUILD) - Custom BUILD file
+- [example/main/BUILD.bazel](example/main/BUILD.bazel) - Usage examples
+- [example/main/main.cc](example/main/main.cc) - Integration demos
+
 ## ✅ Compact log format with client/server indicators (DONE)
 
 Restructured log output to use a compact, scannable format with clear source
@@ -95,20 +151,24 @@ indicators to distinguish client and server logs.
 **Format**: `HH:MM:SS/L/S message | key=value key=value`
 
 Where:
+
 - `HH:MM:SS` = timestamp in 24-hour format
 - `L` = log level initial (D/I/W/E/T for Debug/Info/Warn/Error/Trace)
 - `S` = source indicator (S for Server, C for Client)
 
-**Backend Implementation** ([pkg/logging/compact_handler.go](pkg/logging/compact_handler.go)):
+**Backend Implementation**
+([pkg/logging/compact_handler.go](pkg/logging/compact_handler.go)):
 
 - Updated `Handle()` function to scan log attributes for "source" field
 - When `source="frontend"` is present, uses 'C' indicator
 - Server-originated logs use 'S' indicator
-- Filters out the "source" attribute from displayed attributes (already used for indicator)
+- Filters out the "source" attribute from displayed attributes (already used for
+  indicator)
 - Time comes first for easy chronological scanning
 - Slash separators provide clear visual boundaries
 
-**Frontend Implementation** ([pkg/web/static/logger.js](pkg/web/static/logger.js)):
+**Frontend Implementation**
+([pkg/web/static/logger.js](pkg/web/static/logger.js)):
 
 - Updated `_output()` function to use new format with 'C' for Client
 - Consistent format across browser console and backend logs
@@ -116,13 +176,15 @@ Where:
 
 **Backend Log Forwarding** ([pkg/web/server.go](pkg/web/server.go)):
 
-- Frontend logs sent to `/api/logs` endpoint include `source="frontend"` attribute
+- Frontend logs sent to `/api/logs` endpoint include `source="frontend"`
+  attribute
 - Backend handler adds this attribute when logging frontend messages
 - CompactHandler detects this and uses 'C' indicator
 
 **Example Output**:
 
 Server logs:
+
 ```
 18:40:18/I/S starting web server | url=http://localhost:8080
 18:40:18/I/S request started | req=eb419103 method=GET path=/
@@ -130,12 +192,14 @@ Server logs:
 ```
 
 Client logs (in browser console):
+
 ```
 18:40:19/I/C fetch started | requestID="abc123" url="/api/module/graph/lens"
 18:40:19/I/C fetch completed | requestID="abc123" status=200
 ```
 
 Client logs (forwarded to backend):
+
 ```
 18:40:19/I/C fetch started | requestID="abc123" url="/api/module/graph/lens"
 18:40:19/I/C fetch completed | requestID="abc123" status=200
@@ -151,7 +215,8 @@ Client logs (forwarded to backend):
 
 **Files Modified**:
 
-- [pkg/logging/compact_handler.go](pkg/logging/compact_handler.go) - Source indicator logic
+- [pkg/logging/compact_handler.go](pkg/logging/compact_handler.go) - Source
+  indicator logic
 - [pkg/web/static/logger.js](pkg/web/static/logger.js) - Client-side format
 
 ## ✅ Unified navigation list with filtering and highlighting fixes (DONE)

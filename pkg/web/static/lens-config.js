@@ -66,7 +66,7 @@ const DEFAULT_PACKAGE_LENS = {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
         fileTypes: ['none'],  // Hide files by default
         showUncovered: false,
-        showExternal: false,
+        showExternal: true,  // Show external dependencies
         showSystemLibraries: true
       },
       collapseLevel: 2,  // Show targets but hide files (default)
@@ -97,7 +97,7 @@ const DEFAULT_DETAIL_LENS = {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
         fileTypes: ['all'],  // Show all files
         showUncovered: true,
-        showExternal: false,
+        showExternal: true,  // Show external dependencies
         showSystemLibraries: true
       },
       collapseLevel: 3,  // Show down to file level
@@ -110,7 +110,7 @@ const DEFAULT_DETAIL_LENS = {
         targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
         fileTypes: ['none'],  // Hide files by default
         showUncovered: false,
-        showExternal: false,
+        showExternal: true,  // Show external dependencies
         showSystemLibraries: true
       },
       collapseLevel: 2,  // Show targets but hide files
@@ -123,7 +123,7 @@ const DEFAULT_DETAIL_LENS = {
         targetTypes: [],  // Empty array = hide all targets
         fileTypes: ['none'],  // Hide all files
         showUncovered: false,
-        showExternal: false,
+        showExternal: false,  // Keep hidden for infinite distance
         showSystemLibraries: false  // Hide system libraries too
       },
       collapseLevel: 0,  // Doesn't matter since everything is hidden

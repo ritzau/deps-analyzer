@@ -1,11 +1,14 @@
 #include <iostream>
 #include <dlfcn.h>
+#include <vector>
 #include "core/engine.h"
 #include "core/state.h"
 #include "util/strings.h"
 #include "util/time.h"
 #include "util/file_io.h"
 #include "graphics/renderer.h"
+#include "formatter/formatter.h"
+#include "config/config.h"
 
 int main(int argc, char** argv) {
   std::cout << "=== Test Application ===" << std::endl;
@@ -28,6 +31,26 @@ int main(int argc, char** argv) {
   state.SetValue("name", "test_app");
 
   std::cout << "State version: " << state.GetValue("version") << std::endl;
+
+  // Use external formatter library
+  std::vector<std::string> features = {"engine", "graphics", "plugins", "formatting"};
+  std::cout << "\nFeatures: " << formatter::format_list(features) << std::endl;
+  std::cout << formatter::format_colored("Status: OK", "green") << std::endl;
+
+  // Use JSON config manager (nlohmann/json via http_archive)
+  config::ConfigManager cfg;
+  cfg.SetValue("app_name", "TestApp");
+  cfg.SetInt("max_connections", 100);
+  cfg.SetValue("debug_mode", "true");
+
+  std::cout << "\nConfiguration (JSON):\n" << cfg.ToJson() << std::endl;
+
+  // Load from JSON
+  std::string json_cfg = R"({"width": 1920, "height": 1080, "fullscreen": false})";
+  if (cfg.LoadFromJson(json_cfg)) {
+    std::cout << "Loaded display config: "
+              << cfg.GetInt("width") << "x" << cfg.GetInt("height") << std::endl;
+  }
 
   // Use graphics library (dynamically linked)
   graphics::Renderer renderer;
