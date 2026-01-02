@@ -68,8 +68,17 @@ func (h *CompactHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 	buf = append(buf, '/')
 
-	// Source indicator (S for Server)
-	buf = append(buf, 'S')
+	// Source indicator (S for Server, C for Client)
+	// Check if there's a "source" attribute set to "frontend"
+	sourceIndicator := 'S'
+	r.Attrs(func(a slog.Attr) bool {
+		if a.Key == "source" && a.Value.String() == "frontend" {
+			sourceIndicator = 'C'
+			return false // Stop iterating once we find it
+		}
+		return true
+	})
+	buf = append(buf, byte(sourceIndicator))
 	buf = append(buf, ' ')
 
 	// Message
@@ -80,6 +89,11 @@ func (h *CompactHandler) Handle(ctx context.Context, r slog.Record) error {
 	r.Attrs(func(a slog.Attr) bool {
 		// Skip empty attrs
 		if a.Equal(slog.Attr{}) {
+			return true
+		}
+
+		// Skip the "source" attribute - we already used it for the indicator
+		if a.Key == "source" {
 			return true
 		}
 

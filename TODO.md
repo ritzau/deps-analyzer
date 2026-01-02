@@ -87,53 +87,126 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
+## ✅ Compact log format with client/server indicators (DONE)
+
+Restructured log output to use a compact, scannable format with clear source
+indicators to distinguish client and server logs.
+
+**Format**: `HH:MM:SS/L/S message | key=value key=value`
+
+Where:
+- `HH:MM:SS` = timestamp in 24-hour format
+- `L` = log level initial (D/I/W/E/T for Debug/Info/Warn/Error/Trace)
+- `S` = source indicator (S for Server, C for Client)
+
+**Backend Implementation** ([pkg/logging/compact_handler.go](pkg/logging/compact_handler.go)):
+
+- Updated `Handle()` function to scan log attributes for "source" field
+- When `source="frontend"` is present, uses 'C' indicator
+- Server-originated logs use 'S' indicator
+- Filters out the "source" attribute from displayed attributes (already used for indicator)
+- Time comes first for easy chronological scanning
+- Slash separators provide clear visual boundaries
+
+**Frontend Implementation** ([pkg/web/static/logger.js](pkg/web/static/logger.js)):
+
+- Updated `_output()` function to use new format with 'C' for Client
+- Consistent format across browser console and backend logs
+- All client logs show 'C' whether viewed in browser or forwarded to backend
+
+**Backend Log Forwarding** ([pkg/web/server.go](pkg/web/server.go)):
+
+- Frontend logs sent to `/api/logs` endpoint include `source="frontend"` attribute
+- Backend handler adds this attribute when logging frontend messages
+- CompactHandler detects this and uses 'C' indicator
+
+**Example Output**:
+
+Server logs:
+```
+18:40:18/I/S starting web server | url=http://localhost:8080
+18:40:18/I/S request started | req=eb419103 method=GET path=/
+18:40:18/I/S request completed | req=eb419103 status=200 duration=3ms
+```
+
+Client logs (in browser console):
+```
+18:40:19/I/C fetch started | requestID="abc123" url="/api/module/graph/lens"
+18:40:19/I/C fetch completed | requestID="abc123" status=200
+```
+
+Client logs (forwarded to backend):
+```
+18:40:19/I/C fetch started | requestID="abc123" url="/api/module/graph/lens"
+18:40:19/I/C fetch completed | requestID="abc123" status=200
+```
+
+**Benefits**:
+
+- Easy to distinguish client vs server logs at a glance
+- Time-first ordering aids chronological analysis
+- Compact format reduces visual clutter
+- Consistent format across all logging contexts
+- Works seamlessly with existing log forwarding infrastructure
+
+**Files Modified**:
+
+- [pkg/logging/compact_handler.go](pkg/logging/compact_handler.go) - Source indicator logic
+- [pkg/web/static/logger.js](pkg/web/static/logger.js) - Client-side format
+
 ## ✅ Unified navigation list with filtering and highlighting fixes (DONE)
 
-Consolidated binaries and targets into a single filterable navigation list, and fixed
-navigation highlighting to properly reflect graph selections.
+Consolidated binaries and targets into a single filterable navigation list, and
+fixed navigation highlighting to properly reflect graph selections.
 
 **Implementation (TODO #1)**:
 
-- Merged separate binaries and targets lists into unified "Targets" navigation section
-- Added filter controls: rule type checkboxes (cc_binary, cc_library, cc_shared_library)
-  and free text search
+- Merged separate binaries and targets lists into unified "Targets" navigation
+  section
+- Added filter controls: rule type checkboxes (cc_binary, cc_library,
+  cc_shared_library) and free text search
 - Implemented client-side filtering (300ms debounce on search)
 - Removed `/api/binaries` endpoint (use graph nodes as single source of truth)
 - All three rule types checked by default
 
 **Navigation highlighting bug fixes**:
 
-**Problem 1**: When selecting nodes in the graph view, the navigation sidebar items
-were not being highlighted to show what was selected.
+**Problem 1**: When selecting nodes in the graph view, the navigation sidebar
+items were not being highlighted to show what was selected.
 
-**Root Cause 1**: After `filterAndRenderNavigationList()` re-created the navigation
-DOM elements, it wasn't applying the selection highlighting to match the current state.
+**Root Cause 1**: After `filterAndRenderNavigationList()` re-created the
+navigation DOM elements, it wasn't applying the selection highlighting to match
+the current state.
 
-**Fix 1**: Added call to `updateNavigationHighlighting(viewStateManager.state.selectedNodes)`
-at the end of `filterAndRenderNavigationList()` in
+**Fix 1**: Added call to
+`updateNavigationHighlighting(viewStateManager.state.selectedNodes)` at the end
+of `filterAndRenderNavigationList()` in
 [app.js:2099](pkg/web/static/app.js#L2099).
 
-**Problem 2**: When selecting a package node (e.g., `//core`) in the graph, the targets
-within that package (e.g., `//core:core`) were not being highlighted in the navigation
-sidebar.
+**Problem 2**: When selecting a package node (e.g., `//core`) in the graph, the
+targets within that package (e.g., `//core:core`) were not being highlighted in
+the navigation sidebar.
 
-**Root Cause 2**: The highlighting logic only checked for direct node ID matches, but
-didn't check if a navigation item's parent package was selected. Since the backend
-expands package selections to include all child targets, the navigation should reflect
-this.
+**Root Cause 2**: The highlighting logic only checked for direct node ID
+matches, but didn't check if a navigation item's parent package was selected.
+Since the backend expands package selections to include all child targets, the
+navigation should reflect this.
 
 **Fix 2**: Updated `updateNavigationHighlighting()` in
 [app.js:1946-1973](pkg/web/static/app.js#L1946-L1973) to check both:
+
 - Direct target selection (`//core:core` in selectedNodes)
 - Parent package selection (`//core` in selectedNodes)
 
-Extracts package prefix from target IDs (`//package:target` → `//package`) and checks
-if that package is selected.
+Extracts package prefix from target IDs (`//package:target` → `//package`) and
+checks if that package is selected.
 
 **Files modified**:
+
 - [pkg/web/static/app.js](pkg/web/static/app.js) - Navigation highlighting fixes
 
 **Result**:
+
 - Navigation sidebar properly highlights selected targets ✓
 - Package selections correctly highlight all child targets in navigation ✓
 - Highlighting updates immediately when filters change ✓
