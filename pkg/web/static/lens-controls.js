@@ -59,41 +59,6 @@ function setupResetControls() {
  * Set up default lens configuration controls
  */
 function setupDefaultLensControls() {
-  // Base set type selector
-  const baseSetType = document.getElementById('baseSetType');
-  if (baseSetType) {
-    baseSetType.addEventListener('change', (e) => {
-      const type = e.target.value;
-      const binarySelector = document.getElementById('binarySelector');
-
-      // Show/hide binary selector based on type
-      if (binarySelector) {
-        if (type === 'reachable-from-binary') {
-          binarySelector.style.display = 'block';
-        } else {
-          binarySelector.style.display = 'none';
-        }
-      }
-
-      // Update lens configuration
-      lensLogger.debug('[LensControls] Base set type changed to:', type);
-      const currentLens = cloneLens(viewStateManager.getState().defaultLens);
-      currentLens.baseSet.type = type;
-
-      if (type === 'reachable-from-binary') {
-        const binarySelect = document.getElementById('baseSetBinary');
-        if (binarySelect) {
-          currentLens.baseSet.binaryLabel = binarySelect.value;
-        }
-      }
-
-      // Update lens and clear selection atomically (single backend request)
-      // Switching between full graph and binary-focused is a major view change
-      lensLogger.debug('[LensControls] Updating default lens with new base set');
-      viewStateManager.updateDefaultLensAndClearSelection(currentLens);
-    });
-  }
-
   // Global filters
   const filterIds = ['hideExternal', 'hideUncovered', 'hideSystemLibs'];
   filterIds.forEach(id => {
@@ -268,33 +233,4 @@ function setupDetailLensControls() {
       viewStateManager.updateDetailLens(currentLens);
     });
   }
-}
-
-/**
- * Populate binary selector dropdown
- * Call this when binary data is loaded
- *
- * @param {Array} binaries - Array of binary info objects
- */
-function populateBinarySelector(binaries) {
-  const selector = document.getElementById('baseSetBinary');
-  if (!selector) return;
-
-  selector.innerHTML = '';
-  binaries.forEach(binary => {
-    const option = document.createElement('option');
-    option.value = binary.label;
-    option.textContent = simplifyLabel(binary.label);
-    selector.appendChild(option);
-  });
-
-  // Add change listener
-  selector.addEventListener('change', (e) => {
-    const currentLens = cloneLens(viewStateManager.getState().defaultLens);
-    currentLens.baseSet.binaryLabel = e.target.value;
-
-    // Update lens and clear selection atomically (single backend request)
-    // Switching binary selection is a major view change
-    viewStateManager.updateDefaultLensAndClearSelection(currentLens);
-  });
 }

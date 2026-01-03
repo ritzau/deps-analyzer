@@ -2,12 +2,7 @@
 
 ## Prioritized backlog
 
-1. The "Base set" section of the default lens does no longer make sense. Remove
-   it.
-
-2. If a node has a single nested node, we should be able to collapse the
-   hierarchy (recursively). We need to determine what the label should be
-   though.
+1. BUG: The overlapping deps no longer show.
 
 ## Unclear
 
@@ -82,6 +77,22 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## Remove "Base Set" section from default lens
+
+Removed the "Base Set" configuration section from the Default tab in the lens controls. This feature no longer made sense in the current design where:
+
+- The graph always starts with the full graph as the base
+- Hierarchy level (packages/targets/files) is controlled by the "Hierarchy Level" radio buttons
+- Node filtering is accomplished through selection + distance rules in the Detail lens
+
+**Changes**:
+- Removed "Base Set" dropdown (Full Graph/Package Level/Reachable from Binary) from [index.html:104-113](pkg/web/static/index.html#L104-L113)
+- Removed binary selector dropdown and associated show/hide logic
+- Removed `populateBinarySelector()` function from [lens-controls.js](pkg/web/static/lens-controls.js)
+- Removed base set type change handler with 35 lines of code
+
+**Result**: Simpler, cleaner Default tab UI focused on the controls that actually affect visualization (hierarchy level, filters, edge types).
 
 ## Alphabetical navigation sorting
 
