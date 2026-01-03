@@ -1014,16 +1014,17 @@ header h1 {
 
 /* Config Controls */
 #defaultTab h4,
-#focusTab h4 {
+#detailTab h4 {
     margin-top: 15px;
     margin-bottom: 8px;
-    font-size: 13px;
+    font-size: 0.8em;
     color: var(--text-secondary);
     text-transform: uppercase;
+    font-weight: 600;
 }
 
 #defaultTab select,
-#focusTab select {
+#detailTab select {
     width: 100%;
     padding: 6px;
     margin-bottom: 10px;
@@ -1031,13 +1032,16 @@ header h1 {
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     border-radius: 4px;
+    font-size: 0.85em;
 }
 
 #defaultTab label,
-#focusTab label {
+#detailTab label {
     display: block;
     margin-bottom: 8px;
     cursor: pointer;
+    font-size: 0.85em;
+    color: var(--text-primary);
 }
 
 .hint {
