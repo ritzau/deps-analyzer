@@ -2,17 +2,9 @@
 
 ## Prioritized backlog
 
-1. Add a licences option to the CLI which lists the contained licenses. I want
-   it to list "XXX by <Author> — <License> — <Source URL>". The items I have
-   identified so far to be listed are:
-   - Cytoscape
-   - dagre
-   - fmt
-   - nlohmann json
-   - The ones listed in go.mod
-   - Filter icon from:
-     <a href="https://www.flaticon.com/free-icons/filter" title="filter icons">Filter
-     icons created by Kiranshastry - Flaticon</a>
+1. Store the view settings in local storage.
+
+2. Combine the view and details tab into the view tab.
 
 ## Unclear
 
@@ -139,11 +131,11 @@ filter dropdown in the navigation header.
 
 **Changes**:
 
-1. **Replaced emoji with image**: Changed from 🔽 emoji to `<img
-   src="filter.png">` in the filter dropdown button.
+1. **Replaced emoji with image**: Changed from 🔽 emoji to
+   `<img src="filter.png">` in the filter dropdown button.
 
-2. **Removed button styling**: Made the filter button transparent with no
-   border or background for a cleaner, more minimal look.
+2. **Removed button styling**: Made the filter button transparent with no border
+   or background for a cleaner, more minimal look.
 
 3. **Icon styling**: Applied white color using CSS `filter: invert(1)` to match
    the surrounding text color. Set opacity to 0.6 for subtle appearance,
@@ -193,6 +185,45 @@ anyway.
 
 **Result**: Cleaner error handling that matches actual usage pattern. If server
 is stopped, user restarts it and gets a fresh browser tab.
+
+## License listing command
+
+Added `--licenses` CLI flag to display all third-party software licenses used
+by the project.
+
+**Implementation**:
+
+- Added `--licenses` boolean flag in [main.go:27](cmd/deps-analyzer/main.go#L27)
+- Implemented `printLicenses()` function that outputs licenses in the format:
+  `Name by Author — License — Source URL`
+- Includes all dependencies from go.mod, frontend JavaScript libraries, C++
+  libraries used in examples, and assets
+
+**Libraries included**:
+
+Go dependencies:
+- pflag (BSD-3-Clause)
+- fsnotify (BSD-3-Clause)
+- uuid (BSD-3-Clause)
+- gorilla/mux (BSD-3-Clause)
+- gonum (BSD-3-Clause)
+
+Frontend JavaScript:
+- Cytoscape.js (MIT)
+- dagre (MIT)
+- cytoscape-dagre (MIT)
+
+C++ libraries:
+- fmt (MIT)
+- nlohmann/json (MIT)
+
+Assets:
+- Filter icon from Flaticon by Kiranshastry
+
+**Usage**: `./deps-analyzer --licenses`
+
+**Result**: Clear attribution and license information for all third-party
+software used in the project.
 
 ## GNU-style command-line options
 
