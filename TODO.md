@@ -2,7 +2,10 @@
 
 ## Prioritized backlog
 
-1. If a node has a single nested node, we should be able to collapse the
+1. The "Base set" section of the default lens does no longer make sense. Remove
+   it.
+
+2. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
@@ -80,74 +83,85 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 # Archive
 
-## ✅ Alphabetical navigation sorting (DONE)
+## Alphabetical navigation sorting
 
-Added alphabetical sorting to the navigation targets list for easier browsing.
+Added alphabetical sorting to navigation targets list. Modified
+`filterAndRenderNavigationList()` to sort with `localeCompare()` after
+filtering.
 
-**Implementation**:
-- Modified `filterAndRenderNavigationList()` in [pkg/web/static/app.js:2089](pkg/web/static/app.js#L2089)
-- Added sort after filtering: `filteredNodes.sort((a, b) => a.label.localeCompare(b.label))`
-- Uses locale-aware string comparison for proper sorting
-- Sorting happens client-side after filtering by rule type and search text
+## External dependency support
 
-**Result**:
-- All targets in navigation sidebar now appear in alphabetical order
-- Makes it easier to find specific targets by name
-- Works seamlessly with existing filters (rule type checkboxes and search)
-
-## ✅ External dependency support (DONE)
-
-Added comprehensive support for querying and visualizing external Bazel dependencies in the dependency analyzer.
+Added comprehensive support for querying and visualizing external Bazel
+dependencies in the dependency analyzer.
 
 **Implementation**:
 
 Backend ([pkg/bazel/query.go](pkg/bazel/query.go)):
-- Added `collectExternalDependencies()` function to extract external dependency labels from workspace target deps
-- Added `queryExternalTargets()` function to query Bazel for external target details using `bazel query "label1 + label2 + ..." --output=xml`
+
+- Added `collectExternalDependencies()` function to extract external dependency
+  labels from workspace target deps
+- Added `queryExternalTargets()` function to query Bazel for external target
+  details using `bazel query "label1 + label2 + ..." --output=xml`
 - Modified `QueryWorkspace()` to perform three-pass parsing:
   1. Parse workspace targets from `//...` query
   2. Query and parse external targets referenced by workspace
   3. Parse dependencies from both workspace and external rules
-- Filters out system repositories (`@bazel_tools//`, `@local_config_*`, `@platforms//`)
+- Filters out system repositories (`@bazel_tools//`, `@local_config_*`,
+  `@platforms//`)
 
 Hierarchy handling ([pkg/lens/distance.go](pkg/lens/distance.go)):
-- Updated `extractParentID()` to handle external target label format (`@repo//:target:file`)
+
+- Updated `extractParentID()` to handle external target label format
+  (`@repo//:target:file`)
 - Added special case for `@` prefix: splits by `:` and removes last component
 - External files now properly collapse under their parent targets
 
-Frontend visibility ([pkg/web/static/lens-config.js](pkg/web/static/lens-config.js)):
+Frontend visibility
+([pkg/web/static/lens-config.js](pkg/web/static/lens-config.js)):
+
 - Updated default lens configurations to show external dependencies by default
-- Changed `showExternal: false` to `showExternal: true` in both DEFAULT_PACKAGE_LENS and DEFAULT_DETAIL_LENS
+- Changed `showExternal: false` to `showExternal: true` in both
+  DEFAULT_PACKAGE_LENS and DEFAULT_DETAIL_LENS
 
 **Example dependencies added to test workspace**:
+
 - `@fmt//:fmt` - Modern C++ formatting library via bzlmod `bazel_dep`
-- `@nlohmann_json//:json` - JSON library via `http_archive` with custom BUILD file
+- `@nlohmann_json//:json` - JSON library via `http_archive` with custom BUILD
+  file
 - Created wrapper packages `//formatter` and `//config` to demonstrate usage
 
 **Label formats**:
+
 - Workspace targets: `//package:target` or `//package:target:file`
 - External targets: `@repo//:target` or `@repo//:target:file`
-- External files properly nest under parent: `@fmt//:fmt:@fmt/src/format.cc` → parent `@fmt//:fmt`
+- External files properly nest under parent: `@fmt//:fmt:@fmt/src/format.cc` →
+  parent `@fmt//:fmt`
 
 **Result**:
+
 - External targets appear in target list and navigation sidebar ✓
 - Dependency edges from workspace to external targets display correctly ✓
 - External targets visible in graph by default ✓
 - External files properly collapse under parent targets at collapseLevel: 2 ✓
-- Works with both bzlmod (`bazel_dep`) and legacy (`http_archive`) integration methods ✓
+- Works with both bzlmod (`bazel_dep`) and legacy (`http_archive`) integration
+  methods ✓
 
 **Files modified**:
+
 - [pkg/bazel/query.go](pkg/bazel/query.go) - External dependency querying
 - [pkg/lens/distance.go](pkg/lens/distance.go) - External target hierarchy
-- [pkg/web/static/lens-config.js](pkg/web/static/lens-config.js) - Visibility defaults
+- [pkg/web/static/lens-config.js](pkg/web/static/lens-config.js) - Visibility
+  defaults
 - [example/MODULE.bazel](example/MODULE.bazel) - Test dependencies
-- [example/formatter/](example/formatter/) - Wrapper for fmt library (new package)
+- [example/formatter/](example/formatter/) - Wrapper for fmt library (new
+  package)
 - [example/config/](example/config/) - Wrapper for nlohmann/json (new package)
-- [example/third_party/nlohmann_json.BUILD](example/third_party/nlohmann_json.BUILD) - Custom BUILD file
+- [example/third_party/nlohmann_json.BUILD](example/third_party/nlohmann_json.BUILD) -
+  Custom BUILD file
 - [example/main/BUILD.bazel](example/main/BUILD.bazel) - Usage examples
 - [example/main/main.cc](example/main/main.cc) - Integration demos
 
-## ✅ Compact log format with client/server indicators (DONE)
+## Compact log format with client/server indicators
 
 Restructured log output to use a compact, scannable format with clear source
 indicators to distinguish client and server logs.
@@ -223,7 +237,7 @@ Client logs (forwarded to backend):
   indicator logic
 - [pkg/web/static/logger.js](pkg/web/static/logger.js) - Client-side format
 
-## ✅ Unified navigation list with filtering and highlighting fixes (DONE)
+## Unified navigation list with filtering and highlighting fixes
 
 Consolidated binaries and targets into a single filterable navigation list, and
 fixed navigation highlighting to properly reflect graph selections.
@@ -281,7 +295,7 @@ checks if that package is selected.
 - Highlighting updates immediately when filters change ✓
 - Works with both single and multi-select (Cmd/Ctrl+click) ✓
 
-## ✅ Navigation multi-select and mixed-level edge fix (DONE)
+## Navigation multi-select and mixed-level edge fix
 
 Fixed two issues with node selection and edge rendering.
 
@@ -351,7 +365,7 @@ if sourceIsPackage && !targetIsPackage {
 - Fixed edge: `//audio → //util` (both packages) instead of
   `//audio → //util:util` ✓
 
-## ✅ Atomic state updates for performance (DONE)
+## Atomic state updates for performance
 
 Fixed redundant backend requests when changing default lens settings.
 
@@ -382,7 +396,7 @@ both state updates before calling `notifyListeners()` once.
 exactly 1 backend request instead of 3-4, improving performance and reducing
 server load.
 
-## ✅ Frontend-to-backend logging integration (DONE)
+## Frontend-to-backend logging integration
 
 Implemented centralized logging that sends frontend logs to the backend for
 monitoring and debugging.
@@ -435,7 +449,7 @@ logger.enableBackendLogging(false); // Stop sending logs
 - Request ID correlation between frontend and backend
 - All frontend context (component, data) preserved in backend logs
 
-## ✅ File node selection redirect to parent target (DONE)
+## File node selection redirect to parent target
 
 Fixed confusing behavior when selecting file nodes in the graph.
 
@@ -509,7 +523,7 @@ should be listed there).
 target is selected), but clicking them now produces sensible behavior instead of
 breaking the visualization.
 
-## ✅ Uncovered files visibility fixes (DONE)
+## Uncovered files visibility fixes
 
 Fixed two related bugs with uncovered file visibility in the graph.
 
@@ -578,7 +592,7 @@ package selections:
 - Selecting `//util` shows `orphaned.cc` ✓
 - Selecting `//cycle_demo` shows both `file_a.h` and `file_b.h` ✓
 
-## ✅ Package-only view edge aggregation fix (DONE)
+## Package-only view edge aggregation fix
 
 Fixed missing edges when showing only packages in the graph (collapseLevel: 1).
 
@@ -655,7 +669,7 @@ if firstVisiblePackage != "" {
 This makes the package-only view useful for understanding high-level
 architecture and identifying which packages depend on each other.
 
-## ✅ Workspace directory display (DONE)
+## Workspace directory display
 
 Added workspace directory path to the web UI header to help users identify which
 workspace is being analyzed.
@@ -679,7 +693,7 @@ workspace is being analyzed.
 - Absolute path helps distinguish between multiple workspaces
 - No ambiguity when switching between projects
 
-## ✅ Frontend structured logging migration (DONE)
+## Frontend structured logging migration
 
 Migrated all frontend JavaScript files to use the structured logger
 infrastructure.
@@ -706,7 +720,7 @@ infrastructure.
 - Runtime log level control without rebuilding
 - Reduced console noise from internal operations
 
-## ✅ Documentation consolidation (DONE)
+## Documentation consolidation
 
 Consolidated multiple markdown files and added missing installation
 instructions.
@@ -731,7 +745,7 @@ instructions.
 - Reduced documentation fragmentation
 - Easier to maintain and keep up-to-date
 
-## ✅ CSS style refactoring (DONE)
+## CSS style refactoring
 
 Refactored Cytoscape graph styles to reduce duplication and improve
 maintainability.
@@ -761,7 +775,7 @@ maintainability.
 - Less duplication in edge/node style definitions
 - No visual changes - purely maintainability improvement
 
-## ✅ Structured logging infrastructure (PARTIALLY DONE)
+## Structured logging infrastructure
 
 **Goal**: Implement consistent, structured logging across backend and frontend
 with request tracking, proper log levels, and request-response correlation.
@@ -847,7 +861,7 @@ Frontend:
 [INFO] fetch completed | requestID="abc123" status=200 durationMs=45
 ```
 
-## ✅ Info popups bug fixes (DONE)
+## Info popups bug fixes
 
 **Problem 1: Stuck popups accumulating in DOM**: Info popups (hover tooltips)
 were getting stuck on screen and accumulating in the DOM, causing visual clutter
@@ -887,7 +901,7 @@ management in [pkg/web/static/app.js](pkg/web/static/app.js):
 - Smooth visual transitions with fade animations
 - Better performance (reusing DOM element instead of create/destroy)
 
-## ✅ Package node edge collision bug fix (DONE)
+## Package node edge collision bug fix
 
 **Problem**: When a target node was hidden by lens configuration
 (distance=infinite), edges would incorrectly point to its parent package node
@@ -934,7 +948,7 @@ if includedNodeIds[parentID] {
 are hidden, edges to/from those hidden nodes are correctly dropped instead of
 being incorrectly aggregated to the parent package node.
 
-## ✅ "Focus" to "Select" terminology refactoring (DONE)
+## "Focus" to "Select" terminology refactoring
 
 Comprehensive refactoring to rename all "focus" terminology to "select"
 throughout the codebase and simplify the interaction model.
@@ -999,7 +1013,7 @@ throughout the codebase and simplify the interaction model.
 - Cleaner codebase: removed manual override complexity
 - Better consistency: single way to clear selection (click background)
 
-## ✅ Edge type collapse option (DONE)
+## Edge type collapse option
 
 Added option to collapse all dependency types between the same pair of nodes
 into a single aggregated edge.
@@ -1035,7 +1049,7 @@ of nodes into a single edge. Unchecked by default to maintain existing behavior.
   levels, focused nodes)
 - Aggregation happens server-side for performance
 
-## ✅ Browser auto-open flag (DONE)
+## Browser auto-open flag
 
 Added `--open` / `--no-open` CLI flag to control browser auto-opening when
 starting the web server.
@@ -1062,7 +1076,7 @@ starting the web server.
 - Useful for CI/CD environments or when running multiple instances
 - Better developer experience with clear messaging
 
-## ✅ Backend lens rendering system (DONE)
+## Backend lens rendering system
 
 Complete migration of lens rendering logic from frontend JavaScript to backend
 Go for better performance, scalability, and maintainability.
@@ -1155,7 +1169,7 @@ Go for better performance, scalability, and maintainability.
 - Incremental updates reduce bandwidth and improve responsiveness
 - Single source of truth for lens rendering logic
 
-## ✅ Project name display fix (DONE)
+## Project name display fix
 
 Fixed the bug where the project name showed "." when using the current
 directory.
@@ -1175,7 +1189,7 @@ directory.
 - Before: Subtitle showed "Coverage Analysis"
 - After: Subtitle shows "bazel_test_workspace" (from MODULE.bazel)
 
-## ✅ Legend simplification (DONE)
+## Legend simplification
 
 Simplified the dependency types legend for better clarity and visual
 consistency:
@@ -1209,7 +1223,7 @@ Implementation:
   - Compile edges: blue solid [app.js:523](pkg/web/static/app.js#L523)
 - Removed unused wavy line CSS
 
-## ✅ System library filtering (DONE)
+## System library filtering
 
 Fixed system libraries incorrectly appearing in the targets navigation sidebar.
 System libraries (like 'dl', 'pthread', 'rt', etc.) are specified via linkopts
@@ -1222,7 +1236,7 @@ Implementation:
 - System libraries still appear correctly in graph visualizations
 - Only affects the clickable targets list in the navigation sidebar
 
-## ✅ Horizontal sidebar resize (DONE)
+## Horizontal sidebar resize
 
 Implemented drag-to-resize functionality for the navigation sidebar. Users can
 now adjust the sidebar width by dragging the resize handle between the sidebar
@@ -1245,7 +1259,7 @@ Implementation details:
 - Implemented mouse event handlers in
   [app.js:2219-2274](pkg/web/static/app.js#L2219-L2274)
 
-## ✅ Target label simplification (DONE)
+## Target label simplification
 
 Implemented client-side label simplification to reduce visual clutter. The
 `simplifyLabel()` function removes redundant target names when they match the
@@ -1258,7 +1272,7 @@ package name:
 Applied to all label displays: graph nodes, sidebar navigation, tree browser,
 and modal dialogs. Internal lookups and API calls still use full labels.
 
-## ✅ Symbol name simplification (DONE)
+## Symbol name simplification
 
 Added client-side symbol simplification to improve readability in tooltips. The
 `simplifySymbol()` function reduces C++ template verbosity by:
@@ -1274,7 +1288,7 @@ Example:
 `util::ToUpper(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&)`
 becomes: `util::ToUpper(std::string const&)`
 
-## ✅ Symbol dependency parsing fix (DONE)
+## Symbol dependency parsing fix
 
 Fixed nm output parsing to correctly handle C++ symbol names containing spaces
 (e.g., template parameters). The parser was using `strings.Fields()` which split
@@ -1284,39 +1298,39 @@ Now joins all parts after the type field to preserve the full symbol name. This
 fixed the bug where intra-target symbol dependencies (e.g., math.cc → strings.cc
 within //util) were not being detected.
 
-## ✅ Show visibility in graph (DONE)
+## Show visibility in graph
 
 Dashed gold border for public targets.
 
-## ✅ Remove the collapse package toggle (DONE)
+## Remove the collapse package toggle
 
 Removed non-functional toggle and 75 lines of unused code.
 
-## ✅ Front end layout (DONE)
+## Front end layout
 
 Full-screen responsive layout: header row, navigation sidebar, graph fills
 remaining space with compact legend and proper canvas sizing.
 
-## ✅ File coverage (DONE)
+## File coverage
 
 Git-based discovery identifies C++ files not included in any target; displayed
 as red warning nodes in focused view; includes bug fix for header parsing in
 srcs attribute.
 
-## ✅ Backend connection monitoring (DONE)
+## Backend connection monitoring
 
 Modal notification on connection loss with retry/reload options; hybrid
 detection using SSE error handlers, monitoredFetch wrapper for immediate
 failures, and periodic health checks every 5s when idle; prevents silent
 failures when backend goes down.
 
-## ✅ BUG FIX: Binary selection (DONE)
+## BUG FIX: Binary selection
 
 Removed leftover packagesCollapsed reference from collapse package toggle
 removal; binary-focused graphs now display correctly when clicking binaries in
 navigation.
 
-## ✅ Binary/so-level (DONE)
+## Binary/so-level
 
 Start at the level of the generated artefacts. Clicking lets you see what is
 inside. You may also be able to see what is accessed from other artefacts, and
@@ -1325,7 +1339,7 @@ what is used in external ones.
 **Status**: Implemented! Click binaries in sidebar to see binary-focused view
 with overlapping dependencies highlighted.
 
-## ✅ Message bus (DONE)
+## Message bus
 
 Communicate from the server to the UI using a pub/sub. UI subscribes to get UI
 state messages. Great for start up. Awesome also to do live updates.
@@ -1335,7 +1349,7 @@ state messages. Great for start up. Awesome also to do live updates.
 **Status**: SSE (Server-Sent Events) implemented with
 `/api/subscribe/workspace_status` and `/api/subscribe/target_graph`
 
-## ✅ Tooltips on all edges (DONE)
+## Tooltips on all edges
 
 Store in the edge (type and text). Maybe for each node? Maybe some more info
 when clicking on edges?
@@ -1343,14 +1357,14 @@ when clicking on edges?
 **Status**: Comprehensive tooltips with hover delay, directional info, file
 details, and symbol lists.
 
-## ✅ Color scheme (DONE)
+## Color scheme
 
 Make a good looking color scheme and support dark/light (auto detected by
 default). Maybe dive deeper and also choose a font that we can enjoy some.
 
 **Status**: VS Code dark theme colors, good font stack, professional UI.
 
-## ✅ Optimize analysis (PARTIALLY DONE)
+## Optimize analysis
 
 Fewer queries should be possible for many phases. Can we use bazel to generate
 and cache this info?
@@ -1359,7 +1373,7 @@ and cache this info?
 
 **Status**: Reduced from 4 analysis passes to 2, eliminated redundant work.
 
-## ✅ Live updates (DONE)
+## Live updates
 
 Watch the project files for changes and update continuously. Automatically
 re-analyze when BUILD files or build artifacts change.
