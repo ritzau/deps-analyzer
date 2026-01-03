@@ -17,29 +17,29 @@ import (
 
 func main() {
 	// Parse command-line flags
-	// Long and short options following Unix conventions
-	workspace := flag.String("workspace", ".", "Path to the Bazel workspace root")
-	workspaceShort := flag.String("w", ".", "Path to the Bazel workspace root (shorthand)")
+	// Note: Go's flag package only supports single-dash flags (e.g., -web, -workspace)
+	workspace := flag.String("workspace", ".", "path to Bazel workspace")
+	w := flag.String("w", ".", "alias for -workspace")
 
-	webMode := flag.Bool("web", false, "Start web server instead of printing to console")
+	webMode := flag.Bool("web", false, "start web server")
 
-	port := flag.Int("port", 8080, "Port for web server (only used with --web)")
-	portShort := flag.Int("p", 8080, "Port for web server (shorthand)")
+	port := flag.Int("port", 8080, "web server port")
+	p := flag.Int("p", 8080, "alias for -port")
 
-	watch := flag.Bool("watch", false, "Watch for file changes and re-analyze automatically")
+	watch := flag.Bool("watch", false, "watch for file changes and re-analyze")
 
-	open := flag.Bool("open", true, "Automatically open browser when starting web server")
+	open := flag.Bool("open", true, "auto-open browser when starting server")
 	flag.Parse()
 
-	// Resolve short vs long options (short takes precedence if different from default)
+	// Resolve aliases (short option takes precedence if different from default)
 	workspaceVal := *workspace
-	if *workspaceShort != "." {
-		workspaceVal = *workspaceShort
+	if *w != "." {
+		workspaceVal = *w
 	}
 
 	portVal := *port
-	if *portShort != 8080 {
-		portVal = *portShort
+	if *p != 8080 {
+		portVal = *p
 	}
 
 	if *webMode {
