@@ -1074,10 +1074,7 @@ let analysisComplete = false;
 
 // Connection monitoring
 let connectionLost = false;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 3;
 let lastSuccessfulRequest = Date.now();
-let healthCheckInterval = null;
 
 // Map workspace status state to loading step
 const statusToStep = {
@@ -1109,56 +1106,13 @@ function showConnectionLostModal() {
     const modal = document.getElementById('connectionLostModal');
     const messageEl = document.getElementById('connectionErrorMessage');
 
-    if (reconnectAttempts > 0) {
-        messageEl.textContent = `Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} failed.`;
-    } else {
-        messageEl.textContent = 'Please check that the backend server is running.';
-    }
-
+    messageEl.textContent = 'The backend server is not running. Restart the server to continue.';
     modal.style.display = 'flex';
-
-    // Set up button handlers
-    document.getElementById('retryConnection').onclick = attemptReconnect;
-    document.getElementById('reloadPage').onclick = () => window.location.reload();
 }
 
 // Hide connection lost modal
 function hideConnectionLostModal() {
     document.getElementById('connectionLostModal').style.display = 'none';
-}
-
-// Attempt to reconnect
-function attemptReconnect() {
-    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        const messageEl = document.getElementById('connectionErrorMessage');
-        messageEl.textContent = 'Maximum reconnection attempts reached. Please reload the page.';
-        document.getElementById('retryConnection').disabled = true;
-        return;
-    }
-
-    reconnectAttempts++;
-    hideConnectionLostModal();
-
-    // Try to reconnect by testing the API
-    fetch('/api/module')
-        .then(response => {
-            if (response.ok) {
-                // Connection restored
-                appLogger.info('Connection restored, reloading page...');
-                window.location.reload();
-            } else {
-                throw new Error('Server not ready');
-            }
-        })
-        .catch(error => {
-            appLogger.error('Reconnection failed:', error);
-            // Wait a bit before showing modal again
-            setTimeout(() => {
-                if (connectionLost) {
-                    showConnectionLostModal();
-                }
-            }, 1000);
-        });
 }
 
 // Wrapper for fetch that detects connection failures
@@ -1178,37 +1132,6 @@ function monitoredFetch(url, options) {
         });
 }
 
-// Start periodic health check
-function startHealthCheck() {
-    // Check every 2 seconds if we haven't had a successful request in 3 seconds
-    healthCheckInterval = setInterval(() => {
-        const timeSinceLastSuccess = Date.now() - lastSuccessfulRequest;
-
-        // Only check if analysis is complete and it's been a while
-        if (analysisComplete && timeSinceLastSuccess > 3000 && !connectionLost) {
-            appLogger.debug('Performing health check...');
-            fetch('/api/module', { method: 'HEAD' })
-                .then(response => {
-                    if (response.ok) {
-                        lastSuccessfulRequest = Date.now();
-                    } else {
-                        handleConnectionLost('health_check');
-                    }
-                })
-                .catch(() => {
-                    handleConnectionLost('health_check');
-                });
-        }
-    }, 2000);
-}
-
-// Stop health check
-function stopHealthCheck() {
-    if (healthCheckInterval) {
-        clearInterval(healthCheckInterval);
-        healthCheckInterval = null;
-    }
-}
 
 // Check connection on user activity
 function checkConnectionOnActivity() {
@@ -1345,11 +1268,6 @@ function subscribeToWorkspaceStatus() {
                         targetGraphSource.close();
                         targetGraphSource = null;
                     }
-                }
-
-                // Start health check to detect backend failures
-                if (!healthCheckInterval) {
-                    startHealthCheck();
                 }
             }
         } catch (e) {
