@@ -318,9 +318,9 @@ header h1 {
     width: 16px;
     height: 16px;
     display: block;
-    opacity: 0.8;
+    opacity: 0.6;
     transition: opacity 0.2s;
-    filter: invert(55%) sepia(100%) saturate(2000%) hue-rotate(0deg) brightness(100%) contrast(102%);
+    filter: invert(1);
 }
 
 .nav-section-title .filter-dropdown-btn:hover {
