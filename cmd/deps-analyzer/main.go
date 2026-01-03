@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
@@ -22,7 +24,15 @@ func main() {
 	port := pflag.IntP("port", "p", 8080, "web server port")
 	watch := pflag.Bool("watch", false, "watch for file changes and re-analyze")
 	open := pflag.Bool("open", true, "auto-open browser when starting server")
+
+	// Verbosity flags
+	verboseCount := pflag.CountP("verbose", "v", "increase verbosity (can be repeated: -v, -vv, -vvv)")
+	verbosity := pflag.String("verbosity", "", "set log level explicitly: T(race), D(ebug), I(nfo), W(arn), E(rror)")
+
 	pflag.Parse()
+
+	// Configure logging level based on verbosity flags
+	configureLogging(*verboseCount, *verbosity)
 
 	if *webMode {
 		// Start web server and run streamlined analysis
@@ -187,4 +197,44 @@ func openBrowser(url string) {
 	if err := exec.Command(cmd, args...).Start(); err != nil {
 		logging.Warn("failed to open browser", "error", err)
 	}
+}
+
+// configureLogging sets the log level based on verbosity flags
+func configureLogging(verboseCount int, verbosityFlag string) {
+	var level slog.Level
+
+	// Explicit verbosity flag takes precedence
+	if verbosityFlag != "" {
+		switch strings.ToUpper(verbosityFlag)[0] {
+		case 'T':
+			level = slog.LevelDebug - 4 // Trace
+		case 'D':
+			level = slog.LevelDebug
+		case 'I':
+			level = slog.LevelInfo
+		case 'W':
+			level = slog.LevelWarn
+		case 'E':
+			level = slog.LevelError
+		default:
+			fmt.Fprintf(os.Stderr, "Invalid verbosity level: %s (use T, D, I, W, or E)\n", verbosityFlag)
+			os.Exit(1)
+		}
+	} else {
+		// Use -v count to determine level
+		// Default (0): Info
+		// -v (1): Debug
+		// -vv (2): Trace
+		// -vvv+ (3+): Trace
+		switch verboseCount {
+		case 0:
+			level = slog.LevelInfo
+		case 1:
+			level = slog.LevelDebug
+		default: // 2 or more
+			level = slog.LevelDebug - 4 // Trace
+		}
+	}
+
+	logging.SetLevel(level)
 }
