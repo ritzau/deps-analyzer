@@ -2,7 +2,17 @@
 
 ## Prioritized backlog
 
-(Empty - all items completed!)
+1. Add a licences option to the CLI which lists the contained licenses. I want
+   it to list "XXX by <Author> — <License> — <Source URL>". The items I have
+   identified so far to be listed are:
+   - Cytoscape
+   - dagre
+   - fmt
+   - nlohmann json
+   - The ones listed in go.mod
+   - Filter icon from:
+     <a href="https://www.flaticon.com/free-icons/filter" title="filter icons">Filter
+     icons created by Kiranshastry - Flaticon</a>
 
 ## Unclear
 
@@ -98,28 +108,61 @@ Series of small UI improvements for a cleaner, more professional interface:
    standard UI behavior.
 
 2. **Relocated rule type filter**: Moved the rule types dropdown from the filter
-   controls section into the Targets header as a compact button (🔽 funnel icon).
-   This saves vertical space and makes the filter more accessible.
+   controls section into the Targets header as a compact button (🔽 funnel
+   icon). This saves vertical space and makes the filter more accessible.
 
 3. **Renamed Default tab to View**: Changed tab label from "Default" to "View"
    for clarity, as it controls visualization settings.
 
-4. **Fixed font inconsistencies**: Standardized font sizes and styles across View
-   and Detail tabs. Changed to relative units (0.8em for headers, 0.85em for
-   labels and selects). Fixed obsolete #focusTab references to #detailTab.
+4. **Fixed font inconsistencies**: Standardized font sizes and styles across
+   View and Detail tabs. Changed to relative units (0.8em for headers, 0.85em
+   for labels and selects). Fixed obsolete #focusTab references to #detailTab.
 
 5. **Removed graph title**: Deleted "📊 Dependency Graph" heading and help text
    as they're unnecessary - the graph is self-explanatory.
 
-6. **Added filter icon**: Changed dropdown button from "▾" to "🔽" (funnel/tratt)
-   to make it visually recognizable as a filter control.
+6. **Added filter icon**: Changed dropdown button from "▾" to "🔽"
+   (funnel/tratt) to make it visually recognizable as a filter control.
 
 **Files modified**:
+
 - [index.html](pkg/web/static/index.html) - UI structure changes
 - [styles.css](pkg/web/static/styles.css) - Typography and layout updates
 
 **Result**: Cleaner, more professional interface with better use of space and
 consistent styling throughout.
+
+## Filter icon implementation
+
+Replaced the filter emoji with a proper funnel icon image for the rule type
+filter dropdown in the navigation header.
+
+**Changes**:
+
+1. **Replaced emoji with image**: Changed from 🔽 emoji to `<img
+   src="filter.png">` in the filter dropdown button.
+
+2. **Removed button styling**: Made the filter button transparent with no
+   border or background for a cleaner, more minimal look.
+
+3. **Icon styling**: Applied white color using CSS `filter: invert(1)` to match
+   the surrounding text color. Set opacity to 0.6 for subtle appearance,
+   increasing to 1.0 on hover.
+
+4. **Right-aligned dropdown**: Changed dropdown menu alignment from left to
+   right, so it aligns with the right edge of the filter icon button.
+
+**Files modified**:
+
+- [index.html](pkg/web/static/index.html) - Replaced emoji with img element
+- [styles.css](pkg/web/static/styles.css) - Icon styling and dropdown alignment
+- [filter.png](pkg/web/static/filter.png) - Added funnel icon asset
+
+**Attribution**: Filter icon from
+[Flaticon](https://www.flaticon.com/free-icons/filter) created by Kiranshastry.
+
+**Result**: Professional funnel icon that matches the UI text color, with
+cleaner button styling and better dropdown positioning.
 
 ## Connection monitoring simplification
 
@@ -144,6 +187,7 @@ anyway.
    fetch failures - we just handle it more simply.
 
 **Files modified**:
+
 - [index.html](pkg/web/static/index.html) - Simplified modal content
 - [app.js](pkg/web/static/app.js) - Removed health check and retry code
 
@@ -160,6 +204,7 @@ replacing Go's standard flag package which only supports single-dash flags.
 1. **Added pflag dependency**: github.com/spf13/pflag v1.0.10
 
 2. **Short and long options**: Each flag now has both forms:
+
    - `-w` / `--workspace` for workspace path
    - `-p` / `--port` for server port
    - `-v` / `--verbose` for verbosity (repeatable)
@@ -168,6 +213,7 @@ replacing Go's standard flag package which only supports single-dash flags.
    --workspace string") instead of showing duplicates.
 
 **Files modified**:
+
 - [main.go](cmd/deps-analyzer/main.go) - Switched from flag to pflag
 - [go.mod](go.mod), [go.sum](go.sum) - Added pflag dependency
 
@@ -182,11 +228,13 @@ Added flexible verbosity control with both incremental (-v) and explicit
 **Implementation**:
 
 1. **Incremental verbosity**: -v flag can be repeated
+
    - Default (no flag): Info level
    - `-v`: Debug level
    - `-vv` or more: Trace level
 
 2. **Explicit verbosity**: --verbosity flag for direct level setting
+
    - T(race), D(ebug), I(nfo), W(arn), E(rror)
    - Takes precedence over -v if both specified
 
@@ -198,6 +246,7 @@ Added flexible verbosity control with both incremental (-v) and explicit
    - Error = slog.LevelError
 
 **Files modified**:
+
 - [main.go](cmd/deps-analyzer/main.go) - Added configureLogging() function
 
 **Result**: Users can easily control log verbosity for debugging or production
@@ -210,6 +259,7 @@ Removed obsolete test files from the repository root that were development
 artifacts no longer needed.
 
 **Removed**:
+
 - `test_binaries.go`: Old standalone test program for binary analysis
 - `test-bazel-xml`: Compiled binary (3.4MB, was already in .gitignore)
 - `test/`: Empty test directory
