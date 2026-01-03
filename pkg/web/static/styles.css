@@ -307,14 +307,28 @@ header h1 {
 
 .nav-section-title .filter-dropdown-btn {
     width: auto;
-    padding: 2px 8px;
+    padding: 4px 6px;
     font-size: 14px;
     min-width: 32px;
+    border: none;
+    background: transparent;
 }
 
 .filter-icon {
-    font-size: 16px;
-    line-height: 1;
+    width: 16px;
+    height: 16px;
+    display: block;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    filter: invert(56%) sepia(96%) saturate(1837%) hue-rotate(0deg) brightness(103%) contrast(101%);
+}
+
+.nav-section-title .filter-dropdown-btn:hover {
+    background: transparent;
+}
+
+.filter-dropdown-btn:hover .filter-icon {
+    opacity: 1.0;
 }
 
 .filter-dropdown-btn:hover {
