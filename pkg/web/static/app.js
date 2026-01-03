@@ -370,7 +370,7 @@ function displayDependencyGraph(graphData) {
     // Debug: Log overlapping flags
     const overlappingNodes = elements.filter(e => e.data.hasOverlap === true);
     const overlappingEdges = elements.filter(e => e.data.isOverlapping === true);
-    appLogger.debug('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.label || n.data.id));
+    appLogger.debug('Nodes with hasOverlap=true:', overlappingNodes.map(n => n.data.id));
     appLogger.debug('Edges with isOverlapping=true:', overlappingEdges.map(e => `${e.data.source} -> ${e.data.target}`));
 
     // Cytoscape stylesheet (shared between initial and incremental updates)
@@ -578,19 +578,6 @@ function displayDependencyGraph(graphData) {
                 style: edgeStyle(GRAPH_COLORS.lightBlue, 3, 'solid')
             },
             // ===== State Overlays (must come after base styles) =====
-            // Overlapping dependencies
-            {
-                selector: 'node[hasOverlap][type = "cc_binary"], node[hasOverlap][type = "cc_shared_library"], node[hasOverlap][type = "cc_library"]',
-                style: {
-                    'border-width': '8px',
-                    'border-color': GRAPH_COLORS.overlap,
-                    'border-style': 'double'
-                }
-            },
-            {
-                selector: 'edge[isOverlapping]',
-                style: edgeStyle(GRAPH_COLORS.overlap, 4, 'solid')
-            },
             // Selection indicators
             {
                 selector: 'node:selected',
@@ -616,6 +603,19 @@ function displayDependencyGraph(graphData) {
                     'border-color': GRAPH_COLORS.selected,
                     'border-style': 'solid'
                 }
+            },
+            // Overlapping dependencies - MUST come after other border styles to be visible
+            {
+                selector: 'node[hasOverlap][type = "cc_binary"], node[hasOverlap][type = "cc_shared_library"], node[hasOverlap][type = "cc_library"]',
+                style: {
+                    'border-width': '8px',
+                    'border-color': GRAPH_COLORS.overlap,
+                    'border-style': 'double'
+                }
+            },
+            {
+                selector: 'edge[isOverlapping]',
+                style: edgeStyle(GRAPH_COLORS.overlap, 4, 'solid')
             }
     ];
 
@@ -676,12 +676,15 @@ function displayDependencyGraph(graphData) {
             } else {
                 // Node
                 if (currentNodeIds.has(e.data.id)) {
-                    // Update existing node data (especially label)
+                    // Update existing node data (all fields, not just label)
                     const existingNode = cy.getElementById(e.data.id);
-                    if (existingNode.data('label') !== e.data.label) {
-                        existingNode.data('label', e.data.label);
-                        updatedNodes++;
-                    }
+                    // Update all data fields from the new element
+                    Object.keys(e.data).forEach(key => {
+                        if (existingNode.data(key) !== e.data[key]) {
+                            existingNode.data(key, e.data[key]);
+                        }
+                    });
+                    updatedNodes++;
                 } else {
                     // Add new node
                     elementsToAdd.push(e);
@@ -1423,21 +1426,22 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
     appLogger.debug('Overlapping targets found:', Array.from(allOverlappingTargets.keys()));
 
     // Mark nodes that have overlapping dependencies
+    // Use node.id for matching because node.label may have distance annotations like "(d=1)"
     graph.nodes.forEach(node => {
-        const nodeLabel = node.label || node.id;
-        if (allOverlappingTargets.has(nodeLabel)) {
+        if (allOverlappingTargets.has(node.id)) {
             node.hasOverlap = true;
-            node.overlappingWith = Array.from(allOverlappingTargets.get(nodeLabel));
-            appLogger.debug('Marked node as overlapping:', nodeLabel, 'with:', node.overlappingWith);
+            node.overlappingWith = Array.from(allOverlappingTargets.get(node.id));
+            appLogger.debug('Marked node as overlapping:', node.id);
         }
     });
 
     // Mark shared library nodes that have overlapping deps
+    // Use node.id for matching because node.label may have distance annotations
     binaries.forEach(binary => {
         if (binary.kind === 'cc_shared_library' && binary.overlappingDeps) {
             const overlappingCount = Object.keys(binary.overlappingDeps).length;
             if (overlappingCount > 0) {
-                const node = graph.nodes.find(n => (n.label || n.id) === binary.label);
+                const node = graph.nodes.find(n => n.id === binary.label);
                 if (node) {
                     node.hasOverlap = true;
                     node.overlappingTargets = Object.values(binary.overlappingDeps).flat();
