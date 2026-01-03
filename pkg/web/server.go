@@ -206,6 +206,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/module", s.handleModule).Methods("GET", "HEAD") // HEAD for health checks
 	s.router.HandleFunc("/api/module/graph", s.handleModuleGraph).Methods("GET")
 	s.router.HandleFunc("/api/module/graph/lens", s.handleModuleGraphWithLens).Methods("POST")
+	s.router.HandleFunc("/api/binaries", s.handleBinaries).Methods("GET")
 	s.router.HandleFunc("/api/target/{label}/selected", s.handleTargetSelected).Methods("GET")
 	s.router.HandleFunc("/api/logs", s.handleFrontendLogs).Methods("POST")
 
@@ -308,6 +309,20 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 	// Build target-level graph from module with file-level details
 	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
 	json.NewEncoder(w).Encode(graphData)
+}
+
+func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.binaries == nil {
+		json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+
+	json.NewEncoder(w).Encode(s.binaries)
 }
 
 // LensRenderRequest represents the request body for lens rendering

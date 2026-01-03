@@ -1465,6 +1465,7 @@ async function loadGraphData() {
                 try {
                     const currentState = viewStateManager.getState();
                     const renderedGraph = await fetchRenderedGraphFromBackend(currentState);
+                    // Note: binaryData not loaded yet at this point, will be enriched in second render
                     displayDependencyGraph(renderedGraph);
                 } catch (error) {
                     appLogger.error('Error rendering graph via backend:', error);
@@ -1493,12 +1494,27 @@ async function loadGraphData() {
                 populateTreeBrowser(analysisData);
             }
 
+            // Fetch binaries data for overlapping dependency detection
+            try {
+                const binariesResponse = await monitoredFetch('/api/binaries');
+                if (binariesResponse.ok) {
+                    binaryData = await binariesResponse.json();
+                    appLogger.info('Loaded binary data:', binaryData.length, 'binaries');
+                }
+            } catch (error) {
+                appLogger.warn('Failed to load binaries data:', error);
+            }
+
             // Initialize lens controls (after DOM is ready and data is loaded)
             initializeLensControls();
 
             // Trigger initial render with backend lens API
             try {
                 const renderedGraph = await fetchRenderedGraphFromBackend(viewStateManager.getState());
+                // Enrich with overlapping dependency information if we have binary data
+                if (binaryData && packageGraph) {
+                    enrichGraphWithOverlappingInfo(renderedGraph, binaryData);
+                }
                 displayDependencyGraph(renderedGraph);
             } catch (error) {
                 appLogger.error('Error rendering graph via backend:', error);
@@ -1759,6 +1775,7 @@ document.addEventListener('DOMContentLoaded', function() {
 let treeData = null;
 let analysisData = null; // Store full analysis data
 let packageGraph = null; // Store the original package-level graph
+let binaryData = null; // Store binary analysis data for overlapping dependency detection
 let binaryGraph = null; // Store the binary-level graph
 let cy = null; // Store the Cytoscape instance
 let allTargetNodes = []; // Store all target nodes for client-side filtering
@@ -1994,6 +2011,11 @@ viewStateManager.addListener(async (newState) => {
   try {
     // Fetch rendered graph from backend
     const renderedGraph = await fetchRenderedGraphFromBackend(newState);
+
+    // Enrich with overlapping dependency information if we have binary data
+    if (binaryData) {
+      enrichGraphWithOverlappingInfo(renderedGraph, binaryData);
+    }
 
     // Display the pre-rendered graph from backend
     displayDependencyGraph(renderedGraph);
