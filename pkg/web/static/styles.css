@@ -260,7 +260,7 @@ header h1 {
 }
 
 .nav-item {
-    padding: 8px 16px;
+    padding: 4px 16px;
     cursor: pointer;
     color: var(--text-primary);
     font-size: 0.85em;

@@ -2093,9 +2093,7 @@ window.filterAndRenderNavigationList = function filterAndRenderNavigationList() 
         item.className = 'nav-item';
         item.dataset.nodeId = node.label;  // Store full node ID for selection matching
 
-        // Icon based on type
-        const icon = getIconForType(node.type);
-        item.textContent = `${icon} ${simplifyLabel(node.label)}`;
+        item.textContent = simplifyLabel(node.label);
 
         // Click selects this target (Cmd/Ctrl+click for multi-select)
         item.onclick = (e) => {
@@ -2114,16 +2112,6 @@ window.filterAndRenderNavigationList = function filterAndRenderNavigationList() 
     // Update highlighting to match current selection
     updateNavigationHighlighting(viewStateManager.state.selectedNodes);
 };
-
-// Helper function to get icon for node type
-function getIconForType(type) {
-    switch(type) {
-        case 'cc_binary': return '🔧';
-        case 'cc_shared_library': return '📦';
-        case 'cc_library': return '📚';
-        default: return '•';
-    }
-}
 
 // Handle window resize to update Cytoscape canvas size
 let resizeTimeout;
