@@ -1,7 +1,6 @@
 package lens
 
 import (
-	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"strings"
 )
 
@@ -106,14 +105,6 @@ func ComputeDistances(graph *GraphData, selectedNodes []string) map[string]inter
 
 	// Build adjacency list (undirected graph for distance computation)
 	adjacency := buildAdjacencyList(graph)
-
-	// Debug logging for external node selection
-	for _, nodeID := range selectedNodes {
-		if strings.HasPrefix(nodeID, "@") {
-			neighbors := adjacency[nodeID]
-			logging.Debug("external node selected", "node", nodeID, "neighborCount", len(neighbors), "neighbors", neighbors)
-		}
-	}
 
 	// Expand selected nodes: if a package is selected (e.g., "//main"), include all its targets
 	// This ensures that clicking on a package selects all targets within it

@@ -2,14 +2,9 @@
 
 ## Prioritized backlog
 
-1. External packages: May require support of .a files. These packages can be
-   added using cc_foreign_rule, bazel_dep, or cc_import. They typically result
-   in static or dynamic libraries, alternatively being header only. Add a
-   special configuration step for their visualization much like the system libs.
-   The "source" files they share are the headers and libs. We can either show
-   them collapsed or with those files, alternatively we can hide them.
-
-   - BUG: Selecting an external package does not show deps into //...
+1. External packages: Additional visualization options for external packages.
+   May want to add special configuration for their visualization similar to
+   system libs, allowing users to hide/show them or their files as needed.
 
 2. Sort the targets alphabetically (in navigation).
 
