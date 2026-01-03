@@ -24,6 +24,7 @@ func main() {
 	port := pflag.IntP("port", "p", 8080, "web server port")
 	watch := pflag.Bool("watch", false, "watch for file changes and re-analyze")
 	open := pflag.Bool("open", true, "auto-open browser when starting server")
+	licenses := pflag.Bool("licenses", false, "list all third-party licenses")
 
 	// Verbosity flags
 	verboseCount := pflag.CountP("verbose", "v", "increase verbosity (can be repeated: -v, -vv, -vvv)")
@@ -33,6 +34,11 @@ func main() {
 
 	// Configure logging level based on verbosity flags
 	configureLogging(*verboseCount, *verbosity)
+
+	if *licenses {
+		printLicenses()
+		return
+	}
 
 	if *webMode {
 		// Start web server and run streamlined analysis
@@ -237,4 +243,96 @@ func configureLogging(verboseCount int, verbosityFlag string) {
 	}
 
 	logging.SetLevel(level)
+}
+
+// printLicenses outputs all third-party licenses used by this project
+func printLicenses() {
+	fmt.Println("Third-Party Licenses")
+	fmt.Println("====================")
+	fmt.Println()
+
+	licenses := []struct {
+		name    string
+		author  string
+		license string
+		url     string
+	}{
+		// Go dependencies
+		{
+			name:    "pflag",
+			author:  "The Go Authors and spf13 contributors",
+			license: "BSD-3-Clause",
+			url:     "https://github.com/spf13/pflag",
+		},
+		{
+			name:    "fsnotify",
+			author:  "fsnotify contributors",
+			license: "BSD-3-Clause",
+			url:     "https://github.com/fsnotify/fsnotify",
+		},
+		{
+			name:    "uuid",
+			author:  "Google Inc.",
+			license: "BSD-3-Clause",
+			url:     "https://github.com/google/uuid",
+		},
+		{
+			name:    "gorilla/mux",
+			author:  "Gorilla web toolkit contributors",
+			license: "BSD-3-Clause",
+			url:     "https://github.com/gorilla/mux",
+		},
+		{
+			name:    "gonum",
+			author:  "The Gonum Authors",
+			license: "BSD-3-Clause",
+			url:     "https://gonum.org/v1/gonum",
+		},
+
+		// Frontend JavaScript libraries
+		{
+			name:    "Cytoscape.js",
+			author:  "The Cytoscape Consortium",
+			license: "MIT",
+			url:     "https://js.cytoscape.org/",
+		},
+		{
+			name:    "dagre",
+			author:  "Chris Pettitt",
+			license: "MIT",
+			url:     "https://github.com/dagrejs/dagre",
+		},
+		{
+			name:    "cytoscape-dagre",
+			author:  "The Cytoscape Consortium",
+			license: "MIT",
+			url:     "https://github.com/cytoscape/cytoscape.js-dagre",
+		},
+
+		// C++ libraries (used in example workspace, may be analyzed)
+		{
+			name:    "fmt",
+			author:  "Victor Zverovich and contributors",
+			license: "MIT",
+			url:     "https://github.com/fmtlib/fmt",
+		},
+		{
+			name:    "nlohmann/json",
+			author:  "Niels Lohmann",
+			license: "MIT",
+			url:     "https://github.com/nlohmann/json",
+		},
+
+		// Assets
+		{
+			name:    "Filter icon",
+			author:  "Kiranshastry",
+			license: "Flaticon License",
+			url:     "https://www.flaticon.com/free-icons/filter",
+		},
+	}
+
+	for _, lib := range licenses {
+		fmt.Printf("%s by %s — %s — %s\n", lib.name, lib.author, lib.license, lib.url)
+	}
 }
