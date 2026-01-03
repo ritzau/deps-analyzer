@@ -2,19 +2,7 @@
 
 ## Prioritized backlog
 
-1. Do we need to ping to check that the backend is running? Can we instead
-   detect a closed connection? In any case, the UI to retry connection and
-   reload does not really make sense. If the server was killed we re-open the
-   page using the server.
-
-2. Double check the options. I'm used to having short options with one dash and
-   long options with two.
-
-3. Add options for verbosity where the default verbosity is info and each -v
-   increases the level but the level can also be set explicitly using
-   --verbosity=[FEWIDVT]
-
-4. Test files in the repo?
+(Empty - all items completed!)
 
 ## Unclear
 
@@ -132,6 +120,104 @@ Series of small UI improvements for a cleaner, more professional interface:
 
 **Result**: Cleaner, more professional interface with better use of space and
 consistent styling throughout.
+
+## Connection monitoring simplification
+
+Simplified connection loss handling by removing retry/reload UI that didn't make
+sense for the use case. When the backend server is killed, retrying doesn't
+help - the user needs to restart the server, which auto-opens a new browser tab
+anyway.
+
+**Changes**:
+
+1. **Removed periodic health check**: Eliminated 2-second polling interval that
+   was checking server health unnecessarily.
+
+2. **Removed retry logic**: Deleted reconnection attempt counter, max retry
+   limit, and automatic retry functionality.
+
+3. **Simplified modal**: Changed connection lost modal to show a simple
+   informational message: "The backend server is not running. Restart the server
+   to continue." Removed confusing "Retry Connection" and "Reload Page" buttons.
+
+4. **Kept SSE monitoring**: Connection loss is still detected via SSE errors and
+   fetch failures - we just handle it more simply.
+
+**Files modified**:
+- [index.html](pkg/web/static/index.html) - Simplified modal content
+- [app.js](pkg/web/static/app.js) - Removed health check and retry code
+
+**Result**: Cleaner error handling that matches actual usage pattern. If server
+is stopped, user restarts it and gets a fresh browser tab.
+
+## GNU-style command-line options
+
+Implemented proper POSIX/GNU-style command-line flags using the pflag library,
+replacing Go's standard flag package which only supports single-dash flags.
+
+**Implementation**:
+
+1. **Added pflag dependency**: github.com/spf13/pflag v1.0.10
+
+2. **Short and long options**: Each flag now has both forms:
+   - `-w` / `--workspace` for workspace path
+   - `-p` / `--port` for server port
+   - `-v` / `--verbose` for verbosity (repeatable)
+
+3. **Clean help output**: pflag displays both forms together (e.g., "-w,
+   --workspace string") instead of showing duplicates.
+
+**Files modified**:
+- [main.go](cmd/deps-analyzer/main.go) - Switched from flag to pflag
+- [go.mod](go.mod), [go.sum](go.sum) - Added pflag dependency
+
+**Result**: Command-line interface now follows standard Unix conventions that
+users expect.
+
+## Verbosity control
+
+Added flexible verbosity control with both incremental (-v) and explicit
+(--verbosity) flag support for controlling log output levels.
+
+**Implementation**:
+
+1. **Incremental verbosity**: -v flag can be repeated
+   - Default (no flag): Info level
+   - `-v`: Debug level
+   - `-vv` or more: Trace level
+
+2. **Explicit verbosity**: --verbosity flag for direct level setting
+   - T(race), D(ebug), I(nfo), W(arn), E(rror)
+   - Takes precedence over -v if both specified
+
+3. **Log level mapping**:
+   - Trace = slog.LevelDebug - 4
+   - Debug = slog.LevelDebug
+   - Info = slog.LevelInfo
+   - Warn = slog.LevelWarn
+   - Error = slog.LevelError
+
+**Files modified**:
+- [main.go](cmd/deps-analyzer/main.go) - Added configureLogging() function
+
+**Result**: Users can easily control log verbosity for debugging or production
+use. The two-option approach provides both convenience (just add more -v's) and
+precision (set exact level).
+
+## Cleanup of test artifacts
+
+Removed obsolete test files from the repository root that were development
+artifacts no longer needed.
+
+**Removed**:
+- `test_binaries.go`: Old standalone test program for binary analysis
+- `test-bazel-xml`: Compiled binary (3.4MB, was already in .gitignore)
+- `test/`: Empty test directory
+
+**Rationale**: The actual testing infrastructure is in the example/ workspace.
+These were one-off test files from early development.
+
+**Result**: Cleaner repository structure without obsolete artifacts.
 
 ## Fix overlapping dependencies visualization (complete)
 
