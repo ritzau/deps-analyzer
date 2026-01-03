@@ -2,8 +2,6 @@
 
 ## Prioritized backlog
 
-1. BUG: The overlapping deps no longer show.
-
 ## Unclear
 
 1. What can we do with a CLI in this case. Can it be used to find
@@ -93,6 +91,28 @@ Removed the "Base Set" configuration section from the Default tab in the lens co
 - Removed base set type change handler with 35 lines of code
 
 **Result**: Simpler, cleaner Default tab UI focused on the controls that actually affect visualization (hierarchy level, filters, edge types).
+
+## Fix overlapping dependencies visualization
+
+Restored overlapping dependency detection that was broken after the backend lens rendering migration. The feature detects when a binary and a shared library both include the same cc_library targets (potential duplicate symbols at runtime).
+
+**Root cause**: When the codebase migrated to backend lens rendering, the `enrichGraphWithOverlappingInfo()` function stopped being called because:
+- Binary data was no longer being fetched from the backend
+- The `/api/binaries` endpoint didn't exist
+- Graph enrichment step was removed from the rendering pipeline
+
+**Implementation**:
+- Added `/api/binaries` GET endpoint in [server.go:209,314-326](pkg/web/server.go#L209,L314-L326)
+- Added `binaryData` global variable in [app.js:1762](pkg/web/static/app.js#L1762)
+- Load binaries during page initialization in [app.js:1496-1505](pkg/web/static/app.js#L1496-L1505)
+- Enrich graph after backend rendering in [app.js:1514-1516,2015-2017](pkg/web/static/app.js#L1514-L1516,L2015-L2017)
+
+**Visual indicators** (now working again):
+- Nodes with hasOverlap: red double border (4px double #ff4444)
+- Edges to overlapping targets: red solid line (4px #ff4444)
+- Tooltips show which binaries/shared libraries cause the overlap
+
+**Example from test workspace**: `//main:test_app` loads `//graphics:graphics` (shared lib), and both include `//graphics:graphics_impl`, causing potential duplicate symbols.
 
 ## Alphabetical navigation sorting
 
