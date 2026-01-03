@@ -17,16 +17,34 @@ import (
 
 func main() {
 	// Parse command-line flags
+	// Long and short options following Unix conventions
 	workspace := flag.String("workspace", ".", "Path to the Bazel workspace root")
+	workspaceShort := flag.String("w", ".", "Path to the Bazel workspace root (shorthand)")
+
 	webMode := flag.Bool("web", false, "Start web server instead of printing to console")
+
 	port := flag.Int("port", 8080, "Port for web server (only used with --web)")
+	portShort := flag.Int("p", 8080, "Port for web server (shorthand)")
+
 	watch := flag.Bool("watch", false, "Watch for file changes and re-analyze automatically")
+
 	open := flag.Bool("open", true, "Automatically open browser when starting web server")
 	flag.Parse()
 
+	// Resolve short vs long options (short takes precedence if different from default)
+	workspaceVal := *workspace
+	if *workspaceShort != "." {
+		workspaceVal = *workspaceShort
+	}
+
+	portVal := *port
+	if *portShort != 8080 {
+		portVal = *portShort
+	}
+
 	if *webMode {
 		// Start web server and run streamlined analysis
-		startWebServerAsync(*workspace, *port, *watch, *open)
+		startWebServerAsync(workspaceVal, portVal, *watch, *open)
 	} else {
 		// TODO: Add CLI mode back with Module-based output
 		// - Show targets, dependencies by type, packages
