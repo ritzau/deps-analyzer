@@ -320,7 +320,7 @@ header h1 {
     display: block;
     opacity: 0.8;
     transition: opacity 0.2s;
-    filter: invert(56%) sepia(96%) saturate(1837%) hue-rotate(0deg) brightness(103%) contrast(101%);
+    filter: invert(55%) sepia(100%) saturate(2000%) hue-rotate(0deg) brightness(100%) contrast(102%);
 }
 
 .nav-section-title .filter-dropdown-btn:hover {
@@ -350,7 +350,8 @@ header h1 {
 }
 
 .nav-section-title .filter-dropdown-menu {
-    right: auto;
+    left: auto;
+    right: 0;
     min-width: 200px;
 }
 
