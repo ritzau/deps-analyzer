@@ -2,6 +2,30 @@
 
 ## Prioritized backlog
 
+1. Clean up UI:
+
+   - Note at the end of the target list is not needed
+   - Maybe make the Rule types dropdown a filter button in the TARGETS header
+     (still a dropdown)?
+   - Rename the Default tab to View
+   - Inconsistent font and font size in the View tab?
+   - Is the details tab needed?
+   - Kill title and subtitle of the dependency graph
+
+2. Do we need to ping to check that the backend is running? Can we instead
+   detect a closed connection? In any case, the UI to retry connection and
+   reload does not really make sense. If the server was killed we re-open the
+   page using the server.
+
+3. Double check the options. I'm used to having short options with one dash and
+   long options with two.
+
+4. Add options for verbosity where the default verbosity is info and each -v
+   increases the level but the level can also be set explicitly using
+   --verbosity=[FEWIDVT]
+
+5. Test files in the repo?
+
 ## Unclear
 
 1. What can we do with a CLI in this case. Can it be used to find
@@ -45,32 +69,20 @@
    flickering. Current approach (immediate requests + cancellation) is simpler
    and gives instant feedback, so debouncing is optional optimization.
 
----
+8. **Test coverage**: This is a weird one, but the term coverage led me to think
+   about adding quality metrics. Test coverage is just one example. Maybe an
+   idea?
 
-## Attic below
+9. **Integrated browser**: Maybe skip the actual browser dependency and use
+   something like electron?
 
-### Come up with a way to collapse edges between targets
+10. **Investigate compiler options to also track header:header deps**: Better
+    track compile time deps to detect cycles.
 
-### Test coverage
+11. **Caching the result**: Store a cache so that we don't have to reanalyze
+    unless there is a change.
 
-This is a weird one, but the term coverage led me to think about adding quality
-metrics. Test coverage is just one example. Maybe an idea?
-
-### Integrated browser
-
-Maybe skip the actual browser dependency and use something like electron?
-
-### Investigate compiler options to also track header:header deps
-
-Better track compile time deps to detect cycles.
-
-### Caching the result
-
-Store a cache so that we don't have to reanalyze unless there is a change.
-
-### CI
-
-### Test using a (headless?) browser
+12. **Test using a (headless?) browser**: Worth it?
 
 ---
 
@@ -78,41 +90,95 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 
 ## Remove "Base Set" section from default lens
 
-Removed the "Base Set" configuration section from the Default tab in the lens controls. This feature no longer made sense in the current design where:
+Removed the "Base Set" configuration section from the Default tab in the lens
+controls. This feature no longer made sense in the current design where:
 
 - The graph always starts with the full graph as the base
-- Hierarchy level (packages/targets/files) is controlled by the "Hierarchy Level" radio buttons
-- Node filtering is accomplished through selection + distance rules in the Detail lens
+- Hierarchy level (packages/targets/files) is controlled by the "Hierarchy
+  Level" radio buttons
+- Node filtering is accomplished through selection + distance rules in the
+  Detail lens
 
 **Changes**:
-- Removed "Base Set" dropdown (Full Graph/Package Level/Reachable from Binary) from [index.html:104-113](pkg/web/static/index.html#L104-L113)
+
+- Removed "Base Set" dropdown (Full Graph/Package Level/Reachable from Binary)
+  from [index.html:104-113](pkg/web/static/index.html#L104-L113)
 - Removed binary selector dropdown and associated show/hide logic
-- Removed `populateBinarySelector()` function from [lens-controls.js](pkg/web/static/lens-controls.js)
+- Removed `populateBinarySelector()` function from
+  [lens-controls.js](pkg/web/static/lens-controls.js)
 - Removed base set type change handler with 35 lines of code
 
-**Result**: Simpler, cleaner Default tab UI focused on the controls that actually affect visualization (hierarchy level, filters, edge types).
+**Result**: Simpler, cleaner Default tab UI focused on the controls that
+actually affect visualization (hierarchy level, filters, edge types).
 
-## Fix overlapping dependencies visualization
+## Fix overlapping dependencies visualization (complete)
 
-Restored overlapping dependency detection that was broken after the backend lens rendering migration. The feature detects when a binary and a shared library both include the same cc_library targets (potential duplicate symbols at runtime).
+Restored overlapping dependency detection that was broken after the backend lens
+rendering migration. The feature detects when a binary and a shared library both
+include the same cc_library targets (potential duplicate symbols at runtime).
 
-**Root cause**: When the codebase migrated to backend lens rendering, the `enrichGraphWithOverlappingInfo()` function stopped being called because:
-- Binary data was no longer being fetched from the backend
-- The `/api/binaries` endpoint didn't exist
-- Graph enrichment step was removed from the rendering pipeline
+**Root causes**:
+
+1. When the codebase migrated to backend lens rendering, the
+   `enrichGraphWithOverlappingInfo()` function stopped being called because:
+
+   - Binary data was no longer being fetched from the backend
+   - The `/api/binaries` endpoint didn't exist
+   - Graph enrichment step was removed from the rendering pipeline
+
+2. Cytoscape stylesheet ordering bug: the overlap style (red double border) was
+   being overridden by the `isPublic` style (gold border) because public
+   visibility came later in the stylesheet. In Cytoscape, later styles override
+   earlier ones.
+
+3. **Label vs ID matching bug**: Backend lens rendering adds distance
+   annotations to node labels (e.g., "//graphics:graphics_impl (d=1)"). The
+   enrichment code was using `node.label || node.id` for matching, which failed
+   when labels had these annotations. Fixed by using `node.id` exclusively for
+   all node matching.
+
+4. **Incremental update bug**: The incremental update path in
+   `displayDependencyGraph()` was only updating the `label` field for existing
+   nodes, completely ignoring other data fields like `hasOverlap`. Fixed by
+   iterating through ALL data fields and updating each one, ensuring attributes
+   like hasOverlap are properly propagated to Cytoscape.
 
 **Implementation**:
-- Added `/api/binaries` GET endpoint in [server.go:209,314-326](pkg/web/server.go#L209,L314-L326)
-- Added `binaryData` global variable in [app.js:1762](pkg/web/static/app.js#L1762)
-- Load binaries during page initialization in [app.js:1496-1505](pkg/web/static/app.js#L1496-L1505)
-- Enrich graph after backend rendering in [app.js:1514-1516,2015-2017](pkg/web/static/app.js#L1514-L1516,L2015-L2017)
 
-**Visual indicators** (now working again):
-- Nodes with hasOverlap: red double border (4px double #ff4444)
-- Edges to overlapping targets: red solid line (4px #ff4444)
+Backend data flow:
+
+- Added `/api/binaries` GET endpoint in
+  [server.go:209,314-326](pkg/web/server.go#L209,L314-L326)
+- Added `binaryData` global variable in
+  [app.js:1762](pkg/web/static/app.js#L1762)
+- Load binaries during page initialization in
+  [app.js:1505-1521](pkg/web/static/app.js#L1505-L1521)
+- Enrich graph after backend rendering in
+  [app.js:1530-1532,2030-2032](pkg/web/static/app.js#L1530-L1532,L2030-L2032)
+
+Style ordering fix:
+
+- Moved overlap style rules to END of stylesheet in
+  [app.js:610-622](pkg/web/static/app.js#L610-L622) so they take precedence over
+  isPublic and other border styles
+
+Node matching fixes:
+
+- Changed enrichment code to use `node.id` instead of `node.label || node.id`
+  for matching in [app.js:1426-1449](pkg/web/static/app.js#L1426-L1449)
+- Updated incremental update to copy ALL data fields, not just label, in
+  [app.js:676-692](pkg/web/static/app.js#L676-L692)
+
+**Visual indicators** (now working correctly):
+
+- Nodes with hasOverlap: red double border (8px double #ff4444)
 - Tooltips show which binaries/shared libraries cause the overlap
+- Legend shows "Overlapping deps" indicator (removed unused edge indicator)
 
-**Example from test workspace**: `//main:test_app` loads `//graphics:graphics` (shared lib), and both include `//graphics:graphics_impl`, causing potential duplicate symbols.
+**Example from test workspace**: `//main:test_app` loads `//graphics:graphics`
+(shared lib), and both include `//graphics:graphics_impl`, causing potential
+duplicate symbols. When you select `//main:test_app`, you'll see
+`//graphics:graphics_impl` with a prominent red double border.
 
 ## Alphabetical navigation sorting
 
