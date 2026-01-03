@@ -2085,6 +2085,9 @@ window.filterAndRenderNavigationList = function filterAndRenderNavigationList() 
         return;
     }
 
+    // Sort alphabetically by label
+    filteredNodes.sort((a, b) => a.label.localeCompare(b.label));
+
     filteredNodes.forEach(node => {
         const item = document.createElement('div');
         item.className = 'nav-item';

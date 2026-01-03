@@ -2,13 +2,7 @@
 
 ## Prioritized backlog
 
-1. External packages: Additional visualization options for external packages.
-   May want to add special configuration for their visualization similar to
-   system libs, allowing users to hide/show them or their files as needed.
-
-2. Sort the targets alphabetically (in navigation).
-
-3. If a node has a single nested node, we should be able to collapse the
+1. If a node has a single nested node, we should be able to collapse the
    hierarchy (recursively). We need to determine what the label should be
    though.
 
@@ -85,6 +79,21 @@ Store a cache so that we don't have to reanalyze unless there is a change.
 ---
 
 # Archive
+
+## ✅ Alphabetical navigation sorting (DONE)
+
+Added alphabetical sorting to the navigation targets list for easier browsing.
+
+**Implementation**:
+- Modified `filterAndRenderNavigationList()` in [pkg/web/static/app.js:2089](pkg/web/static/app.js#L2089)
+- Added sort after filtering: `filteredNodes.sort((a, b) => a.label.localeCompare(b.label))`
+- Uses locale-aware string comparison for proper sorting
+- Sorting happens client-side after filtering by rule type and search text
+
+**Result**:
+- All targets in navigation sidebar now appear in alphabetical order
+- Makes it easier to find specific targets by name
+- Works seamlessly with existing filters (rule type checkboxes and search)
 
 ## ✅ External dependency support (DONE)
 
