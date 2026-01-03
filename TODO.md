@@ -2,14 +2,19 @@
 
 ## Prioritized backlog
 
-1. Double check the options. I'm used to having short options with one dash and
+1. Do we need to ping to check that the backend is running? Can we instead
+   detect a closed connection? In any case, the UI to retry connection and
+   reload does not really make sense. If the server was killed we re-open the
+   page using the server.
+
+2. Double check the options. I'm used to having short options with one dash and
    long options with two.
 
-2. Add options for verbosity where the default verbosity is info and each -v
+3. Add options for verbosity where the default verbosity is info and each -v
    increases the level but the level can also be set explicitly using
    --verbosity=[FEWIDVT]
 
-3. Test files in the repo?
+4. Test files in the repo?
 
 ## Unclear
 
