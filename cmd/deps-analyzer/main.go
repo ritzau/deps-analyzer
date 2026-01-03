@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,38 +12,21 @@ import (
 	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"github.com/ritzau/deps-analyzer/pkg/watcher"
 	"github.com/ritzau/deps-analyzer/pkg/web"
+	"github.com/spf13/pflag"
 )
 
 func main() {
-	// Parse command-line flags
-	// Note: Go's flag package only supports single-dash flags (e.g., -web, -workspace)
-	workspace := flag.String("workspace", ".", "path to Bazel workspace")
-	w := flag.String("w", ".", "alias for -workspace")
-
-	webMode := flag.Bool("web", false, "start web server")
-
-	port := flag.Int("port", 8080, "web server port")
-	p := flag.Int("p", 8080, "alias for -port")
-
-	watch := flag.Bool("watch", false, "watch for file changes and re-analyze")
-
-	open := flag.Bool("open", true, "auto-open browser when starting server")
-	flag.Parse()
-
-	// Resolve aliases (short option takes precedence if different from default)
-	workspaceVal := *workspace
-	if *w != "." {
-		workspaceVal = *w
-	}
-
-	portVal := *port
-	if *p != 8080 {
-		portVal = *p
-	}
+	// Parse command-line flags using pflag for POSIX/GNU-style flags
+	workspace := pflag.StringP("workspace", "w", ".", "path to Bazel workspace")
+	webMode := pflag.Bool("web", false, "start web server")
+	port := pflag.IntP("port", "p", 8080, "web server port")
+	watch := pflag.Bool("watch", false, "watch for file changes and re-analyze")
+	open := pflag.Bool("open", true, "auto-open browser when starting server")
+	pflag.Parse()
 
 	if *webMode {
 		// Start web server and run streamlined analysis
-		startWebServerAsync(workspaceVal, portVal, *watch, *open)
+		startWebServerAsync(*workspace, *port, *watch, *open)
 	} else {
 		// TODO: Add CLI mode back with Module-based output
 		// - Show targets, dependencies by type, packages
