@@ -2,29 +2,14 @@
 
 ## Prioritized backlog
 
-1. Clean up UI:
-
-   - Note at the end of the target list is not needed
-   - Maybe make the Rule types dropdown a filter button in the TARGETS header
-     (still a dropdown)?
-   - Rename the Default tab to View
-   - Inconsistent font and font size in the View tab?
-   - Is the details tab needed?
-   - Kill title and subtitle of the dependency graph
-
-2. Do we need to ping to check that the backend is running? Can we instead
-   detect a closed connection? In any case, the UI to retry connection and
-   reload does not really make sense. If the server was killed we re-open the
-   page using the server.
-
-3. Double check the options. I'm used to having short options with one dash and
+1. Double check the options. I'm used to having short options with one dash and
    long options with two.
 
-4. Add options for verbosity where the default verbosity is info and each -v
+2. Add options for verbosity where the default verbosity is info and each -v
    increases the level but the level can also be set explicitly using
    --verbosity=[FEWIDVT]
 
-5. Test files in the repo?
+3. Test files in the repo?
 
 ## Unclear
 
@@ -110,6 +95,38 @@ controls. This feature no longer made sense in the current design where:
 
 **Result**: Simpler, cleaner Default tab UI focused on the controls that
 actually affect visualization (hierarchy level, filters, edge types).
+
+## UI cleanup and polish
+
+Series of small UI improvements for a cleaner, more professional interface:
+
+1. **Removed redundant hint text**: Deleted "Click to select, Cmd+Click to
+   toggle, click background to clear" hint from navigation panel as this is
+   standard UI behavior.
+
+2. **Relocated rule type filter**: Moved the rule types dropdown from the filter
+   controls section into the Targets header as a compact button (🔽 funnel icon).
+   This saves vertical space and makes the filter more accessible.
+
+3. **Renamed Default tab to View**: Changed tab label from "Default" to "View"
+   for clarity, as it controls visualization settings.
+
+4. **Fixed font inconsistencies**: Standardized font sizes and styles across View
+   and Detail tabs. Changed to relative units (0.8em for headers, 0.85em for
+   labels and selects). Fixed obsolete #focusTab references to #detailTab.
+
+5. **Removed graph title**: Deleted "📊 Dependency Graph" heading and help text
+   as they're unnecessary - the graph is self-explanatory.
+
+6. **Added filter icon**: Changed dropdown button from "▾" to "🔽" (funnel/tratt)
+   to make it visually recognizable as a filter control.
+
+**Files modified**:
+- [index.html](pkg/web/static/index.html) - UI structure changes
+- [styles.css](pkg/web/static/styles.css) - Typography and layout updates
+
+**Result**: Cleaner, more professional interface with better use of space and
+consistent styling throughout.
 
 ## Fix overlapping dependencies visualization (complete)
 
