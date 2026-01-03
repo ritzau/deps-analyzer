@@ -252,6 +252,10 @@ header h1 {
     padding: 8px 16px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
 }
 
 .nav-items {
@@ -301,6 +305,13 @@ header h1 {
     color: var(--text-primary);
 }
 
+.nav-section-title .filter-dropdown-btn {
+    width: auto;
+    padding: 2px 8px;
+    font-size: 14px;
+    min-width: 32px;
+}
+
 .filter-dropdown-btn:hover {
     background: var(--bg-tertiary);
 }
@@ -317,6 +328,11 @@ header h1 {
     z-index: 1000;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     margin-top: 2px;
+}
+
+.nav-section-title .filter-dropdown-menu {
+    right: auto;
+    min-width: 200px;
 }
 
 .filter-dropdown-menu label {
