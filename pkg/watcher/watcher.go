@@ -3,12 +3,12 @@ package watcher
 import (
 	"context"
 	"fmt"
-	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -35,7 +35,6 @@ type FileWatcher struct {
 	workspace string
 	events    chan ChangeEvent
 	done      chan struct{}
-	mu        sync.Mutex
 }
 
 // NewFileWatcher creates a new file system watcher for a Bazel workspace
@@ -224,4 +223,3 @@ func (fw *FileWatcher) Stop() error {
 	close(fw.done)
 	return fw.watcher.Close()
 }
-

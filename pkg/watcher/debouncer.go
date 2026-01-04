@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/ritzau/deps-analyzer/pkg/logging"
@@ -14,7 +13,6 @@ type Debouncer struct {
 	output      chan ChangeEvent
 	quietPeriod time.Duration
 	maxWait     time.Duration
-	mu          sync.Mutex
 }
 
 // NewDebouncer creates a new event debouncer
