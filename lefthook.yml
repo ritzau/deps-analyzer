@@ -113,7 +113,7 @@ format:
     biome:
       run: |
         if command -v npx > /dev/null 2>&1; then
-          find pkg/web/static -type f \( -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" -o -name "*.json" -o -name "*.jsonc" \) -exec npx --yes @biomejs/biome format --write {} +
+          npx --yes @biomejs/biome format --write pkg/web/static
         fi
 
     prettier:
