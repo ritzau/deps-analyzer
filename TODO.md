@@ -2,6 +2,12 @@
 
 ## Prioritized backlog
 
+1. TypeScript preparation
+
+2. Something like pre-commit but without python to:
+   - Format the code (go, bazel, c++, ts, js, ...)
+   - Run linters
+
 ## Unclear
 
 1. What can we do with a CLI in this case. Can it be used to find
@@ -184,8 +190,8 @@ is stopped, user restarts it and gets a fresh browser tab.
 
 ## License listing command
 
-Added `--licenses` CLI flag to display all third-party software licenses used
-by the project.
+Added `--licenses` CLI flag to display all third-party software licenses used by
+the project.
 
 **Implementation**:
 
@@ -198,6 +204,7 @@ by the project.
 **Libraries included**:
 
 Go dependencies:
+
 - pflag (BSD-3-Clause)
 - fsnotify (BSD-3-Clause)
 - uuid (BSD-3-Clause)
@@ -205,15 +212,18 @@ Go dependencies:
 - gonum (BSD-3-Clause)
 
 Frontend JavaScript:
+
 - Cytoscape.js (MIT)
 - dagre (MIT)
 - cytoscape-dagre (MIT)
 
 C++ libraries:
+
 - fmt (MIT)
 - nlohmann/json (MIT)
 
 Assets:
+
 - Filter icon from Flaticon by Kiranshastry
 
 **Usage**: `./deps-analyzer --licenses`
@@ -229,12 +239,14 @@ localStorage, so settings are restored across page reloads.
 **Implementation**:
 
 1. **storage.js module**: Created with save/load functions
+
    - `saveViewState()`: Serializes state to JSON and stores in localStorage
    - `loadViewState()`: Deserializes and restores state on page load
    - Handles Set↔Array conversion for JSON compatibility
    - Version check to handle future schema changes
 
 2. **ViewStateManager integration**:
+
    - Constructor loads saved state from localStorage
    - `notifyListeners()` automatically saves state on every change
    - Navigation filter updates also trigger saves
@@ -245,18 +257,22 @@ localStorage, so settings are restored across page reloads.
    - Called during initialization to reflect loaded settings
 
 **Persisted settings**:
+
 - Default lens configuration (collapse level, filters, edge types)
 - Detail lens configuration
 - Navigation filters (rule types, search text)
 - Active tab selection
 
 **Not persisted**:
+
 - Selected nodes (intentionally cleared on page load)
 
 **Files created**:
+
 - [storage.js](pkg/web/static/storage.js) - LocalStorage persistence module
 
 **Files modified**:
+
 - [view-state.js](pkg/web/static/view-state.js) - Load/save integration
 - [lens-controls.js](pkg/web/static/lens-controls.js) - UI sync function
 - [index.html](pkg/web/static/index.html) - Added storage.js script tag
@@ -275,11 +291,13 @@ place.
 1. **Tab structure**: Removed Detail tab, kept only Tree and View tabs
 
 2. **Merged controls**: Added Selected Nodes section to View tab containing:
+
    - Selected: File visibility for selected nodes
    - Neighbors: File visibility for direct neighbors
    - Rest: Visibility for remaining graph nodes
 
 3. **Label simplification**: Removed distance numbers from labels for clarity
+
    - "Distance 0 (Selected)" → "Selected"
    - "Distance 1 (Neighbors)" → "Neighbors"
    - "Distance 2+ (Rest)" → "Rest"
@@ -288,6 +306,7 @@ place.
    'detail' tab selection to 'default' for backward compatibility
 
 **Files modified**:
+
 - [index.html](pkg/web/static/index.html) - Merged tab structure and controls
 - [styles.css](pkg/web/static/styles.css) - Added detail-controls styling
 - [view-state.js](pkg/web/static/view-state.js) - Tab migration logic
@@ -306,6 +325,7 @@ requirements for BSD-3-Clause and MIT licenses.
 1. **LICENSES/ directory**: Created with 12 files containing full license texts
 
 2. **Go dependencies (BSD-3-Clause)**: 5 files
+
    - pflag.txt - github.com/spf13/pflag
    - fsnotify.txt - github.com/fsnotify/fsnotify
    - uuid.txt - github.com/google/uuid
@@ -313,20 +333,24 @@ requirements for BSD-3-Clause and MIT licenses.
    - gonum.txt - gonum.org/v1/gonum
 
 3. **Frontend JavaScript libraries (MIT)**: 3 files
+
    - cytoscape.txt - Cytoscape.js
    - dagre.txt - dagre
    - cytoscape-dagre.txt - cytoscape-dagre
 
 4. **C++ libraries (MIT)**: 2 files
+
    - fmt.txt - fmtlib/fmt
    - nlohmann-json.txt - nlohmann/json
 
 5. **Assets**: 1 file
+
    - flaticon-filter.txt - Filter icon from Flaticon
 
 6. **README.md**: Index file listing all licenses with links
 
 **Files created**:
+
 - [LICENSES/README.md](LICENSES/README.md) - License index
 - 12 individual license text files
 

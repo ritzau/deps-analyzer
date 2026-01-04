@@ -24,29 +24,36 @@ This installs the `deps-analyzer` binary to `$GOPATH/bin` (usually `~/go/bin`). 
 
 ### Build from Source
 
+**Option 1: Using Makefile (recommended for development)**
 ```bash
 git clone https://github.com/ritzau/deps-analyzer.git
 cd deps-analyzer
 make build
 ```
 
-The Makefile will automatically:
-- Install esbuild as a build tool
-- Compile TypeScript frontend (if present)
-- Build the Go binary
+The Makefile automatically installs esbuild and compiles TypeScript (if present).
 
-Alternatively, build with Go directly:
+**Option 2: Using Go directly**
 ```bash
+git clone https://github.com/ritzau/deps-analyzer.git
+cd deps-analyzer
+
+# First time: install esbuild and generate frontend
+go install github.com/evanw/esbuild/cmd/esbuild@latest
+go generate ./pkg/web
+
+# Build
 go build -o deps-analyzer ./cmd/deps-analyzer
 ```
+
+The `go:generate` directive automatically compiles TypeScript during `go generate`.
 
 ### Prerequisites
 
 - Go 1.21 or later
 - Bazel 7.0 or later
 - A Bazel workspace with C++ targets
-- Make (for automated builds)
-- esbuild (automatically installed via `make build`)
+- esbuild (for TypeScript compilation, optional if using JavaScript)
 
 ## Usage
 
