@@ -2,9 +2,10 @@ package lens
 
 import (
 	"fmt"
-	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"sort"
 	"strings"
+
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 )
 
 // RenderGraph applies lens transformations to raw graph data

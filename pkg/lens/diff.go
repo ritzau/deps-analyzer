@@ -155,4 +155,3 @@ func nodesEqual(a, b GraphNode) bool {
 		a.Parent == b.Parent
 	// Note: We don't compare metadata fields that don't affect structure
 }
-

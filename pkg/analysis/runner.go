@@ -194,4 +194,3 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	logging.Info("analysis complete", "reason", opts.Reason)
 	return nil
 }
-

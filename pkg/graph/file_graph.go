@@ -165,4 +165,3 @@ func BuildFileGraph(fileDeps []*deps.FileDependency) *FileGraph {
 
 	return fg
 }
-

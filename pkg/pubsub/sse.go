@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"io"
 	"sync"
+
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 )
 
 // TopicConfig configures buffering behavior for a topic
