@@ -50,7 +50,7 @@ pre-commit:
           # Remove all trailing newlines
           sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$file"
           # Add single newline at end
-          echo "" >> "$file"
+          printf '\n' >> "$file"
 
           git add "$file"
         done
@@ -100,6 +100,6 @@ format:
         find . -type f \( -name "*.go" -o -name "*.cc" -o -name "*.h" -o -name "*.js" -o -name "*.ts" -o -name "*.css" -o -name "*.html" -o -name "*.md" \) -not -path "*/bazel-*" -not -path "*/.git/*" -not -path "*/node_modules/*" | while read file; do
           sed -i '' 's/[[:space:]]*$//' "$file"
           sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$file"
-          echo "" >> "$file"
+          printf '\n' >> "$file"
         done
 
