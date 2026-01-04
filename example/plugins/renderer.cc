@@ -35,4 +35,3 @@ void DestroyRenderer(Renderer *renderer) { delete renderer; }
 }
 
 } // namespace plugins
-

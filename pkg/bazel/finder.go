@@ -158,4 +158,3 @@ func isInPackage(fileDir string, packageDirs map[string]bool) bool {
 
 	return false
 }
-

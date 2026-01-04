@@ -26,24 +26,28 @@ Bazel C++ Dependency Analyzer helps analyze and visualize C++ dependencies in Ba
 ### Core Components
 
 #### 1. Bazel Integration (`pkg/bazel/`)
+
 - Query targets: `bazel query 'kind("cc_.* rule", //...)'`
 - Get dependencies: `bazel query 'deps(//path:target)'`
 - Parse XML output for target metadata
 - Extract workspace name from `bazel mod graph`
 
 #### 2. Dependency Analysis (`pkg/deps/`, `pkg/symbols/`)
+
 - Parse `.d` files from `bazel-out/` for compile dependencies
 - Use `nm` to analyze symbols from object files
 - Extract file-level include dependencies
 - Track which symbols are actually used between targets
 
 #### 3. Binary Analysis (`pkg/binaries/`)
+
 - Analyze binaries and shared libraries
 - Detect overlapping dependencies (same code linked into multiple binaries)
 - Track system library dependencies
 - Identify data dependencies
 
 #### 4. Lens Rendering System (`pkg/lens/`)
+
 The lens system provides sophisticated graph filtering and visualization:
 
 - **Distance Computation**: BFS-based distance from selected nodes
@@ -54,6 +58,7 @@ The lens system provides sophisticated graph filtering and visualization:
 - **Diff-based Updates**: Compute incremental changes for efficient UI updates
 
 #### 5. PubSub System (`pkg/pubsub/`)
+
 Event-driven publish/subscribe using Server-Sent Events (SSE):
 
 ```go
@@ -75,18 +80,21 @@ for event := range sub.Events() {
 ```
 
 **Benefits:**
+
 - Server controls state transitions (no race conditions)
 - Late subscribers get current state instantly
 - Configurable buffering per topic
 - Browser-native EventSource API
 
 #### 6. File Watching (`pkg/watcher/`)
+
 - Monitor BUILD files and bazel-out/ for changes
 - Smart debouncing (1.5s quiet period, 10s max wait)
 - Intelligent change detection for incremental updates
 - Triggers appropriate re-analysis based on what changed
 
 #### 7. Structured Logging (`pkg/logging/`)
+
 - Wraps Go's `log/slog` with custom compact handler
 - Request ID tracking for HTTP requests
 - Context-aware logging
@@ -189,6 +197,7 @@ go build -o deps-analyzer cmd/deps-analyzer/main.go
 ### Logging
 
 **Backend:**
+
 ```go
 import "github.com/ritzau/deps-analyzer/pkg/logging"
 
@@ -198,13 +207,14 @@ logging.Error("problem occurred", "error", err)
 ```
 
 **Frontend:**
+
 ```javascript
-appLogger.info('User clicked node', { nodeId: id });
-appLogger.debug('Internal state', { state: viewState });
-appLogger.error('Request failed', { error: err.message });
+appLogger.info("User clicked node", { nodeId: id });
+appLogger.debug("Internal state", { state: viewState });
+appLogger.error("Request failed", { error: err.message });
 
 // Enable DEBUG logs in browser console:
-appLogger.setLevel(LogLevel.DEBUG)
+appLogger.setLevel(LogLevel.DEBUG);
 ```
 
 ## Key Algorithms
@@ -278,17 +288,21 @@ Original implementation had client-side lens rendering in JavaScript. Migrated t
 ## Testing Strategy
 
 ### Unit Tests
+
 - Graph algorithms (distance, cycles)
 - Diff computation
 - Parser edge cases
 
 ### Integration Tests
+
 - Full analysis pipeline with example workspace
 - SSE pub/sub system
 - File watcher debouncing
 
 ### Manual Testing
+
 The `example/` workspace has intentional problems:
+
 - Uncovered files (orphaned.cc)
 - Monolithic packages (util with 4 unrelated files)
 - Cross-package dependencies
@@ -317,6 +331,7 @@ See [example/README.md](example/README.md) for full test cases.
 ### Debugging Tips
 
 **Enable DEBUG logging:**
+
 ```bash
 # Backend: modify pkg/logging/logger.go init() to use slog.LevelDebug
 # Frontend: in browser console
@@ -324,11 +339,13 @@ appLogger.setLevel(LogLevel.DEBUG)
 ```
 
 **Inspect lens rendering:**
+
 - Backend logs distance computation and visibility decisions at DEBUG level
 - Check browser Network tab for `/api/module/graph/lens` request/response
 - Use `previousHash` parameter to test diff computation
 
 **Test file watching:**
+
 ```bash
 # Run with watch
 ./deps-analyzer --web --watch --workspace=./example
@@ -355,4 +372,3 @@ See [TODO.md](TODO.md) for planned features and ideas.
 - [Cytoscape.js Documentation](https://js.cytoscape.org/)
 - [Server-Sent Events Specification](https://html.spec.whatwg.org/multipage/server-sent-events.html)
 - [Go slog Package](https://pkg.go.dev/log/slog)
-

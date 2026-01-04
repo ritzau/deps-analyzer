@@ -11,4 +11,3 @@ std::string format_colored(const std::string &text, const std::string &color);
 std::string format_list(const std::vector<std::string> &items);
 
 } // namespace formatter
-

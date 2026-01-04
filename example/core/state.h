@@ -26,4 +26,3 @@ private:
 } // namespace core
 
 #endif // CORE_STATE_H_
-

@@ -18,4 +18,3 @@ bool EndsWith(const std::string &str, const std::string &suffix);
 } // namespace util
 
 #endif // UTIL_STRINGS_H_
-

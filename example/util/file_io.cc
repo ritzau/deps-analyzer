@@ -53,4 +53,3 @@ std::vector<std::string> ListDirectory(const std::string &path) {
 }
 
 } // namespace util
-

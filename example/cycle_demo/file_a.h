@@ -9,4 +9,3 @@ void functionA() {
 }
 
 #endif
-

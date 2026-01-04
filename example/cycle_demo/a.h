@@ -4,4 +4,3 @@
 void funcA();
 
 #endif
-

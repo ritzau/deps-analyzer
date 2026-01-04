@@ -24,4 +24,3 @@ void Renderer::SetResolution(int width, int height) {
 }
 
 } // namespace graphics
-

@@ -157,4 +157,3 @@ func TestNoBuffer(t *testing.T) {
 		t.Fatal("Timeout waiting for new event")
 	}
 }
-

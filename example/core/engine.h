@@ -28,4 +28,3 @@ private:
 } // namespace core
 
 #endif // CORE_ENGINE_H_
-

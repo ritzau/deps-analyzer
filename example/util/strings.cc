@@ -49,4 +49,3 @@ bool EndsWith(const std::string &str, const std::string &suffix) {
 }
 
 } // namespace util
-

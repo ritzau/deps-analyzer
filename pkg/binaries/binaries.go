@@ -436,4 +436,3 @@ func collectAllLibraries(module *model.Module, targetLabel string, visited map[s
 		}
 	}
 }
-

@@ -15,4 +15,3 @@ void Sleep(int64_t millis);
 } // namespace util
 
 #endif // UTIL_TIME_H_
-

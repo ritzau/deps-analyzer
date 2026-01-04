@@ -57,4 +57,3 @@ type NodeState struct {
 	AppliedLens string      // "default" or "detail"
 	Rule        *DistanceRule
 }
-

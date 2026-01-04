@@ -200,4 +200,3 @@ func (h *CompactHandler) WithGroup(name string) slog.Handler {
 		group: name,
 	}
 }
-

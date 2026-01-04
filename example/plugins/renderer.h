@@ -31,4 +31,3 @@ void DestroyRenderer(Renderer *renderer);
 } // namespace plugins
 
 #endif // PLUGINS_RENDERER_H_
-

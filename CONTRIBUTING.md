@@ -130,4 +130,3 @@ make dev
 5. Push and create a pull request
 
 The git hooks ensure all code is properly formatted before commit, maintaining consistent style across the codebase.
-

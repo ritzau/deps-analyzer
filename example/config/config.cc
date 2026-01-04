@@ -73,4 +73,3 @@ int ConfigManager::GetInt(const std::string &key, int default_value) const {
 }
 
 } // namespace config
-

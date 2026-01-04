@@ -56,4 +56,3 @@ func extractModuleNameFromBazel(workspacePath string) (string, error) {
 
 	return "", nil
 }
-

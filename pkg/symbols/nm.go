@@ -305,4 +305,3 @@ func isDefinedSymbol(symType string) bool {
 		return false
 	}
 }
-

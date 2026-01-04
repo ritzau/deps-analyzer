@@ -25,6 +25,7 @@ This installs the `deps-analyzer` binary to `$GOPATH/bin` (usually `~/go/bin`). 
 ### Build from Source
 
 **Option 1: Using Makefile (recommended for development)**
+
 ```bash
 git clone https://github.com/ritzau/deps-analyzer.git
 cd deps-analyzer
@@ -34,6 +35,7 @@ make build
 The Makefile automatically installs esbuild and compiles TypeScript (if present).
 
 **Option 2: Using Go directly**
+
 ```bash
 git clone https://github.com/ritzau/deps-analyzer.git
 cd deps-analyzer
@@ -66,6 +68,7 @@ Start the web server and open the UI:
 ```
 
 The tool will:
+
 1. Query Bazel for all targets and dependencies
 2. Parse .d files for compile dependencies
 3. Analyze symbols from object files
@@ -81,9 +84,10 @@ Enable automatic re-analysis when files change:
 ```
 
 The analyzer will monitor:
+
 - **BUILD and BUILD.bazel files** → triggers full re-analysis
-- **bazel-out/**/*.d files** (compile dependencies) → triggers partial re-analysis
-- **bazel-out/**/*.o files** (symbol info) → triggers symbol dependency re-analysis
+- **bazel-out/**/\*.d files\*\* (compile dependencies) → triggers partial re-analysis
+- **bazel-out/**/\*.o files\*\* (symbol info) → triggers symbol dependency re-analysis
 
 Changes are debounced (1.5s quiet period, 10s max wait) to avoid excessive re-analysis.
 
@@ -110,6 +114,7 @@ The tool uses structured logging with a compact, readable console format:
 ```
 
 Features:
+
 - **Compact timestamps**: HH:MM:SS instead of full RFC3339
 - **Shortened request IDs**: First 8 characters for readability
 - **Structured key-value pairs**: Easy to grep and parse
@@ -130,11 +135,11 @@ Features:
 
 When `--watch` is enabled, the tool intelligently determines which analysis phases to re-run:
 
-| Changed Files | Phases Re-run | Why |
-|--------------|---------------|-----|
-| BUILD files | Full analysis | Target definitions may have changed |
-| .d files only | Compile deps → Symbols → Binaries | Header dependencies changed |
-| .o files only | Symbols → Binaries | Symbol information changed |
+| Changed Files | Phases Re-run                     | Why                                 |
+| ------------- | --------------------------------- | ----------------------------------- |
+| BUILD files   | Full analysis                     | Target definitions may have changed |
+| .d files only | Compile deps → Symbols → Binaries | Header dependencies changed         |
+| .o files only | Symbols → Binaries                | Symbol information changed          |
 
 This minimizes re-analysis time for common changes.
 
@@ -207,4 +212,3 @@ For development documentation, architecture decisions, and implementation detail
 ## License
 
 [Your License Here]
-

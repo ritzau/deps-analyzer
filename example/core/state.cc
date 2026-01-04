@@ -53,4 +53,3 @@ bool StateManager::LoadFromFile(const std::string &path) {
 }
 
 } // namespace core
-

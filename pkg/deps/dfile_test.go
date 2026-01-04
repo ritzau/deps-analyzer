@@ -150,4 +150,3 @@ func TestParseAllDFiles(t *testing.T) {
 		t.Error("Expected to find at least one cross-package dependency (core -> util)")
 	}
 }
-

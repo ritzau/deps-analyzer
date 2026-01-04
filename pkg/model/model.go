@@ -234,4 +234,3 @@ func (m *Module) GetAllPackageDependencies() []PackageDependency {
 
 	return result
 }
-

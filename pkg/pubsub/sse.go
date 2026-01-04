@@ -237,4 +237,3 @@ func WriteSSE(w io.Writer, event Event) error {
 	_, err = fmt.Fprintf(w, "data: %s\n\n", jsonData)
 	return err
 }
-

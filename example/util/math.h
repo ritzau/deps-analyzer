@@ -18,4 +18,3 @@ std::string NumberToString(int64_t n);
 } // namespace util
 
 #endif // UTIL_MATH_H_
-

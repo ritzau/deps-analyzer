@@ -15,4 +15,3 @@ std::vector<std::string> ListDirectory(const std::string &path);
 } // namespace util
 
 #endif // UTIL_FILE_IO_H_
-

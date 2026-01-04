@@ -230,4 +230,3 @@ func extractParentID(nodeID string) string {
 	parentParts := parts[:len(parts)-1]
 	return "//" + strings.Join(parentParts, ":")
 }
-

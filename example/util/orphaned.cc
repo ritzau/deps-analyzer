@@ -10,4 +10,3 @@ void OrphanedFunction() {
 }
 
 } // namespace util
-

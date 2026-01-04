@@ -34,4 +34,3 @@ std::string format_list(const std::vector<std::string> &items) {
 }
 
 } // namespace formatter
-
