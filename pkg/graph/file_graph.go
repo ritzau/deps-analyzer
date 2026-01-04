@@ -158,7 +158,7 @@ func BuildFileGraph(fileDeps []*deps.FileDependency) *FileGraph {
 
 			// Add dependencies
 			for _, depFile := range dep.Dependencies {
-				fg.AddDependency(dep.SourceFile, depFile)
+				_ = fg.AddDependency(dep.SourceFile, depFile)
 			}
 		}
 	}

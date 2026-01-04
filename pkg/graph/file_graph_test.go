@@ -66,8 +66,8 @@ func TestFileGetDependencies(t *testing.T) {
 	fg.AddFile("util/strings.h")
 	fg.AddFile("util/time.h")
 
-	fg.AddDependency("core/engine.cc", "util/strings.h")
-	fg.AddDependency("core/engine.cc", "util/time.h")
+	_ = fg.AddDependency("core/engine.cc", "util/strings.h")
+	_ = fg.AddDependency("core/engine.cc", "util/time.h")
 
 	deps := fg.GetDependencies("core/engine.cc")
 	if len(deps) != 2 {

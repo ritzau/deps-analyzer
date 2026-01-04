@@ -20,7 +20,7 @@ func ParseDFile(path string) (*FileDependency, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var sourceFile string
 	var dependencies []string

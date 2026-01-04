@@ -49,25 +49,25 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	// Phase 1: Bazel Query
 	module := ar.server.GetModule()
 	if !opts.SkipBazelQuery {
-		ar.server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 6)
+		_ = ar.server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 6)
 		logging.Info("querying bazel module")
 
 		var err error
 		module, err = bazel.QueryWorkspace(ar.workspace)
 		if err != nil {
 			logging.Error("bazel query failed", "error", err)
-			ar.server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 6)
+			_ = ar.server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 6)
 			return fmt.Errorf("bazel query failed: %w", err)
 		}
 
 		logging.Info("bazel query complete", "targets", len(module.Targets), "dependencies", len(module.Dependencies))
 		ar.server.SetModule(module)
-		ar.server.PublishTargetGraph("partial_data", false)
+		_ = ar.server.PublishTargetGraph("partial_data", false)
 	}
 
 	// Phase 2: Compile Dependencies
 	if !opts.SkipCompileDeps {
-		ar.server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 6)
+		_ = ar.server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 6)
 		logging.Info("adding compile dependencies from .d files")
 
 		// Parse file-level dependencies and store them
@@ -85,12 +85,12 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		} else {
 			logging.Info("added compile dependencies", "totalDependencies", len(module.Dependencies))
 		}
-		ar.server.PublishTargetGraph("partial_data", false)
+		_ = ar.server.PublishTargetGraph("partial_data", false)
 	}
 
 	// Phase 3: Symbol Dependencies
 	if !opts.SkipSymbolDeps {
-		ar.server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 6)
+		_ = ar.server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 6)
 		logging.Info("adding symbol dependencies from nm analysis")
 
 		// Build file-to-target map for symbol analysis and file dependencies
@@ -113,7 +113,7 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 
 		// Discover source files in workspace
 		logging.Info("discovering source files in workspace")
-		ar.server.PublishWorkspaceStatus("discovering_files", "Discovering source files...", 4, 6)
+		_ = ar.server.PublishWorkspaceStatus("discovering_files", "Discovering source files...", 4, 6)
 
 		discovered, err := bazel.DiscoverSourceFiles(ar.workspace)
 		if err != nil {
@@ -159,13 +159,13 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 
 		// Store module in server and publish targets ready
 		ar.server.SetModule(module)
-		ar.server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 5, 6)
-		ar.server.PublishTargetGraph("complete", true)
+		_ = ar.server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 5, 6)
+		_ = ar.server.PublishTargetGraph("complete", true)
 	}
 
 	// Phase 4: Binary Derivation
 	if !opts.SkipBinaryDeriv {
-		ar.server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 6, 6)
+		_ = ar.server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 6, 6)
 		logging.Info("deriving binary information from module")
 
 		binaryInfos := binaries.DeriveBinaryInfoFromModule(module)
@@ -189,7 +189,7 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	}
 
 	// Publish final ready state
-	ar.server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
+	_ = ar.server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
 
 	logging.Info("analysis complete", "reason", opts.Reason)
 	return nil

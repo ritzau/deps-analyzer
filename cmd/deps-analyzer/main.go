@@ -108,7 +108,7 @@ func startFileWatcher(ctx context.Context, workspace string, runner *analysis.An
 
 	// Notify UI that watching is active
 	server.SetWatching(true)
-	server.PublishWorkspaceStatus("watching", "Watching for changes...", 6, 6)
+	_ = server.PublishWorkspaceStatus("watching", "Watching for changes...", 6, 6)
 
 	// Create watcher
 	fw, err := watcher.NewFileWatcher(workspace)
@@ -163,7 +163,7 @@ func startFileWatcher(ctx context.Context, workspace string, runner *analysis.An
 			}
 
 			// Restore watching state
-			server.PublishWorkspaceStatus("watching", "Watching for changes...", 6, 6)
+			_ = server.PublishWorkspaceStatus("watching", "Watching for changes...", 6, 6)
 		}
 	}()
 }

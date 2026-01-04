@@ -8,7 +8,7 @@ import (
 
 func TestEventBuffer(t *testing.T) {
 	pub := NewSSEPublisher()
-	defer pub.Close()
+	defer func() { _ = pub.Close() }()
 
 	// Configure topic with buffer size 3, replay all
 	pub.ConfigureTopic("test", TopicConfig{
@@ -32,7 +32,7 @@ func TestEventBuffer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}
-	defer sub.Close()
+	defer func() { _ = sub.Close() }()
 
 	// Should receive last 3 events (3, 4, 5)
 	receivedCount := 0
@@ -58,7 +58,7 @@ func TestEventBuffer(t *testing.T) {
 
 func TestReplayLastOnly(t *testing.T) {
 	pub := NewSSEPublisher()
-	defer pub.Close()
+	defer func() { _ = pub.Close() }()
 
 	// Configure topic with buffer size 5, replay only last
 	pub.ConfigureTopic("test", TopicConfig{
@@ -82,7 +82,7 @@ func TestReplayLastOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}
-	defer sub.Close()
+	defer func() { _ = sub.Close() }()
 
 	// Should receive only last event (version 3)
 	select {
@@ -106,7 +106,7 @@ func TestReplayLastOnly(t *testing.T) {
 
 func TestNoBuffer(t *testing.T) {
 	pub := NewSSEPublisher()
-	defer pub.Close()
+	defer func() { _ = pub.Close() }()
 
 	// Configure topic with no buffer
 	pub.ConfigureTopic("test", TopicConfig{
@@ -130,7 +130,7 @@ func TestNoBuffer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}
-	defer sub.Close()
+	defer func() { _ = sub.Close() }()
 
 	// Verify no events are received (because none were buffered)
 	select {

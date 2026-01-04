@@ -93,7 +93,7 @@ func (p *SSEPublisher) Subscribe(ctx context.Context, topic string) (Subscriptio
 	// Handle context cancellation
 	go func() {
 		<-ctx.Done()
-		sub.Close()
+		_ = sub.Close()
 	}()
 
 	return sub, nil

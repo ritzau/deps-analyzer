@@ -226,7 +226,7 @@ func (s *Server) handleSubscribeWorkspaceStatus(w http.ResponseWriter, r *http.R
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS support
 
 	// Send initial comment to establish connection (Safari compatibility)
-	fmt.Fprintf(w, ": connected\n\n")
+	_, _ = fmt.Fprintf(w, ": connected\n\n")
 	if flusher, ok := w.(http.Flusher); ok {
 		flusher.Flush()
 	}
@@ -237,7 +237,7 @@ func (s *Server) handleSubscribeWorkspaceStatus(w http.ResponseWriter, r *http.R
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer sub.Close()
+	defer func() { _ = sub.Close() }()
 
 	// Stream events
 	for event := range sub.Events() {
@@ -259,7 +259,7 @@ func (s *Server) handleSubscribeTargetGraph(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS support
 
 	// Send initial comment to establish connection (Safari compatibility)
-	fmt.Fprintf(w, ": connected\n\n")
+	_, _ = fmt.Fprintf(w, ": connected\n\n")
 	if flusher, ok := w.(http.Flusher); ok {
 		flusher.Flush()
 	}
@@ -270,7 +270,7 @@ func (s *Server) handleSubscribeTargetGraph(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer sub.Close()
+	defer func() { _ = sub.Close() }()
 
 	// Stream events
 	for event := range sub.Events() {
@@ -292,14 +292,14 @@ func (s *Server) handleModule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(s.module)
+	_ = json.NewEncoder(w).Encode(s.module)
 }
 
 func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if s.module == nil {
-		json.NewEncoder(w).Encode(&GraphData{
+		_ = json.NewEncoder(w).Encode(&GraphData{
 			Nodes: []GraphNode{},
 			Edges: []GraphEdge{},
 		})
@@ -308,7 +308,7 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 
 	// Build target-level graph from module with file-level details
 	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
-	json.NewEncoder(w).Encode(graphData)
+	_ = json.NewEncoder(w).Encode(graphData)
 }
 
 func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
@@ -318,11 +318,11 @@ func (s *Server) handleBinaries(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.RUnlock()
 
 	if s.binaries == nil {
-		json.NewEncoder(w).Encode([]interface{}{})
+		_ = json.NewEncoder(w).Encode([]interface{}{})
 		return
 	}
 
-	json.NewEncoder(w).Encode(s.binaries)
+	_ = json.NewEncoder(w).Encode(s.binaries)
 }
 
 // LensRenderRequest represents the request body for lens rendering
@@ -353,7 +353,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 
 	if s.module == nil {
-		json.NewEncoder(w).Encode(&LensRenderResponse{
+		_ = json.NewEncoder(w).Encode(&LensRenderResponse{
 			Hash:      "",
 			FullGraph: &GraphData{Nodes: []GraphNode{}, Edges: []GraphEdge{}},
 		})
@@ -409,7 +409,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 			})
 		}
 
-		json.NewEncoder(w).Encode(&LensRenderResponse{
+		_ = json.NewEncoder(w).Encode(&LensRenderResponse{
 			Hash:      requestHash,
 			FullGraph: cachedGraphData,
 		})
@@ -490,7 +490,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 		// If diff is larger than 50% of full graph, send full graph instead
 		if diffSize > fullSize/2 {
 			logging.DebugContext(r.Context(), "diff too large, sending full graph", "diffSize", diffSize, "fullSize", fullSize)
-			json.NewEncoder(w).Encode(&LensRenderResponse{
+			_ = json.NewEncoder(w).Encode(&LensRenderResponse{
 				Hash:      newSnapshot.Hash,
 				FullGraph: resultGraphData,
 			})
@@ -501,7 +501,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 				"modifiedNodes", len(webDiff.ModifiedNodes),
 				"addedEdges", len(webDiff.AddedEdges),
 				"removedEdges", len(webDiff.RemovedEdges))
-			json.NewEncoder(w).Encode(&LensRenderResponse{
+			_ = json.NewEncoder(w).Encode(&LensRenderResponse{
 				Hash: newSnapshot.Hash,
 				Diff: webDiff,
 			})
@@ -509,7 +509,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	} else {
 		// No previous snapshot, send full graph
 		logging.InfoContext(r.Context(), "sending full graph", "nodes", len(resultGraphData.Nodes), "edges", len(resultGraphData.Edges))
-		json.NewEncoder(w).Encode(&LensRenderResponse{
+		_ = json.NewEncoder(w).Encode(&LensRenderResponse{
 			Hash:      newSnapshot.Hash,
 			FullGraph: resultGraphData,
 		})
@@ -546,7 +546,7 @@ func (s *Server) handleTargetSelected(w http.ResponseWriter, r *http.Request) {
 
 	// Build selected target graph data with file-level dependencies
 	graphData := buildTargetSelectedGraph(s.module, target, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
-	json.NewEncoder(w).Encode(graphData)
+	_ = json.NewEncoder(w).Encode(graphData)
 }
 
 // FrontendLogEntry represents a log entry from the frontend

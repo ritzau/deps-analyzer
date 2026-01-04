@@ -178,7 +178,7 @@ func (fw *FileWatcher) processEvents(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			fw.watcher.Close()
+			_ = fw.watcher.Close()
 			close(fw.events)
 			close(fw.done)
 			return
