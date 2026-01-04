@@ -3,11 +3,8 @@
 
 namespace core {
 
-Engine::Engine(const std::string& name) 
-    : name_(util::ToUpper(name)), 
-      start_time_(0),
-      initialized_(false) {
-}
+Engine::Engine(const std::string &name)
+    : name_(util::ToUpper(name)), start_time_(0), initialized_(false) {}
 
 Engine::~Engine() {
   if (initialized_) {
@@ -20,7 +17,7 @@ void Engine::Initialize() {
     std::cout << "Engine already initialized" << std::endl;
     return;
   }
-  
+
   start_time_ = util::GetCurrentTimeMillis();
   initialized_ = true;
   std::cout << "Engine '" << name_ << "' initialized" << std::endl;
@@ -30,10 +27,10 @@ void Engine::Shutdown() {
   if (!initialized_) {
     return;
   }
-  
+
   initialized_ = false;
-  std::cout << "Engine '" << name_ << "' shutdown after " 
-            << GetUptime() << "ms" << std::endl;
+  std::cout << "Engine '" << name_ << "' shutdown after " << GetUptime() << "ms"
+            << std::endl;
 }
 
 void Engine::Update() {
@@ -51,4 +48,5 @@ int64_t Engine::GetUptime() const {
   return util::GetCurrentTimeMillis() - start_time_;
 }
 
-}  // namespace core
+} // namespace core
+

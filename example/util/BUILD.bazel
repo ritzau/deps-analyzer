@@ -11,10 +11,10 @@ cc_library(
         # Note: orphaned.cc is intentionally NOT included
     ],
     hdrs = [
-        "strings.h",
         "file_io.h",
-        "time.h",
         "math.h",
+        "strings.h",
+        "time.h",
     ],
     visibility = ["//visibility:public"],
 )
@@ -26,21 +26,21 @@ cc_library(
 #     hdrs = ["strings.h"],
 #     visibility = ["//visibility:public"],
 # )
-# 
+#
 # cc_library(
 #     name = "file_io",
 #     srcs = ["file_io.cc"],
 #     hdrs = ["file_io.h"],
 #     visibility = ["//visibility:public"],
 # )
-# 
+#
 # cc_library(
 #     name = "time",
 #     srcs = ["time.cc"],
 #     hdrs = ["time.h"],
 #     visibility = ["//visibility:public"],
 # )
-# 
+#
 # cc_library(
 #     name = "math",
 #     srcs = ["math.cc"],

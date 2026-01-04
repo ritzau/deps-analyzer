@@ -1,8 +1,8 @@
 #ifndef UTIL_TIME_H_
 #define UTIL_TIME_H_
 
-#include <string>
 #include <cstdint>
+#include <string>
 
 namespace util {
 
@@ -12,6 +12,7 @@ int64_t GetCurrentTimeMicros();
 std::string FormatTime(int64_t timestamp_millis);
 void Sleep(int64_t millis);
 
-}  // namespace util
+} // namespace util
 
-#endif  // UTIL_TIME_H_
+#endif // UTIL_TIME_H_
+

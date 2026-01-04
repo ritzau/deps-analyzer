@@ -4,3 +4,4 @@
 void funcB();
 
 #endif
+

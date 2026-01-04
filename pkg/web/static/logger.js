@@ -63,16 +63,16 @@ class Logger {
     }
 
     try {
-      await fetch('/api/logs', {
-        method: 'POST',
+      await fetch("/api/logs", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ logs: logsToSend }),
       });
     } catch (error) {
       // Don't log errors sending logs to avoid infinite loop
-      console.error('[Logger] Failed to send logs to backend:', error);
+      console.error("[Logger] Failed to send logs to backend:", error);
     }
   }
 
@@ -117,14 +117,16 @@ class Logger {
    */
   _format(level, message, data = {}) {
     const timestamp = new Date().toISOString();
-    const levelName = Object.keys(LogLevel).find(key => LogLevel[key] === level);
+    const levelName = Object.keys(LogLevel).find(
+      (key) => LogLevel[key] === level,
+    );
 
     // Build structured log object
     const logData = {
       timestamp,
       level: levelName,
       message,
-      ...data
+      ...data,
     };
 
     return logData;
@@ -137,11 +139,11 @@ class Logger {
   _output(level, logData) {
     // Format: HH:MM:SS/L/C message | key=value
     // Where L = level initial (T/D/I/W/E), C = Client
-    const time = new Date(logData.timestamp).toLocaleTimeString('en-US', {
+    const time = new Date(logData.timestamp).toLocaleTimeString("en-US", {
       hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
     const levelInitial = logData.level.charAt(0); // T, D, I, W, or E
     const formatted = `${time}/${levelInitial}/C ${logData.message}`;
@@ -154,7 +156,7 @@ class Logger {
     // Convert to key=value format for readability
     const attrStr = Object.entries(attrs)
       .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-      .join(' ');
+      .join(" ");
 
     const fullMessage = attrStr ? `${formatted} | ${attrStr}` : formatted;
 
@@ -195,10 +197,12 @@ class Logger {
     }
 
     // If single argument is a plain object (not array, not null), use it directly
-    if (args.length === 1 &&
-        typeof args[0] === 'object' &&
-        args[0] !== null &&
-        !Array.isArray(args[0])) {
+    if (
+      args.length === 1 &&
+      typeof args[0] === "object" &&
+      args[0] !== null &&
+      !Array.isArray(args[0])
+    ) {
       return args[0];
     }
 

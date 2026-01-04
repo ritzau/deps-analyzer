@@ -7,11 +7,11 @@ Renderer::Renderer() : engine_(nullptr), initialized_(false) {}
 
 Renderer::~Renderer() {}
 
-void Renderer::Initialize(core::Engine* engine) {
+void Renderer::Initialize(core::Engine *engine) {
   engine_ = engine;
   initialized_ = true;
-  std::cout << "Renderer initialized for engine: " 
-            << engine->GetName() << std::endl;
+  std::cout << "Renderer initialized for engine: " << engine->GetName()
+            << std::endl;
 }
 
 void Renderer::Render() {
@@ -19,23 +19,20 @@ void Renderer::Render() {
     std::cout << "Renderer not initialized!" << std::endl;
     return;
   }
-  
+
   std::cout << "Rendering frame for: " << title_ << std::endl;
 }
 
-void Renderer::SetTitle(const std::string& title) {
-  title_ = util::ToUpper(title);  // Use util function
+void Renderer::SetTitle(const std::string &title) {
+  title_ = util::ToUpper(title); // Use util function
 }
 
 // Plugin interface implementation
 extern "C" {
-  Renderer* CreateRenderer() {
-    return new Renderer();
-  }
-  
-  void DestroyRenderer(Renderer* renderer) {
-    delete renderer;
-  }
+Renderer *CreateRenderer() { return new Renderer(); }
+
+void DestroyRenderer(Renderer *renderer) { delete renderer; }
 }
 
-}  // namespace plugins
+} // namespace plugins
+

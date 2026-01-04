@@ -6,12 +6,13 @@ namespace graphics {
 
 class Renderer {
 public:
-    Renderer();
-    ~Renderer();
+  Renderer();
+  ~Renderer();
 
-    void Initialize();
-    void DrawFrame();
-    void SetResolution(int width, int height);
+  void Initialize();
+  void DrawFrame();
+  void SetResolution(int width, int height);
 };
 
 } // namespace graphics
+

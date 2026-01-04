@@ -1806,3 +1806,4 @@ re-analyze when BUILD files or build artifacts change.
 **Status**: Implemented with fsnotify-based file watcher, smart debouncing (1.5s
 quiet, 10s max), intelligent change detection for incremental updates, and
 discrete UI status indicator. Run with `--watch` flag.
+

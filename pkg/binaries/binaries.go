@@ -10,14 +10,14 @@ import (
 
 // BinaryInfo represents a cc_binary or cc_shared_library
 type BinaryInfo struct {
-	Label             string              `json:"label"`
-	Kind              string              `json:"kind"` // "cc_binary" or "cc_shared_library"
-	DynamicDeps       []string            `json:"dynamicDeps"`
-	DataDeps          []string            `json:"dataDeps"`
-	SystemLibraries   []string            `json:"systemLibraries"`
-	RegularDeps       []string            `json:"regularDeps"`      // Direct cc_library dependencies
-	InternalTargets   []string            `json:"internalTargets"` // All cc_library targets this binary depends on
-	OverlappingDeps   map[string][]string `json:"overlappingDeps"` // Map of binary -> overlapping cc_library targets (potential duplicate symbols)
+	Label           string              `json:"label"`
+	Kind            string              `json:"kind"` // "cc_binary" or "cc_shared_library"
+	DynamicDeps     []string            `json:"dynamicDeps"`
+	DataDeps        []string            `json:"dataDeps"`
+	SystemLibraries []string            `json:"systemLibraries"`
+	RegularDeps     []string            `json:"regularDeps"`     // Direct cc_library dependencies
+	InternalTargets []string            `json:"internalTargets"` // All cc_library targets this binary depends on
+	OverlappingDeps map[string][]string `json:"overlappingDeps"` // Map of binary -> overlapping cc_library targets (potential duplicate symbols)
 }
 
 // QueryAllBinaries finds all cc_binary and cc_shared_library targets
@@ -338,8 +338,8 @@ func DeriveBinaryInfoFromModule(module *model.Module) []*BinaryInfo {
 		}
 
 		// Collect dependencies from module.Dependencies
-		allLibraries := make(map[string]bool)          // All transitive cc_library dependencies
-		dynamicLibs := make(map[string][]string)       // Track which libraries are in which dynamic deps
+		allLibraries := make(map[string]bool)    // All transitive cc_library dependencies
+		dynamicLibs := make(map[string][]string) // Track which libraries are in which dynamic deps
 
 		for _, dep := range module.Dependencies {
 			if dep.From != target.Label {
@@ -436,3 +436,4 @@ func collectAllLibraries(module *model.Module, targetLabel string, visited map[s
 		}
 	}
 }
+

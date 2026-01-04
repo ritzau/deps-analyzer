@@ -58,28 +58,42 @@
  */
 const DEFAULT_PACKAGE_LENS = {
   name: "Package View",
-  baseSet: { type: 'full-graph' },
+  baseSet: { type: "full-graph" },
   distanceRules: [
     {
-      distance: 'infinite',
+      distance: "infinite",
       nodeVisibility: {
-        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
-        fileTypes: ['none'],  // Hide files by default
+        targetTypes: ["cc_binary", "cc_shared_library", "cc_library"],
+        fileTypes: ["none"], // Hide files by default
         showUncovered: false,
-        showExternal: true,  // Show external dependencies
-        showSystemLibraries: true
+        showExternal: true, // Show external dependencies
+        showSystemLibraries: true,
       },
-      collapseLevel: 2,  // Show targets but hide files (default)
+      collapseLevel: 2, // Show targets but hide files (default)
       showEdges: true,
-      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
-    }
+      edgeTypes: [
+        "static",
+        "dynamic",
+        "system_link",
+        "data",
+        "compile",
+        "symbol",
+      ],
+    },
   ],
   globalFilters: {},
   edgeRules: {
-    types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
+    types: new Set([
+      "static",
+      "dynamic",
+      "system_link",
+      "data",
+      "compile",
+      "symbol",
+    ]),
     aggregateCollapsed: true,
-    collapseEdgeTypes: false
-  }
+    collapseEdgeTypes: false,
+  },
 };
 
 /**
@@ -89,54 +103,75 @@ const DEFAULT_PACKAGE_LENS = {
  */
 const DEFAULT_DETAIL_LENS = {
   name: "Detail View",
-  baseSet: { type: 'full-graph' },
+  baseSet: { type: "full-graph" },
   distanceRules: [
     {
-      distance: 0,  // Selected nodes
+      distance: 0, // Selected nodes
       nodeVisibility: {
-        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
-        fileTypes: ['all'],  // Show all files
+        targetTypes: ["cc_binary", "cc_shared_library", "cc_library"],
+        fileTypes: ["all"], // Show all files
         showUncovered: true,
-        showExternal: true,  // Show external dependencies
-        showSystemLibraries: true
+        showExternal: true, // Show external dependencies
+        showSystemLibraries: true,
       },
-      collapseLevel: 3,  // Show down to file level
+      collapseLevel: 3, // Show down to file level
       showEdges: true,
-      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
+      edgeTypes: [
+        "static",
+        "dynamic",
+        "system_link",
+        "data",
+        "compile",
+        "symbol",
+      ],
     },
     {
-      distance: 1,  // Neighbors (direct dependencies)
+      distance: 1, // Neighbors (direct dependencies)
       nodeVisibility: {
-        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
-        fileTypes: ['none'],  // Hide files by default
+        targetTypes: ["cc_binary", "cc_shared_library", "cc_library"],
+        fileTypes: ["none"], // Hide files by default
         showUncovered: false,
-        showExternal: true,  // Show external dependencies
-        showSystemLibraries: true
+        showExternal: true, // Show external dependencies
+        showSystemLibraries: true,
       },
-      collapseLevel: 2,  // Show targets but hide files
+      collapseLevel: 2, // Show targets but hide files
       showEdges: true,
-      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']
+      edgeTypes: [
+        "static",
+        "dynamic",
+        "system_link",
+        "data",
+        "compile",
+        "symbol",
+      ],
     },
     {
-      distance: 'infinite',  // Rest of graph - HIDE EVERYTHING
+      distance: "infinite", // Rest of graph - HIDE EVERYTHING
       nodeVisibility: {
-        targetTypes: [],  // Empty array = hide all targets
-        fileTypes: ['none'],  // Hide all files
+        targetTypes: [], // Empty array = hide all targets
+        fileTypes: ["none"], // Hide all files
         showUncovered: false,
-        showExternal: false,  // Keep hidden for infinite distance
-        showSystemLibraries: false  // Hide system libraries too
+        showExternal: false, // Keep hidden for infinite distance
+        showSystemLibraries: false, // Hide system libraries too
       },
-      collapseLevel: 0,  // Doesn't matter since everything is hidden
-      showEdges: false,  // Don't show edges to/from hidden nodes
-      edgeTypes: []
-    }
+      collapseLevel: 0, // Doesn't matter since everything is hidden
+      showEdges: false, // Don't show edges to/from hidden nodes
+      edgeTypes: [],
+    },
   ],
   globalFilters: {},
   edgeRules: {
-    types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
+    types: new Set([
+      "static",
+      "dynamic",
+      "system_link",
+      "data",
+      "compile",
+      "symbol",
+    ]),
     aggregateCollapsed: true,
-    collapseEdgeTypes: false
-  }
+    collapseEdgeTypes: false,
+  },
 };
 
 /**
@@ -148,17 +183,17 @@ function cloneLens(lens) {
   return {
     name: lens.name,
     baseSet: { ...lens.baseSet },
-    distanceRules: lens.distanceRules.map(rule => ({
+    distanceRules: lens.distanceRules.map((rule) => ({
       ...rule,
       nodeVisibility: { ...rule.nodeVisibility },
-      edgeTypes: rule.edgeTypes ? [...rule.edgeTypes] : undefined
+      edgeTypes: rule.edgeTypes ? [...rule.edgeTypes] : undefined,
     })),
     globalFilters: { ...lens.globalFilters },
     edgeRules: {
       types: new Set(lens.edgeRules.types),
       aggregateCollapsed: lens.edgeRules.aggregateCollapsed,
       collapseEdgeTypes: lens.edgeRules.collapseEdgeTypes,
-      minimumCount: lens.edgeRules.minimumCount
-    }
+      minimumCount: lens.edgeRules.minimumCount,
+    },
   };
 }

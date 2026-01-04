@@ -9,4 +9,5 @@ void OrphanedFunction() {
   std::cout << "I'm an orphan - not in any BUILD target!" << std::endl;
 }
 
-}  // namespace util
+} // namespace util
+

@@ -2,14 +2,14 @@
 
 cc_shared_library(
     name = "audio",
-    deps = [":audio_impl"],
     visibility = ["//visibility:public"],
+    deps = [":audio_impl"],
 )
 
 cc_library(
     name = "audio_impl",
     srcs = ["audio_engine.cc"],
     hdrs = ["audio_engine.h"],
-    deps = ["//util:util"],
     visibility = ["//visibility:public"],
+    deps = ["//util"],
 )

@@ -56,13 +56,13 @@ type Server struct {
 	binaries       []*binaries.BinaryInfo
 	module         *model.Module
 	publisher      pubsub.Publisher
-	fileDeps       []*deps.FileDependency       // Compile-time file dependencies from .d files
-	symbolDeps     []symbols.SymbolDependency   // Link-time symbol dependencies from nm
-	fileToTarget   map[string]string            // Maps file paths to target labels
-	uncoveredFiles []string                     // Files not included in any target
-	watching       bool                         // File watching active
+	fileDeps       []*deps.FileDependency         // Compile-time file dependencies from .d files
+	symbolDeps     []symbols.SymbolDependency     // Link-time symbol dependencies from nm
+	fileToTarget   map[string]string              // Maps file paths to target labels
+	uncoveredFiles []string                       // Files not included in any target
+	watching       bool                           // File watching active
 	lensCache      map[string]*lens.GraphSnapshot // Cache of rendered graphs by request hash
-	mu             sync.RWMutex                 // Protect all state from concurrent access
+	mu             sync.RWMutex                   // Protect all state from concurrent access
 }
 
 // NewServer creates a new web server
@@ -335,18 +335,18 @@ type LensRenderRequest struct {
 
 // LensRenderResponse represents the response from lens rendering
 type LensRenderResponse struct {
-	Hash         string      `json:"hash"`                   // Hash of this graph state
-	FullGraph    *GraphData  `json:"fullGraph,omitempty"`    // Complete graph (if no previousHash or diff too large)
-	Diff         *GraphDiff  `json:"diff,omitempty"`         // Incremental changes (if previousHash provided)
+	Hash      string     `json:"hash"`                // Hash of this graph state
+	FullGraph *GraphData `json:"fullGraph,omitempty"` // Complete graph (if no previousHash or diff too large)
+	Diff      *GraphDiff `json:"diff,omitempty"`      // Incremental changes (if previousHash provided)
 }
 
 // GraphDiff represents incremental changes to a graph
 type GraphDiff struct {
 	AddedNodes    []GraphNode `json:"addedNodes,omitempty"`
-	RemovedNodes  []string    `json:"removedNodes,omitempty"`  // Node IDs
+	RemovedNodes  []string    `json:"removedNodes,omitempty"` // Node IDs
 	ModifiedNodes []GraphNode `json:"modifiedNodes,omitempty"`
 	AddedEdges    []GraphEdge `json:"addedEdges,omitempty"`
-	RemovedEdges  []string    `json:"removedEdges,omitempty"`  // Edge keys (source|target|type)
+	RemovedEdges  []string    `json:"removedEdges,omitempty"` // Edge keys (source|target|type)
 }
 
 func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Request) {
@@ -484,7 +484,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 
 		// Calculate diff size
 		diffSize := len(webDiff.AddedNodes) + len(webDiff.RemovedNodes) + len(webDiff.ModifiedNodes) +
-		            len(webDiff.AddedEdges) + len(webDiff.RemovedEdges)
+			len(webDiff.AddedEdges) + len(webDiff.RemovedEdges)
 		fullSize := len(resultGraphData.Nodes) + len(resultGraphData.Edges)
 
 		// If diff is larger than 50% of full graph, send full graph instead
@@ -836,7 +836,7 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 		to   string
 	}
 	edgeDetails := make(map[edgeKey]map[string][]string) // edgeKey -> (sourceFile -> []targetFiles)
-	edgeSymbols := make(map[edgeKey]map[string]bool)    // edgeKey -> set of symbols
+	edgeSymbols := make(map[edgeKey]map[string]bool)     // edgeKey -> set of symbols
 
 	// Aggregate compile dependencies (file-level header includes)
 	if fileDeps != nil && fileToTarget != nil {
@@ -1396,8 +1396,8 @@ func convertFromLensGraphData(lensGraph *lens.GraphData, rawGraph *GraphData) *G
 
 	// Create lookup map for raw graph edges to get additional metadata
 	type edgeKey struct {
-		source string
-		target string
+		source   string
+		target   string
 		edgeType string
 	}
 	rawEdgeMap := make(map[edgeKey]GraphEdge)
@@ -1523,3 +1523,4 @@ func (s *Server) Start(port int) error {
 	handler := logging.RequestIDMiddleware(s.router)
 	return http.ListenAndServe(addr, handler)
 }
+

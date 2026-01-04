@@ -15,6 +15,7 @@ double Clamp(double value, double min, double max);
 // Note: This creates a dependency on strings (for demonstration)
 std::string NumberToString(int64_t n);
 
-}  // namespace util
+} // namespace util
 
-#endif  // UTIL_MATH_H_
+#endif // UTIL_MATH_H_
+

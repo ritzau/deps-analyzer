@@ -10,8 +10,8 @@ cc_library(
         "engine.h",
         "state.h",
     ],
-    deps = [
-        "//util:util",  # Depends on the monolithic util library
-    ],
     visibility = ["//visibility:public"],
+    deps = [
+        "//util",  # Depends on the monolithic util library
+    ],
 )

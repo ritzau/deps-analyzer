@@ -7,10 +7,10 @@ cc_binary(
         "renderer.cc",
         "renderer.h",
     ],
-    deps = [
-        "//core:core",
-        "//util:util",  # This creates duplicate dependencies issue
-    ],
     linkshared = True,  # Build as .so
     visibility = ["//visibility:public"],
+    deps = [
+        "//core",
+        "//util",  # This creates duplicate dependencies issue
+    ],
 )

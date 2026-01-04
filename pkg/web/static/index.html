@@ -1,298 +1,378 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bazel C++ Analyzer</title>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css" />
     <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
     <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <header>
-            <h1>🔍 Bazel C++ Analyzer</h1>
-            <div class="header-row">
-                <p class="subtitle">Coverage Analysis</p>
-                <div class="status-bar"></div>
-            </div>
-        </header>
-
-        <div id="loadingOverlay" class="loading-overlay">
-            <div class="loading-checklist">
-                <div class="loading-checklist-item" data-step="1">
-                    <span class="checklist-icon"></span>
-                    <span class="checklist-text">Querying Bazel workspace...</span>
-                </div>
-                <div class="loading-checklist-item" data-step="2">
-                    <span class="checklist-icon"></span>
-                    <span class="checklist-text">Adding compile dependencies...</span>
-                </div>
-                <div class="loading-checklist-item" data-step="3">
-                    <span class="checklist-icon"></span>
-                    <span class="checklist-text">Analyzing symbol dependencies...</span>
-                </div>
-                <div class="loading-checklist-item" data-step="4">
-                    <span class="checklist-icon"></span>
-                    <span class="checklist-text">Discovering uncovered files...</span>
-                </div>
-                <div class="loading-checklist-item" data-step="5">
-                    <span class="checklist-icon"></span>
-                    <span class="checklist-text">Analyzing binaries...</span>
-                </div>
-            </div>
+      <header>
+        <h1>🔍 Bazel C++ Analyzer</h1>
+        <div class="header-row">
+          <p class="subtitle">Coverage Analysis</p>
+          <div class="status-bar"></div>
         </div>
-        <div id="error" class="error" style="display: none;"></div>
+      </header>
 
-        <div class="main-layout">
-            <!-- Tree Browser (Left Panel) with Tabs -->
-            <div id="treeBrowser" class="tree-browser">
-                <!-- Tab Headers -->
-                <div class="tab-header">
-                    <button class="tab-button active" data-tab="tree">Tree</button>
-                    <button class="tab-button" data-tab="default">View</button>
-                </div>
-
-                <!-- Tab Content -->
-                <div class="tab-content">
-                    <!-- Tree Tab -->
-                    <div id="treeTab" class="tab-pane active">
-                        <!-- Unified Navigation List with Filters -->
-                        <div id="navigationPanel" class="nav-section">
-                            <div class="nav-section-title">
-                                🎯 Targets
-                                <button id="ruleTypeDropdown" class="filter-dropdown-btn">
-                                    <img src="filter.png" alt="Filter" class="filter-icon">
-                                </button>
-                                <div id="ruleTypeMenu" class="filter-dropdown-menu" style="display: none;">
-                                    <label><input type="checkbox" value="cc_binary" checked> 🔧 cc_binary</label>
-                                    <label><input type="checkbox" value="cc_library" checked> 📚 cc_library</label>
-                                    <label><input type="checkbox" value="cc_shared_library" checked> 📦 cc_shared_library</label>
-                                </div>
-                            </div>
-
-                            <!-- Filter Controls -->
-                            <div class="nav-filters">
-                                <!-- Text Search -->
-                                <input type="text" id="targetSearch" class="filter-search" placeholder="Search labels...">
-                            </div>
-
-                            <!-- Navigation Items -->
-                            <div id="targetsItems" class="nav-items"></div>
-                        </div>
-                    </div>
-
-                    <!-- View Config Tab -->
-                    <div id="defaultTab" class="tab-pane">
-                        <h4>Hierarchy Level</h4>
-                        <label>
-                            <input type="radio" name="collapseLevel" value="1"> Packages only
-                        </label>
-                        <label>
-                            <input type="radio" name="collapseLevel" value="2" checked> Targets (hide files)
-                        </label>
-                        <label>
-                            <input type="radio" name="collapseLevel" value="3"> Files (show all)
-                        </label>
-
-                        <h4>Global Filters</h4>
-                        <label>
-                            <input type="checkbox" id="hideExternal"> Hide External
-                        </label>
-                        <label>
-                            <input type="checkbox" id="hideUncovered"> Hide Uncovered
-                        </label>
-                        <label>
-                            <input type="checkbox" id="hideSystemLibs"> Hide System Libraries
-                        </label>
-
-                        <h4>Edge Types</h4>
-                        <label>
-                            <input type="checkbox" id="showStatic" checked> Static
-                        </label>
-                        <label>
-                            <input type="checkbox" id="showDynamic" checked> Dynamic
-                        </label>
-                        <label>
-                            <input type="checkbox" id="showData" checked> Data
-                        </label>
-                        <label>
-                            <input type="checkbox" id="showCompile" checked> Compile
-                        </label>
-                        <label>
-                            <input type="checkbox" id="showSymbol"> Symbol
-                        </label>
-
-                        <h4>Edge Aggregation</h4>
-                        <label>
-                            <input type="checkbox" id="collapseEdgeTypes"> Collapse to single edge
-                        </label>
-
-                        <h4>Selected Nodes</h4>
-                        <p class="hint">Configure what to show when nodes are selected</p>
-
-                        <div class="detail-controls">
-                            <label>Selected</label>
-                            <select id="detailD0Files">
-                                <option value="all" selected>All Files</option>
-                                <option value="none">No Files</option>
-                            </select>
-
-                            <label>Neighbors</label>
-                            <select id="detailD1Files">
-                                <option value="all">All Files</option>
-                                <option value="none" selected>No Files</option>
-                            </select>
-
-                            <label>Rest</label>
-                            <select id="detailInfiniteView">
-                                <option value="hide" selected>Hide Completely</option>
-                                <option value="collapsed">Show Collapsed</option>
-                                <option value="default">Same as Default</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Horizontal Resize Handle -->
-            <div id="resizeHandle" class="resize-handle"></div>
-
-            <!-- Main Content Area (Right) -->
-            <div id="content" class="content-area">
-            <!-- Dependency Graph -->
-            <div id="graphSection" class="card" style="display: none;">
-                <div id="cy" class="graph-container">
-                    <div id="graphLoading" class="graph-loading">
-                        <div class="graph-spinner"></div>
-                        <div class="graph-loading-message">Building dependency graph...</div>
-                    </div>
-                </div>
-                <div class="graph-legend">
-                    <div class="legend-section">
-                        <div class="legend-section-title">Target Types</div>
-                        <div class="legend-item">
-                            <div class="legend-color library"></div>
-                            <span>Library (cc_library)</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color binary"></div>
-                            <span>Binary (cc_binary)</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color shared"></div>
-                            <span>Shared Library</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #d7ba7d;"></div>
-                            <span>System Library</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #6a6a6a;"></div>
-                            <span>External/Unknown</span>
-                        </div>
-                    </div>
-
-                    <div class="legend-section">
-                        <div class="legend-section-title">File Types (Detail View)</div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #89d185; border-radius: 50%; width: 18px; height: 18px;"></div>
-                            <span>Source file (.cc)</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #4fc1ff; border-radius: 50%; width: 18px; height: 18px;"></div>
-                            <span>Header file (.h)</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #ff6b6b; border: 3px double #ff4444; border-radius: 50%; width: 18px; height: 18px; opacity: 0.7;"></div>
-                            <span>Uncovered file (not in any target)</span>
-                        </div>
-                    </div>
-
-                    <div class="legend-section">
-                        <div class="legend-section-title">Visibility</div>
-                        <div class="legend-item">
-                            <div class="legend-color library" style="border: 3px solid #ffd700;"></div>
-                            <span>Public</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color library"></div>
-                            <span>Private</span>
-                        </div>
-                    </div>
-
-                    <div class="legend-section">
-                        <div class="legend-section-title">Dependencies</div>
-                        <div class="legend-item">
-                            <div class="legend-line" style="background: #4ec9b0; width: 40px; height: 3px;"></div>
-                            <span>Static (deps)</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-line dashed" style="color: #4ec9b0; width: 40px;"></div>
-                            <span>Dynamic (shared libs)</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-line dotted" style="color: #4ec9b0; width: 40px;"></div>
-                            <span>Data (runtime files)</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-line" style="background: #4fc1ff; width: 40px; height: 3px;"></div>
-                            <span>Compile (#include)</span>
-                        </div>
-                    </div>
-
-                    <div class="legend-section">
-                        <div class="legend-section-title">Warnings</div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: transparent; border: 4px double #ff4444; width: 16px; height: 16px;"></div>
-                            <span>Overlapping deps</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            </div>
+      <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-checklist">
+          <div class="loading-checklist-item" data-step="1">
+            <span class="checklist-icon"></span>
+            <span class="checklist-text">Querying Bazel workspace...</span>
+          </div>
+          <div class="loading-checklist-item" data-step="2">
+            <span class="checklist-icon"></span>
+            <span class="checklist-text">Adding compile dependencies...</span>
+          </div>
+          <div class="loading-checklist-item" data-step="3">
+            <span class="checklist-icon"></span>
+            <span class="checklist-text">Analyzing symbol dependencies...</span>
+          </div>
+          <div class="loading-checklist-item" data-step="4">
+            <span class="checklist-icon"></span>
+            <span class="checklist-text">Discovering uncovered files...</span>
+          </div>
+          <div class="loading-checklist-item" data-step="5">
+            <span class="checklist-icon"></span>
+            <span class="checklist-text">Analyzing binaries...</span>
+          </div>
         </div>
+      </div>
+      <div id="error" class="error" style="display: none"></div>
+
+      <div class="main-layout">
+        <!-- Tree Browser (Left Panel) with Tabs -->
+        <div id="treeBrowser" class="tree-browser">
+          <!-- Tab Headers -->
+          <div class="tab-header">
+            <button class="tab-button active" data-tab="tree">Tree</button>
+            <button class="tab-button" data-tab="default">View</button>
+          </div>
+
+          <!-- Tab Content -->
+          <div class="tab-content">
+            <!-- Tree Tab -->
+            <div id="treeTab" class="tab-pane active">
+              <!-- Unified Navigation List with Filters -->
+              <div id="navigationPanel" class="nav-section">
+                <div class="nav-section-title">
+                  🎯 Targets
+                  <button id="ruleTypeDropdown" class="filter-dropdown-btn">
+                    <img src="filter.png" alt="Filter" class="filter-icon" />
+                  </button>
+                  <div
+                    id="ruleTypeMenu"
+                    class="filter-dropdown-menu"
+                    style="display: none"
+                  >
+                    <label
+                      ><input type="checkbox" value="cc_binary" checked /> 🔧
+                      cc_binary</label
+                    >
+                    <label
+                      ><input type="checkbox" value="cc_library" checked /> 📚
+                      cc_library</label
+                    >
+                    <label
+                      ><input
+                        type="checkbox"
+                        value="cc_shared_library"
+                        checked
+                      />
+                      📦 cc_shared_library</label
+                    >
+                  </div>
+                </div>
+
+                <!-- Filter Controls -->
+                <div class="nav-filters">
+                  <!-- Text Search -->
+                  <input
+                    type="text"
+                    id="targetSearch"
+                    class="filter-search"
+                    placeholder="Search labels..."
+                  />
+                </div>
+
+                <!-- Navigation Items -->
+                <div id="targetsItems" class="nav-items"></div>
+              </div>
+            </div>
+
+            <!-- View Config Tab -->
+            <div id="defaultTab" class="tab-pane">
+              <h4>Hierarchy Level</h4>
+              <label>
+                <input type="radio" name="collapseLevel" value="1" /> Packages
+                only
+              </label>
+              <label>
+                <input type="radio" name="collapseLevel" value="2" checked />
+                Targets (hide files)
+              </label>
+              <label>
+                <input type="radio" name="collapseLevel" value="3" /> Files
+                (show all)
+              </label>
+
+              <h4>Global Filters</h4>
+              <label>
+                <input type="checkbox" id="hideExternal" /> Hide External
+              </label>
+              <label>
+                <input type="checkbox" id="hideUncovered" /> Hide Uncovered
+              </label>
+              <label>
+                <input type="checkbox" id="hideSystemLibs" /> Hide System
+                Libraries
+              </label>
+
+              <h4>Edge Types</h4>
+              <label>
+                <input type="checkbox" id="showStatic" checked /> Static
+              </label>
+              <label>
+                <input type="checkbox" id="showDynamic" checked /> Dynamic
+              </label>
+              <label>
+                <input type="checkbox" id="showData" checked /> Data
+              </label>
+              <label>
+                <input type="checkbox" id="showCompile" checked /> Compile
+              </label>
+              <label> <input type="checkbox" id="showSymbol" /> Symbol </label>
+
+              <h4>Edge Aggregation</h4>
+              <label>
+                <input type="checkbox" id="collapseEdgeTypes" /> Collapse to
+                single edge
+              </label>
+
+              <h4>Selected Nodes</h4>
+              <p class="hint">Configure what to show when nodes are selected</p>
+
+              <div class="detail-controls">
+                <label>Selected</label>
+                <select id="detailD0Files">
+                  <option value="all" selected>All Files</option>
+                  <option value="none">No Files</option>
+                </select>
+
+                <label>Neighbors</label>
+                <select id="detailD1Files">
+                  <option value="all">All Files</option>
+                  <option value="none" selected>No Files</option>
+                </select>
+
+                <label>Rest</label>
+                <select id="detailInfiniteView">
+                  <option value="hide" selected>Hide Completely</option>
+                  <option value="collapsed">Show Collapsed</option>
+                  <option value="default">Same as Default</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Horizontal Resize Handle -->
+        <div id="resizeHandle" class="resize-handle"></div>
+
+        <!-- Main Content Area (Right) -->
+        <div id="content" class="content-area">
+          <!-- Dependency Graph -->
+          <div id="graphSection" class="card" style="display: none">
+            <div id="cy" class="graph-container">
+              <div id="graphLoading" class="graph-loading">
+                <div class="graph-spinner"></div>
+                <div class="graph-loading-message">
+                  Building dependency graph...
+                </div>
+              </div>
+            </div>
+            <div class="graph-legend">
+              <div class="legend-section">
+                <div class="legend-section-title">Target Types</div>
+                <div class="legend-item">
+                  <div class="legend-color library"></div>
+                  <span>Library (cc_library)</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color binary"></div>
+                  <span>Binary (cc_binary)</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color shared"></div>
+                  <span>Shared Library</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #d7ba7d"></div>
+                  <span>System Library</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #6a6a6a"></div>
+                  <span>External/Unknown</span>
+                </div>
+              </div>
+
+              <div class="legend-section">
+                <div class="legend-section-title">File Types (Detail View)</div>
+                <div class="legend-item">
+                  <div
+                    class="legend-color"
+                    style="
+                      background: #89d185;
+                      border-radius: 50%;
+                      width: 18px;
+                      height: 18px;
+                    "
+                  ></div>
+                  <span>Source file (.cc)</span>
+                </div>
+                <div class="legend-item">
+                  <div
+                    class="legend-color"
+                    style="
+                      background: #4fc1ff;
+                      border-radius: 50%;
+                      width: 18px;
+                      height: 18px;
+                    "
+                  ></div>
+                  <span>Header file (.h)</span>
+                </div>
+                <div class="legend-item">
+                  <div
+                    class="legend-color"
+                    style="
+                      background: #ff6b6b;
+                      border: 3px double #ff4444;
+                      border-radius: 50%;
+                      width: 18px;
+                      height: 18px;
+                      opacity: 0.7;
+                    "
+                  ></div>
+                  <span>Uncovered file (not in any target)</span>
+                </div>
+              </div>
+
+              <div class="legend-section">
+                <div class="legend-section-title">Visibility</div>
+                <div class="legend-item">
+                  <div
+                    class="legend-color library"
+                    style="border: 3px solid #ffd700"
+                  ></div>
+                  <span>Public</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color library"></div>
+                  <span>Private</span>
+                </div>
+              </div>
+
+              <div class="legend-section">
+                <div class="legend-section-title">Dependencies</div>
+                <div class="legend-item">
+                  <div
+                    class="legend-line"
+                    style="background: #4ec9b0; width: 40px; height: 3px"
+                  ></div>
+                  <span>Static (deps)</span>
+                </div>
+                <div class="legend-item">
+                  <div
+                    class="legend-line dashed"
+                    style="color: #4ec9b0; width: 40px"
+                  ></div>
+                  <span>Dynamic (shared libs)</span>
+                </div>
+                <div class="legend-item">
+                  <div
+                    class="legend-line dotted"
+                    style="color: #4ec9b0; width: 40px"
+                  ></div>
+                  <span>Data (runtime files)</span>
+                </div>
+                <div class="legend-item">
+                  <div
+                    class="legend-line"
+                    style="background: #4fc1ff; width: 40px; height: 3px"
+                  ></div>
+                  <span>Compile (#include)</span>
+                </div>
+              </div>
+
+              <div class="legend-section">
+                <div class="legend-section-title">Warnings</div>
+                <div class="legend-item">
+                  <div
+                    class="legend-color"
+                    style="
+                      background: transparent;
+                      border: 4px double #ff4444;
+                      width: 16px;
+                      height: 16px;
+                    "
+                  ></div>
+                  <span>Overlapping deps</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Connection Lost Modal -->
-    <div id="connectionLostModal" class="modal" style="display: none;">
-        <div class="modal-content connection-error">
-            <div class="modal-header">
-                <h2>⚠️ Backend Server Stopped</h2>
-            </div>
-            <div class="modal-body">
-                <p id="connectionErrorMessage"></p>
-            </div>
+    <div id="connectionLostModal" class="modal" style="display: none">
+      <div class="modal-content connection-error">
+        <div class="modal-header">
+          <h2>⚠️ Backend Server Stopped</h2>
         </div>
+        <div class="modal-body">
+          <p id="connectionErrorMessage"></p>
+        </div>
+      </div>
     </div>
 
     <!-- Target Details Modal -->
-    <div id="targetModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTargetLabel">Target Details</h2>
-                <span class="modal-close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="modal-section">
-                    <h3>📄 Files in Target</h3>
-                    <div id="modalFiles" class="modal-file-list"></div>
-                </div>
-
-                <div class="modal-section">
-                    <h3>⬅️ Incoming Dependencies</h3>
-                    <p class="modal-help">Other targets depending on this target's files</p>
-                    <div id="modalIncoming" class="modal-file-list"></div>
-                </div>
-
-                <div class="modal-section">
-                    <h3>➡️ Outgoing Dependencies</h3>
-                    <p class="modal-help">This target's files depending on other targets</p>
-                    <div id="modalOutgoing" class="modal-file-list"></div>
-                </div>
-            </div>
+    <div id="targetModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTargetLabel">Target Details</h2>
+          <span class="modal-close">&times;</span>
         </div>
+        <div class="modal-body">
+          <div class="modal-section">
+            <h3>📄 Files in Target</h3>
+            <div id="modalFiles" class="modal-file-list"></div>
+          </div>
+
+          <div class="modal-section">
+            <h3>⬅️ Incoming Dependencies</h3>
+            <p class="modal-help">
+              Other targets depending on this target's files
+            </p>
+            <div id="modalIncoming" class="modal-file-list"></div>
+          </div>
+
+          <div class="modal-section">
+            <h3>➡️ Outgoing Dependencies</h3>
+            <p class="modal-help">
+              This target's files depending on other targets
+            </p>
+            <div id="modalOutgoing" class="modal-file-list"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Structured logging (must load first) -->
@@ -314,5 +394,5 @@
     <script src="/lens-controls.js"></script>
 
     <script src="/app.js"></script>
-</body>
+  </body>
 </html>

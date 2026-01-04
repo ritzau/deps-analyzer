@@ -34,108 +34,123 @@ function syncUIWithState() {
   const state = viewStateManager.getState();
 
   // Sync active tab
-  document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-  const activeTabButton = document.querySelector(`.tab-button[data-tab="${state.activeTab}"]`);
+  document
+    .querySelectorAll(".tab-button")
+    .forEach((b) => b.classList.remove("active"));
+  const activeTabButton = document.querySelector(
+    `.tab-button[data-tab="${state.activeTab}"]`,
+  );
   if (activeTabButton) {
-    activeTabButton.classList.add('active');
+    activeTabButton.classList.add("active");
   }
 
-  document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-  const activeTabPane = document.getElementById(state.activeTab + 'Tab');
+  document
+    .querySelectorAll(".tab-pane")
+    .forEach((pane) => pane.classList.remove("active"));
+  const activeTabPane = document.getElementById(state.activeTab + "Tab");
   if (activeTabPane) {
-    activeTabPane.classList.add('active');
+    activeTabPane.classList.add("active");
   }
 
   // Sync global filters (default lens)
   const filters = state.defaultLens.globalFilters;
-  const hideExternalCheckbox = document.getElementById('hideExternal');
+  const hideExternalCheckbox = document.getElementById("hideExternal");
   if (hideExternalCheckbox) {
     hideExternalCheckbox.checked = filters.hideExternal || false;
   }
 
-  const hideUncoveredCheckbox = document.getElementById('hideUncovered');
+  const hideUncoveredCheckbox = document.getElementById("hideUncovered");
   if (hideUncoveredCheckbox) {
     hideUncoveredCheckbox.checked = filters.hideUncovered || false;
   }
 
-  const hideSystemLibsCheckbox = document.getElementById('hideSystemLibs');
+  const hideSystemLibsCheckbox = document.getElementById("hideSystemLibs");
   if (hideSystemLibsCheckbox) {
     hideSystemLibsCheckbox.checked = filters.hideSystemLibs || false;
   }
 
   // Sync edge type checkboxes
   const edgeTypes = state.defaultLens.edgeRules.types;
-  const showStaticCheckbox = document.getElementById('showStatic');
+  const showStaticCheckbox = document.getElementById("showStatic");
   if (showStaticCheckbox) {
-    showStaticCheckbox.checked = edgeTypes.has('static');
+    showStaticCheckbox.checked = edgeTypes.has("static");
   }
 
-  const showDynamicCheckbox = document.getElementById('showDynamic');
+  const showDynamicCheckbox = document.getElementById("showDynamic");
   if (showDynamicCheckbox) {
-    showDynamicCheckbox.checked = edgeTypes.has('dynamic');
+    showDynamicCheckbox.checked = edgeTypes.has("dynamic");
   }
 
-  const showDataCheckbox = document.getElementById('showData');
+  const showDataCheckbox = document.getElementById("showData");
   if (showDataCheckbox) {
-    showDataCheckbox.checked = edgeTypes.has('data');
+    showDataCheckbox.checked = edgeTypes.has("data");
   }
 
-  const showCompileCheckbox = document.getElementById('showCompile');
+  const showCompileCheckbox = document.getElementById("showCompile");
   if (showCompileCheckbox) {
-    showCompileCheckbox.checked = edgeTypes.has('compile');
+    showCompileCheckbox.checked = edgeTypes.has("compile");
   }
 
-  const showSymbolCheckbox = document.getElementById('showSymbol');
+  const showSymbolCheckbox = document.getElementById("showSymbol");
   if (showSymbolCheckbox) {
-    showSymbolCheckbox.checked = edgeTypes.has('symbol');
+    showSymbolCheckbox.checked = edgeTypes.has("symbol");
   }
 
   // Sync collapse edge types checkbox
-  const collapseEdgeTypesCheckbox = document.getElementById('collapseEdgeTypes');
+  const collapseEdgeTypesCheckbox =
+    document.getElementById("collapseEdgeTypes");
   if (collapseEdgeTypesCheckbox) {
-    collapseEdgeTypesCheckbox.checked = state.defaultLens.edgeRules.collapseEdgeTypes || false;
+    collapseEdgeTypesCheckbox.checked =
+      state.defaultLens.edgeRules.collapseEdgeTypes || false;
   }
 
   // Sync collapse level radio buttons
   const collapseLevel = state.defaultLens.distanceRules[0]?.collapseLevel || 2;
-  const collapseLevelRadio = document.querySelector(`input[name="collapseLevel"][value="${collapseLevel}"]`);
+  const collapseLevelRadio = document.querySelector(
+    `input[name="collapseLevel"][value="${collapseLevel}"]`,
+  );
   if (collapseLevelRadio) {
     collapseLevelRadio.checked = true;
   }
 
   // Sync navigation filters (rule types)
   const ruleTypes = state.navigationFilters.ruleTypes;
-  const ruleTypeCheckboxes = document.querySelectorAll('#ruleTypeMenu input[type="checkbox"]');
-  ruleTypeCheckboxes.forEach(checkbox => {
+  const ruleTypeCheckboxes = document.querySelectorAll(
+    '#ruleTypeMenu input[type="checkbox"]',
+  );
+  ruleTypeCheckboxes.forEach((checkbox) => {
     checkbox.checked = ruleTypes.has(checkbox.value);
   });
 
-  lensLogger.debug('[LensControls] UI synced with restored state');
+  lensLogger.debug("[LensControls] UI synced with restored state");
 }
 
 /**
  * Set up tab switching (Tree | Default | Focus)
  */
 function setupTabSwitching() {
-  document.querySelectorAll('.tab-button').forEach(button => {
-    button.addEventListener('click', () => {
+  document.querySelectorAll(".tab-button").forEach((button) => {
+    button.addEventListener("click", () => {
       // Update active button
-      document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-      button.classList.add('active');
+      document
+        .querySelectorAll(".tab-button")
+        .forEach((b) => b.classList.remove("active"));
+      button.classList.add("active");
 
       // Update active pane
-      const tabName = button.getAttribute('data-tab');
-      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-      const tabPane = document.getElementById(tabName + 'Tab');
+      const tabName = button.getAttribute("data-tab");
+      document
+        .querySelectorAll(".tab-pane")
+        .forEach((pane) => pane.classList.remove("active"));
+      const tabPane = document.getElementById(tabName + "Tab");
       if (tabPane) {
-        tabPane.classList.add('active');
+        tabPane.classList.add("active");
       }
 
       viewStateManager.setActiveTab(tabName);
     });
   });
 }
-
 
 /**
  * Set up reset controls
@@ -150,76 +165,106 @@ function setupResetControls() {
  */
 function setupDefaultLensControls() {
   // Global filters
-  const filterIds = ['hideExternal', 'hideUncovered', 'hideSystemLibs'];
-  filterIds.forEach(id => {
+  const filterIds = ["hideExternal", "hideUncovered", "hideSystemLibs"];
+  filterIds.forEach((id) => {
     const checkbox = document.getElementById(id);
     if (checkbox) {
-      checkbox.addEventListener('change', () => {
+      checkbox.addEventListener("change", () => {
         const currentLens = cloneLens(viewStateManager.getState().defaultLens);
-        currentLens.globalFilters.hideExternal = document.getElementById('hideExternal')?.checked || false;
-        currentLens.globalFilters.hideUncovered = document.getElementById('hideUncovered')?.checked || false;
-        currentLens.globalFilters.hideSystemLibs = document.getElementById('hideSystemLibs')?.checked || false;
+        currentLens.globalFilters.hideExternal =
+          document.getElementById("hideExternal")?.checked || false;
+        currentLens.globalFilters.hideUncovered =
+          document.getElementById("hideUncovered")?.checked || false;
+        currentLens.globalFilters.hideSystemLibs =
+          document.getElementById("hideSystemLibs")?.checked || false;
         viewStateManager.updateDefaultLens(currentLens);
       });
     }
   });
 
   // Edge type checkboxes
-  const edgeTypeIds = ['showStatic', 'showDynamic', 'showData', 'showCompile', 'showSymbol'];
-  edgeTypeIds.forEach(id => {
+  const edgeTypeIds = [
+    "showStatic",
+    "showDynamic",
+    "showData",
+    "showCompile",
+    "showSymbol",
+  ];
+  edgeTypeIds.forEach((id) => {
     const checkbox = document.getElementById(id);
     if (checkbox) {
-      checkbox.addEventListener('change', () => {
-        lensLogger.debug('[LensControls] Edge type checkbox changed:', id);
+      checkbox.addEventListener("change", () => {
+        lensLogger.debug("[LensControls] Edge type checkbox changed:", id);
         const types = new Set();
 
-        if (document.getElementById('showStatic')?.checked) types.add('static');
-        if (document.getElementById('showDynamic')?.checked) types.add('dynamic');
-        if (document.getElementById('showData')?.checked) types.add('data');
-        if (document.getElementById('showCompile')?.checked) types.add('compile');
-        if (document.getElementById('showSymbol')?.checked) types.add('symbol');
+        if (document.getElementById("showStatic")?.checked) types.add("static");
+        if (document.getElementById("showDynamic")?.checked)
+          types.add("dynamic");
+        if (document.getElementById("showData")?.checked) types.add("data");
+        if (document.getElementById("showCompile")?.checked)
+          types.add("compile");
+        if (document.getElementById("showSymbol")?.checked) types.add("symbol");
 
         // Always keep system_link
-        types.add('system_link');
+        types.add("system_link");
 
-        lensLogger.debug('[LensControls] New edge types:', Array.from(types));
+        lensLogger.debug("[LensControls] New edge types:", Array.from(types));
 
         // Update both default and detail lenses to use same edge rules (atomic)
-        const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
+        const currentDefaultLens = cloneLens(
+          viewStateManager.getState().defaultLens,
+        );
         currentDefaultLens.edgeRules.types = types;
 
-        const currentDetailLens = cloneLens(viewStateManager.getState().detailLens);
+        const currentDetailLens = cloneLens(
+          viewStateManager.getState().detailLens,
+        );
         currentDetailLens.edgeRules.types = types;
 
-        viewStateManager.updateBothLenses(currentDefaultLens, currentDetailLens);
+        viewStateManager.updateBothLenses(
+          currentDefaultLens,
+          currentDetailLens,
+        );
       });
     }
   });
 
   // Collapse edge types checkbox
-  const collapseEdgeTypesCheckbox = document.getElementById('collapseEdgeTypes');
+  const collapseEdgeTypesCheckbox =
+    document.getElementById("collapseEdgeTypes");
   if (collapseEdgeTypesCheckbox) {
-    collapseEdgeTypesCheckbox.addEventListener('change', () => {
-      lensLogger.debug('[LensControls] Collapse edge types changed:', collapseEdgeTypesCheckbox.checked);
+    collapseEdgeTypesCheckbox.addEventListener("change", () => {
+      lensLogger.debug(
+        "[LensControls] Collapse edge types changed:",
+        collapseEdgeTypesCheckbox.checked,
+      );
 
       // Update both default and detail lenses to use same edge rules (atomic)
-      const currentDefaultLens = cloneLens(viewStateManager.getState().defaultLens);
-      currentDefaultLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
+      const currentDefaultLens = cloneLens(
+        viewStateManager.getState().defaultLens,
+      );
+      currentDefaultLens.edgeRules.collapseEdgeTypes =
+        collapseEdgeTypesCheckbox.checked;
 
-      const currentDetailLens = cloneLens(viewStateManager.getState().detailLens);
-      currentDetailLens.edgeRules.collapseEdgeTypes = collapseEdgeTypesCheckbox.checked;
+      const currentDetailLens = cloneLens(
+        viewStateManager.getState().detailLens,
+      );
+      currentDetailLens.edgeRules.collapseEdgeTypes =
+        collapseEdgeTypesCheckbox.checked;
 
       viewStateManager.updateBothLenses(currentDefaultLens, currentDetailLens);
     });
   }
 
   // Collapse level radio buttons
-  const collapseLevelRadios = document.querySelectorAll('input[name="collapseLevel"]');
-  collapseLevelRadios.forEach(radio => {
-    radio.addEventListener('change', (e) => {
+  const collapseLevelRadios = document.querySelectorAll(
+    'input[name="collapseLevel"]',
+  );
+  collapseLevelRadios.forEach((radio) => {
+    radio.addEventListener("change", (e) => {
       if (e.target.checked) {
         const level = parseInt(e.target.value);
-        lensLogger.debug('[LensControls] Collapse level changed to:', level);
+        lensLogger.debug("[LensControls] Collapse level changed to:", level);
         const currentLens = cloneLens(viewStateManager.getState().defaultLens);
 
         // Update the collapse level in the distance rule
@@ -229,10 +274,10 @@ function setupDefaultLensControls() {
 
           // Also update file visibility to match
           if (level >= 3) {
-            rule.nodeVisibility.fileTypes = ['all'];
+            rule.nodeVisibility.fileTypes = ["all"];
             rule.nodeVisibility.showUncovered = true;
           } else {
-            rule.nodeVisibility.fileTypes = ['none'];
+            rule.nodeVisibility.fileTypes = ["none"];
             rule.nodeVisibility.showUncovered = false;
           }
         }
@@ -250,20 +295,20 @@ function setupDefaultLensControls() {
  */
 function setupDetailLensControls() {
   // Distance 0 (selected nodes) file visibility
-  const detailD0Files = document.getElementById('detailD0Files');
+  const detailD0Files = document.getElementById("detailD0Files");
   if (detailD0Files) {
-    detailD0Files.addEventListener('change', (e) => {
+    detailD0Files.addEventListener("change", (e) => {
       const currentLens = cloneLens(viewStateManager.getState().detailLens);
 
       // Find distance 0 rule
-      const rule = currentLens.distanceRules.find(r => r.distance === 0);
+      const rule = currentLens.distanceRules.find((r) => r.distance === 0);
       if (rule) {
-        if (e.target.value === 'all') {
-          rule.nodeVisibility.fileTypes = ['all'];
-          rule.collapseLevel = 3;  // Show files
+        if (e.target.value === "all") {
+          rule.nodeVisibility.fileTypes = ["all"];
+          rule.collapseLevel = 3; // Show files
         } else {
-          rule.nodeVisibility.fileTypes = ['none'];
-          rule.collapseLevel = 2;  // Hide files
+          rule.nodeVisibility.fileTypes = ["none"];
+          rule.collapseLevel = 2; // Hide files
         }
       }
 
@@ -272,20 +317,20 @@ function setupDetailLensControls() {
   }
 
   // Distance 1 (neighbors) file visibility
-  const detailD1Files = document.getElementById('detailD1Files');
+  const detailD1Files = document.getElementById("detailD1Files");
   if (detailD1Files) {
-    detailD1Files.addEventListener('change', (e) => {
+    detailD1Files.addEventListener("change", (e) => {
       const currentLens = cloneLens(viewStateManager.getState().detailLens);
 
       // Find distance 1 rule
-      const rule = currentLens.distanceRules.find(r => r.distance === 1);
+      const rule = currentLens.distanceRules.find((r) => r.distance === 1);
       if (rule) {
-        if (e.target.value === 'all') {
-          rule.nodeVisibility.fileTypes = ['all'];
-          rule.collapseLevel = 3;  // Show files
+        if (e.target.value === "all") {
+          rule.nodeVisibility.fileTypes = ["all"];
+          rule.collapseLevel = 3; // Show files
         } else {
-          rule.nodeVisibility.fileTypes = ['none'];
-          rule.collapseLevel = 2;  // Hide files
+          rule.nodeVisibility.fileTypes = ["none"];
+          rule.collapseLevel = 2; // Hide files
         }
       }
 
@@ -294,25 +339,32 @@ function setupDetailLensControls() {
   }
 
   // Distance infinite (rest of graph) visibility
-  const detailInfiniteView = document.getElementById('detailInfiniteView');
+  const detailInfiniteView = document.getElementById("detailInfiniteView");
   if (detailInfiniteView) {
-    detailInfiniteView.addEventListener('change', (e) => {
+    detailInfiniteView.addEventListener("change", (e) => {
       const currentLens = cloneLens(viewStateManager.getState().detailLens);
 
       // Find infinite distance rule
-      const rule = currentLens.distanceRules.find(r => r.distance === 'infinite');
+      const rule = currentLens.distanceRules.find(
+        (r) => r.distance === "infinite",
+      );
       if (rule) {
-        if (e.target.value === 'hide') {
+        if (e.target.value === "hide") {
           // Hide completely
           rule.nodeVisibility.targetTypes = [];
-        } else if (e.target.value === 'collapsed') {
+        } else if (e.target.value === "collapsed") {
           // Show collapsed
-          rule.nodeVisibility.targetTypes = ['cc_binary', 'cc_shared_library', 'cc_library'];
-          rule.collapseLevel = 1;  // Package level
+          rule.nodeVisibility.targetTypes = [
+            "cc_binary",
+            "cc_shared_library",
+            "cc_library",
+          ];
+          rule.collapseLevel = 1; // Package level
         } else {
           // Same as default
           // Copy from default lens
-          const defaultRule = viewStateManager.getState().defaultLens.distanceRules[0];
+          const defaultRule =
+            viewStateManager.getState().defaultLens.distanceRules[0];
           if (defaultRule) {
             rule.nodeVisibility = { ...defaultRule.nodeVisibility };
             rule.collapseLevel = defaultRule.collapseLevel;

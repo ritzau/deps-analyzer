@@ -9,11 +9,11 @@ import (
 // GraphDiff represents the difference between two graph states
 type GraphDiff struct {
 	AddedNodes    []GraphNode `json:"addedNodes"`
-	RemovedNodes  []string    `json:"removedNodes"`    // Node IDs
-	ModifiedNodes []GraphNode `json:"modifiedNodes"`   // Nodes with changed properties
+	RemovedNodes  []string    `json:"removedNodes"`  // Node IDs
+	ModifiedNodes []GraphNode `json:"modifiedNodes"` // Nodes with changed properties
 	AddedEdges    []GraphEdge `json:"addedEdges"`
-	RemovedEdges  []string    `json:"removedEdges"`    // Edge IDs (source|target|type)
-	FullGraph     bool        `json:"fullGraph"`       // True if this is a full graph, not a diff
+	RemovedEdges  []string    `json:"removedEdges"` // Edge IDs (source|target|type)
+	FullGraph     bool        `json:"fullGraph"`    // True if this is a full graph, not a diff
 }
 
 // GraphSnapshot represents a cached graph state for diffing
@@ -27,8 +27,8 @@ type GraphSnapshot struct {
 func ComputeHash(defaultLens, detailLens *LensConfig, selectedNodes []string) string {
 	// Serialize the request to JSON for hashing
 	data := struct {
-		DefaultLens  *LensConfig
-		DetailLens   *LensConfig
+		DefaultLens   *LensConfig
+		DetailLens    *LensConfig
 		SelectedNodes []string
 	}{
 		DefaultLens:   defaultLens,
@@ -155,3 +155,4 @@ func nodesEqual(a, b GraphNode) bool {
 		a.Parent == b.Parent
 	// Note: We don't compare metadata fields that don't affect structure
 }
+

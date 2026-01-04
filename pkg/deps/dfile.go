@@ -96,3 +96,4 @@ func isWorkspaceFile(path string) bool {
 	// Workspace files are relative paths like "util/strings.h" or "core/engine.cc"
 	return true
 }
+

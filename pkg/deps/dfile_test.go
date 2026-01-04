@@ -61,7 +61,7 @@ func TestParseDFileCrossPackage(t *testing.T) {
 
 	// Check for cross-package dependencies
 	expectedDeps := map[string]bool{
-		"core/engine.h": true,
+		"core/engine.h":  true,
 		"util/strings.h": true,
 		"util/time.h":    true,
 	}
@@ -150,3 +150,4 @@ func TestParseAllDFiles(t *testing.T) {
 		t.Error("Expected to find at least one cross-package dependency (core -> util)")
 	}
 }
+

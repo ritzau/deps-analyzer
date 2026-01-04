@@ -56,7 +56,8 @@ func isHexAddress(s string) bool {
 // ParseNMOutput parses the output of nm command for a single object file
 // nm output format: [address] <type> <symbol>
 // Example: 0000000000000000 T _Z3foov
-//          U _Z3barv
+//
+//	U _Z3barv
 func ParseNMOutput(objectFile string, nmOutput string) []Symbol {
 	var symbols []Symbol
 	scanner := bufio.NewScanner(strings.NewReader(nmOutput))
@@ -308,3 +309,4 @@ func isDefinedSymbol(symType string) bool {
 		return false
 	}
 }
+

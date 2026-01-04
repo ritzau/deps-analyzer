@@ -121,3 +121,4 @@ func FatalContext(ctx context.Context, msg string, args ...any) {
 	logger.ErrorContext(ctx, msg, withRequestID(ctx, args)...)
 	os.Exit(1)
 }
+

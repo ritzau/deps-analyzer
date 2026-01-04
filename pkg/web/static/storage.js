@@ -5,7 +5,7 @@
  * Settings are persisted across page reloads.
  */
 
-const STORAGE_KEY = 'deps-analyzer-view-settings';
+const STORAGE_KEY = "deps-analyzer-view-settings";
 const STORAGE_VERSION = 1;
 
 /**
@@ -20,14 +20,14 @@ function saveViewState(state) {
       detailLens: serializeLens(state.detailLens),
       navigationFilters: {
         ruleTypes: Array.from(state.navigationFilters.ruleTypes),
-        searchText: state.navigationFilters.searchText
+        searchText: state.navigationFilters.searchText,
       },
-      activeTab: state.activeTab
+      activeTab: state.activeTab,
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch (e) {
-    console.warn('Failed to save view state to localStorage:', e);
+    console.warn("Failed to save view state to localStorage:", e);
   }
 }
 
@@ -46,7 +46,7 @@ function loadViewState() {
 
     // Version check - if version mismatch, ignore stored state
     if (parsed.version !== STORAGE_VERSION) {
-      console.warn('Stored view state version mismatch, using defaults');
+      console.warn("Stored view state version mismatch, using defaults");
       return null;
     }
 
@@ -55,12 +55,12 @@ function loadViewState() {
       detailLens: deserializeLens(parsed.detailLens),
       navigationFilters: {
         ruleTypes: new Set(parsed.navigationFilters.ruleTypes),
-        searchText: parsed.navigationFilters.searchText
+        searchText: parsed.navigationFilters.searchText,
       },
-      activeTab: parsed.activeTab
+      activeTab: parsed.activeTab,
     };
   } catch (e) {
-    console.warn('Failed to load view state from localStorage:', e);
+    console.warn("Failed to load view state from localStorage:", e);
     return null;
   }
 }
@@ -75,18 +75,18 @@ function serializeLens(lens) {
   return {
     name: lens.name,
     baseSet: { ...lens.baseSet },
-    distanceRules: lens.distanceRules.map(rule => ({
+    distanceRules: lens.distanceRules.map((rule) => ({
       ...rule,
       nodeVisibility: { ...rule.nodeVisibility },
-      edgeTypes: rule.edgeTypes ? [...rule.edgeTypes] : undefined
+      edgeTypes: rule.edgeTypes ? [...rule.edgeTypes] : undefined,
     })),
     globalFilters: { ...lens.globalFilters },
     edgeRules: {
       types: Array.from(lens.edgeRules.types),
       aggregateCollapsed: lens.edgeRules.aggregateCollapsed,
       collapseEdgeTypes: lens.edgeRules.collapseEdgeTypes,
-      minimumCount: lens.edgeRules.minimumCount
-    }
+      minimumCount: lens.edgeRules.minimumCount,
+    },
   };
 }
 
@@ -100,18 +100,18 @@ function deserializeLens(serialized) {
   return {
     name: serialized.name,
     baseSet: { ...serialized.baseSet },
-    distanceRules: serialized.distanceRules.map(rule => ({
+    distanceRules: serialized.distanceRules.map((rule) => ({
       ...rule,
       nodeVisibility: { ...rule.nodeVisibility },
-      edgeTypes: rule.edgeTypes ? [...rule.edgeTypes] : undefined
+      edgeTypes: rule.edgeTypes ? [...rule.edgeTypes] : undefined,
     })),
     globalFilters: { ...serialized.globalFilters },
     edgeRules: {
       types: new Set(serialized.edgeRules.types),
       aggregateCollapsed: serialized.edgeRules.aggregateCollapsed,
       collapseEdgeTypes: serialized.edgeRules.collapseEdgeTypes,
-      minimumCount: serialized.edgeRules.minimumCount
-    }
+      minimumCount: serialized.edgeRules.minimumCount,
+    },
   };
 }
 
@@ -122,6 +122,6 @@ function clearViewState() {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (e) {
-    console.warn('Failed to clear view state from localStorage:', e);
+    console.warn("Failed to clear view state from localStorage:", e);
   }
 }

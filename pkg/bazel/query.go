@@ -611,3 +611,4 @@ func BuildFileToTargetMap(workspacePath string) (map[string]string, error) {
 
 	return fileToTarget, nil
 }
+

@@ -40,3 +40,4 @@ func AnalyzeChanges(event ChangeEvent, workspace string) *ChangeAnalysis {
 
 	return analysis
 }
+

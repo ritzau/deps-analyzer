@@ -65,7 +65,7 @@ func expandPackagesToTargets(selectedNodes []string, graph *GraphData) []string 
 					// E.g., "util/orphaned.cc" belongs to package "util"
 					if strings.HasPrefix(filePath, packagePath+"/") {
 						expanded[node.ID] = true
-						foundTargets = true  // Mark that we found something in this package
+						foundTargets = true // Mark that we found something in this package
 					}
 				}
 			}
@@ -183,9 +183,10 @@ func getInheritedDistance(nodeID string, parentID string, distances map[string]i
 
 // extractParentID extracts the parent node ID from a hierarchical node ID
 // Examples:
-//   //package:target:file -> //package:target
-//   //package:target -> //package
-//   //package -> ""
+//
+//	//package:target:file -> //package:target
+//	//package:target -> //package
+//	//package -> ""
 func extractParentID(nodeID string) string {
 	// Handle uncovered files specially: uncovered:path/file.cc -> //path
 	if strings.HasPrefix(nodeID, "uncovered:") {
@@ -229,3 +230,4 @@ func extractParentID(nodeID string) string {
 	parentParts := parts[:len(parts)-1]
 	return "//" + strings.Join(parentParts, ":")
 }
+

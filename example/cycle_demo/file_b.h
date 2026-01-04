@@ -5,7 +5,8 @@
 void functionA();
 
 void functionFromB() {
-    functionA();  // This creates a dependency on file_a
+  functionA(); // This creates a dependency on file_a
 }
 
 #endif
+

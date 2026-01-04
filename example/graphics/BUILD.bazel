@@ -2,8 +2,8 @@
 
 cc_shared_library(
     name = "graphics",
-    deps = [":graphics_impl"],
     visibility = ["//visibility:public"],
+    deps = [":graphics_impl"],
 )
 
 cc_library(

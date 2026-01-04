@@ -25,7 +25,7 @@ test_bazel_workspace/
   - File I/O (file_io.h/cc)
   - Time utilities (time.h/cc)
   - Math utilities (math.h/cc)
-  
+
 **Expected analysis:**
 - Suggest splitting into separate targets: util_strings, util_io, util_time, util_math
 - Show that different files are used by different consumers
@@ -64,7 +64,7 @@ From the .d files, the analyzer can determine:
 
 **util package file-level dependencies:**
 - strings.cc → strings.h (standalone)
-- file_io.cc → file_io.h (standalone)  
+- file_io.cc → file_io.h (standalone)
 - time.cc → time.h (standalone)
 - math.cc → math.h, strings.h (depends on strings!)
 
@@ -98,7 +98,7 @@ The analyzer should provide:
      - 4 distinct functional areas
      - Should be split into 4 libraries
      - Internal dependency: math → strings
-   
+
 3. **Refactoring Suggestions:**
    ```
    Split //util:util into:
@@ -147,3 +147,4 @@ bazel run //main:test_app
 ```
 
 The analyzer should detect all the issues listed above and provide actionable refactoring suggestions.
+

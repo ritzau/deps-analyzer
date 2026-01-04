@@ -136,3 +136,4 @@ func (d *Debouncer) run(ctx context.Context) {
 func (d *Debouncer) Output() <-chan ChangeEvent {
 	return d.output
 }
+

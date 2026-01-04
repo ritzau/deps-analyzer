@@ -32,3 +32,4 @@ Run `./deps-analyzer --licenses` to see a summary of all dependencies with their
 - [buildifier.txt](buildifier.txt) - github.com/bazelbuild/buildtools (Apache-2.0)
 - [esbuild.txt](esbuild.txt) - github.com/evanw/esbuild (MIT)
 - [lefthook.txt](lefthook.txt) - github.com/evilmartians/lefthook (MIT)
+

@@ -76,9 +76,9 @@ type Package struct {
 
 // PackageDependency represents dependencies between two packages
 type PackageDependency struct {
-	From         string                     `json:"from"`         // Source package path
-	To           string                     `json:"to"`           // Target package path
-	Dependencies map[DependencyType][]Edge  `json:"dependencies"` // Grouped by type
+	From         string                    `json:"from"`         // Source package path
+	To           string                    `json:"to"`           // Target package path
+	Dependencies map[DependencyType][]Edge `json:"dependencies"` // Grouped by type
 }
 
 // Edge represents a single dependency edge between targets
@@ -234,3 +234,4 @@ func (m *Module) GetAllPackageDependencies() []PackageDependency {
 
 	return result
 }
+

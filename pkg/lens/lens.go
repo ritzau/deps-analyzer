@@ -51,9 +51,10 @@ type EdgeDisplayRules struct {
 
 // NodeState tracks the computed state for a node during rendering
 type NodeState struct {
-	Visible      bool
-	Collapsed    bool
-	Distance     interface{} // int or "infinite"
-	AppliedLens  string      // "default" or "detail"
-	Rule         *DistanceRule
+	Visible     bool
+	Collapsed   bool
+	Distance    interface{} // int or "infinite"
+	AppliedLens string      // "default" or "detail"
+	Rule        *DistanceRule
 }
+

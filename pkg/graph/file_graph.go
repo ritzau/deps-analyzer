@@ -12,18 +12,18 @@ type FileNode struct {
 
 // FileGraph represents the file-level dependency graph
 type FileGraph struct {
-	graph *simple.DirectedGraph
-	nodes map[string]*FileNode  // Map from file path to node
-	ids   map[string]int64      // Map from file path to graph ID
+	graph  *simple.DirectedGraph
+	nodes  map[string]*FileNode // Map from file path to node
+	ids    map[string]int64     // Map from file path to graph ID
 	nextID int64
 }
 
 // NewFileGraph creates a new file dependency graph
 func NewFileGraph() *FileGraph {
 	return &FileGraph{
-		graph: simple.NewDirectedGraph(),
-		nodes: make(map[string]*FileNode),
-		ids:   make(map[string]int64),
+		graph:  simple.NewDirectedGraph(),
+		nodes:  make(map[string]*FileNode),
+		ids:    make(map[string]int64),
 		nextID: 0,
 	}
 }
@@ -165,3 +165,4 @@ func BuildFileGraph(fileDeps []*deps.FileDependency) *FileGraph {
 
 	return fg
 }
+

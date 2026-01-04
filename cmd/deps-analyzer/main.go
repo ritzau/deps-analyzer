@@ -127,7 +127,7 @@ func startFileWatcher(ctx context.Context, workspace string, runner *analysis.An
 	debouncer := watcher.NewDebouncer(
 		fw.Events(),
 		1500*time.Millisecond, // quietPeriod
-		10*time.Second,         // maxWait
+		10*time.Second,        // maxWait
 	)
 	debouncer.Start(ctx)
 

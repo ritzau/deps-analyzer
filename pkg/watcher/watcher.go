@@ -224,3 +224,4 @@ func (fw *FileWatcher) Stop() error {
 	close(fw.done)
 	return fw.watcher.Close()
 }
+

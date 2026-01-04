@@ -6,12 +6,13 @@ namespace audio {
 
 class AudioEngine {
 public:
-    AudioEngine();
-    ~AudioEngine();
+  AudioEngine();
+  ~AudioEngine();
 
-    void Initialize();
-    void PlaySound(const std::string& filename);
-    void SetVolume(float volume);
+  void Initialize();
+  void PlaySound(const std::string &filename);
+  void SetVolume(float volume);
 };
 
 } // namespace audio
+

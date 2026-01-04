@@ -7,11 +7,12 @@
 namespace util {
 
 // File I/O utilities
-bool ReadFile(const std::string& path, std::string* content);
-bool WriteFile(const std::string& path, const std::string& content);
-bool FileExists(const std::string& path);
-std::vector<std::string> ListDirectory(const std::string& path);
+bool ReadFile(const std::string &path, std::string *content);
+bool WriteFile(const std::string &path, const std::string &content);
+bool FileExists(const std::string &path);
+std::vector<std::string> ListDirectory(const std::string &path);
 
-}  // namespace util
+} // namespace util
 
-#endif  // UTIL_FILE_IO_H_
+#endif // UTIL_FILE_IO_H_
+

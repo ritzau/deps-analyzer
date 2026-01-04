@@ -54,3 +54,4 @@ type TargetGraphData struct {
 	DependenciesCount int  `json:"dependencies_count"`
 	Complete          bool `json:"complete"` // True when all data is loaded
 }
+

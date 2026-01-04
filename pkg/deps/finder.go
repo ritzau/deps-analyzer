@@ -77,3 +77,4 @@ func ParseAllDFiles(workspaceRoot string) ([]*FileDependency, error) {
 
 	return deps, nil
 }
+
