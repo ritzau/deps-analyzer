@@ -1,0 +1,119 @@
+# Lefthook configuration for code formatting and linting
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    # Format Go files
+    go-fmt:
+      glob: "*.go"
+      run: gofmt -w {staged_files} && git add {staged_files}
+
+    go-imports:
+      glob: "*.go"
+      run: |
+        if command -v goimports > /dev/null 2>&1; then
+          goimports -w {staged_files} && git add {staged_files}
+        else
+          echo "Warning: goimports not found. Install with: go install golang.org/x/tools/cmd/goimports@latest"
+        fi
+
+    # Format C++ files
+    clang-format:
+      glob: "*.{cc,h,cpp,hpp}"
+      run: |
+        if command -v clang-format > /dev/null 2>&1; then
+          clang-format -i {staged_files} && git add {staged_files}
+        else
+          echo "Warning: clang-format not found. Install it for your platform."
+        fi
+
+    # Format Bazel/Starlark files
+    buildifier:
+      glob: "{BUILD,*.bzl,WORKSPACE,*.bazel}"
+      run: |
+        BUILDIFIER=$(go env GOPATH)/bin/buildifier
+        if [ -x "$BUILDIFIER" ]; then
+          "$BUILDIFIER" -mode=fix {staged_files} && git add {staged_files}
+        else
+          echo "Warning: buildifier not found. Install with: go install github.com/bazelbuild/buildtools/buildifier@latest"
+        fi
+
+    # Format JavaScript/TypeScript files with prettier
+    prettier:
+      glob: "*.{js,ts,json,css,html,md}"
+      run: |
+        if command -v npx > /dev/null 2>&1; then
+          npx --yes prettier --write {staged_files} && git add {staged_files}
+        else
+          echo "Warning: npx not found. Skipping prettier formatting."
+        fi
+
+    # Strip trailing whitespace and ensure single trailing newline
+    fix-whitespace:
+      glob: "*.{go,cc,h,cpp,hpp,js,ts,json,css,html,md,bzl,bazel,yml,yaml,sh}"
+      run: |
+        for file in {staged_files}; do
+          # Strip trailing whitespace from each line
+          sed -i '' 's/[[:space:]]*$//' "$file"
+
+          # Ensure file ends with exactly one newline
+          # Remove all trailing newlines
+          sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$file"
+          # Add single newline at end
+          echo "" >> "$file"
+
+          git add "$file"
+        done
+
+  # Run golangci-lint if available
+  scripts:
+    "go-lint":
+      runner: bash
+      script: |
+        if command -v golangci-lint > /dev/null 2>&1; then
+          golangci-lint run --fix
+        else
+          echo "Info: golangci-lint not installed. Skipping Go linting."
+          echo "Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+        fi
+
+# Optional: Run formatters on all files (not just staged)
+format:
+  parallel: true
+  commands:
+    go:
+      run: gofmt -w .
+
+    go-imports:
+      run: |
+        if command -v goimports > /dev/null 2>&1; then
+          find . -name "*.go" -not -path "*/bazel-*" -exec goimports -w {} +
+        fi
+
+    cpp:
+      run: |
+        if command -v clang-format > /dev/null 2>&1; then
+          find . \( -name "*.cc" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) -not -path "*/bazel-*" -exec clang-format -i {} +
+        fi
+
+    bazel:
+      run: |
+        BUILDIFIER=$(go env GOPATH)/bin/buildifier
+        if [ -x "$BUILDIFIER" ]; then
+          find . \( -name "BUILD" -o -name "*.bzl" -o -name "WORKSPACE" -o -name "*.bazel" \) -not -path "*/bazel-*" -exec "$BUILDIFIER" -mode=fix {} +
+        fi
+
+    js:
+      run: |
+        if command -v npx > /dev/null 2>&1; then
+          npx --yes prettier --write "pkg/web/static/**/*.{js,css,html}"
+        fi
+
+    whitespace:
+      run: |
+        find . -type f \( -name "*.go" -o -name "*.cc" -o -name "*.h" -o -name "*.js" -o -name "*.ts" -o -name "*.css" -o -name "*.html" -o -name "*.md" \) -not -path "*/bazel-*" -not -path "*/.git/*" -not -path "*/node_modules/*" | while read file; do
+          sed -i '' 's/[[:space:]]*$//' "$file"
+          sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$file"
+          echo "" >> "$file"
+        done

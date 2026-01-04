@@ -330,6 +330,32 @@ func printLicenses() {
 			license: "Flaticon License",
 			url:     "https://www.flaticon.com/free-icons/filter",
 		},
+
+		// Build tools (development dependencies)
+		{
+			name:    "esbuild",
+			author:  "Evan Wallace",
+			license: "MIT",
+			url:     "https://github.com/evanw/esbuild",
+		},
+		{
+			name:    "goimports",
+			author:  "The Go Authors",
+			license: "BSD-3-Clause",
+			url:     "https://golang.org/x/tools/cmd/goimports",
+		},
+		{
+			name:    "buildifier",
+			author:  "The Bazel Authors",
+			license: "Apache-2.0",
+			url:     "https://github.com/bazelbuild/buildtools",
+		},
+		{
+			name:    "lefthook",
+			author:  "Evil Martians",
+			license: "MIT",
+			url:     "https://github.com/evilmartians/lefthook",
+		},
 	}
 
 	for _, lib := range licenses {

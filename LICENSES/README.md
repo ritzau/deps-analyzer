@@ -26,3 +26,9 @@ Run `./deps-analyzer --licenses` to see a summary of all dependencies with their
 
 ### Assets
 - [flaticon-filter.txt](flaticon-filter.txt) - Filter icon from Flaticon
+
+### Build Tools (Development Dependencies)
+- [goimports.txt](goimports.txt) - golang.org/x/tools/cmd/goimports (BSD-3-Clause)
+- [buildifier.txt](buildifier.txt) - github.com/bazelbuild/buildtools (Apache-2.0)
+- [esbuild.txt](esbuild.txt) - github.com/evanw/esbuild (MIT)
+- [lefthook.txt](lefthook.txt) - github.com/evilmartians/lefthook (MIT)

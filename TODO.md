@@ -5,8 +5,11 @@
 1. TypeScript preparation
 
 2. Something like pre-commit but without python to:
+
    - Format the code (go, bazel, c++, ts, js, ...)
    - Run linters
+
+3. TypeScript migration (+ adding unit tests)
 
 ## Unclear
 
