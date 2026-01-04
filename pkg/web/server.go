@@ -710,40 +710,38 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 	// Create file nodes using the file-to-target mapping to ensure consistent IDs
 	// This ensures file node IDs match what's used in edges
 	createdFileNodes := make(map[string]bool)
-	if fileToTarget != nil {
-		for filePath, targetLabel := range fileToTarget {
-			fileID := targetLabel + ":" + filePath
+	for filePath, targetLabel := range fileToTarget {
+		fileID := targetLabel + ":" + filePath
 
-			// Skip if already created
-			if createdFileNodes[fileID] {
-				continue
-			}
-			createdFileNodes[fileID] = true
-
-			// Extract just the filename for display
-			filename := filePath
-			// Remove package prefix if present (e.g., "graphics:" from "graphics:renderer.cc")
-			if idx := strings.LastIndex(filename, ":"); idx >= 0 {
-				filename = filename[idx+1:]
-			}
-			// Remove directory path
-			if idx := strings.LastIndex(filename, "/"); idx >= 0 {
-				filename = filename[idx+1:]
-			}
-
-			// Determine file type
-			fileType := "source_file"
-			if strings.HasSuffix(filePath, ".h") || strings.HasSuffix(filePath, ".hpp") {
-				fileType = "header_file"
-			}
-
-			graphData.Nodes = append(graphData.Nodes, GraphNode{
-				ID:     fileID,
-				Label:  filename,
-				Type:   fileType,
-				Parent: targetLabel,
-			})
+		// Skip if already created
+		if createdFileNodes[fileID] {
+			continue
 		}
+		createdFileNodes[fileID] = true
+
+		// Extract just the filename for display
+		filename := filePath
+		// Remove package prefix if present (e.g., "graphics:" from "graphics:renderer.cc")
+		if idx := strings.LastIndex(filename, ":"); idx >= 0 {
+			filename = filename[idx+1:]
+		}
+		// Remove directory path
+		if idx := strings.LastIndex(filename, "/"); idx >= 0 {
+			filename = filename[idx+1:]
+		}
+
+		// Determine file type
+		fileType := "source_file"
+		if strings.HasSuffix(filePath, ".h") || strings.HasSuffix(filePath, ".hpp") {
+			fileType = "header_file"
+		}
+
+		graphData.Nodes = append(graphData.Nodes, GraphNode{
+			ID:     fileID,
+			Label:  filename,
+			Type:   fileType,
+			Parent: targetLabel,
+		})
 	}
 
 	// Create file-to-file edges for compile dependencies (header includes)
@@ -864,18 +862,16 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 	}
 
 	// Aggregate symbol dependencies
-	if symbolDeps != nil {
-		for _, symDep := range symbolDeps {
-			if symDep.SourceTarget == symDep.TargetTarget {
-				continue // Skip intra-target symbols
-			}
-
-			key := edgeKey{from: symDep.SourceTarget, to: symDep.TargetTarget}
-			if edgeSymbols[key] == nil {
-				edgeSymbols[key] = make(map[string]bool)
-			}
-			edgeSymbols[key][symDep.Symbol] = true
+	for _, symDep := range symbolDeps {
+		if symDep.SourceTarget == symDep.TargetTarget {
+			continue // Skip intra-target symbols
 		}
+
+		key := edgeKey{from: symDep.SourceTarget, to: symDep.TargetTarget}
+		if edgeSymbols[key] == nil {
+			edgeSymbols[key] = make(map[string]bool)
+		}
+		edgeSymbols[key][symDep.Symbol] = true
 	}
 
 	// Create edges for all dependencies, colored by type
@@ -933,7 +929,7 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 	}
 
 	// Add uncovered files as nodes (files not in any target)
-	if uncoveredFiles != nil && len(uncoveredFiles) > 0 {
+	if len(uncoveredFiles) > 0 {
 		// Track which packages contain uncovered files so we can create package nodes
 		packagesWithUncovered := make(map[string]bool)
 
@@ -1195,66 +1191,64 @@ func buildTargetSelectedGraph(module *model.Module, selectedTarget *model.Target
 	}
 	symbolEdges := make(map[edgeKey]*GraphEdge)
 
-	if symbolDeps != nil {
-		for _, symDep := range symbolDeps {
-			// Only include if both targets are relevant
-			if !relevantTargets[symDep.SourceTarget] || !relevantTargets[symDep.TargetTarget] {
-				continue
-			}
+	for _, symDep := range symbolDeps {
+		// Only include if both targets are relevant
+		if !relevantTargets[symDep.SourceTarget] || !relevantTargets[symDep.TargetTarget] {
+			continue
+		}
 
-			// Only show edges where at least one end is in the selected target
-			if symDep.SourceTarget != selectedTarget.Label && symDep.TargetTarget != selectedTarget.Label {
-				continue
-			}
+		// Only show edges where at least one end is in the selected target
+		if symDep.SourceTarget != selectedTarget.Label && symDep.TargetTarget != selectedTarget.Label {
+			continue
+		}
 
-			// Get the original Bazel format for source and target files
-			sourceOriginal, sourceOK := normalizedToOriginal[symDep.SourceFile]
-			targetOriginal, targetOK := normalizedToOriginal[symDep.TargetFile]
-			if !sourceOK || !targetOK {
-				continue // Skip if we can't find the original format
-			}
+		// Get the original Bazel format for source and target files
+		sourceOriginal, sourceOK := normalizedToOriginal[symDep.SourceFile]
+		targetOriginal, targetOK := normalizedToOriginal[symDep.TargetFile]
+		if !sourceOK || !targetOK {
+			continue // Skip if we can't find the original format
+		}
 
-			// Create file node IDs using original Bazel format
-			sourceFileID := symDep.SourceTarget + ":file:" + sourceOriginal
-			targetFileID := symDep.TargetTarget + ":file:" + targetOriginal
+		// Create file node IDs using original Bazel format
+		sourceFileID := symDep.SourceTarget + ":file:" + sourceOriginal
+		targetFileID := symDep.TargetTarget + ":file:" + targetOriginal
 
-			// Track that these files have edges
-			filesWithEdges[sourceFileID] = true
-			filesWithEdges[targetFileID] = true
+		// Track that these files have edges
+		filesWithEdges[sourceFileID] = true
+		filesWithEdges[targetFileID] = true
 
-			// Create edge key for deduplication
-			key := edgeKey{
-				source:  sourceFileID,
-				target:  targetFileID,
-				linkage: string(symDep.Linkage),
-			}
+		// Create edge key for deduplication
+		key := edgeKey{
+			source:  sourceFileID,
+			target:  targetFileID,
+			linkage: string(symDep.Linkage),
+		}
 
-			// Get or create edge
-			edge, exists := symbolEdges[key]
-			if !exists {
-				edge = &GraphEdge{
-					Source:      sourceFileID,
-					Target:      targetFileID,
-					Type:        "symbol",
-					Linkage:     string(symDep.Linkage),
-					Symbols:     []string{},
-					SourceLabel: getFileName(sourceOriginal),
-					TargetLabel: getFileName(targetOriginal),
-				}
-				symbolEdges[key] = edge
+		// Get or create edge
+		edge, exists := symbolEdges[key]
+		if !exists {
+			edge = &GraphEdge{
+				Source:      sourceFileID,
+				Target:      targetFileID,
+				Type:        "symbol",
+				Linkage:     string(symDep.Linkage),
+				Symbols:     []string{},
+				SourceLabel: getFileName(sourceOriginal),
+				TargetLabel: getFileName(targetOriginal),
 			}
+			symbolEdges[key] = edge
+		}
 
-			// Add symbol to the edge (avoiding duplicates)
-			symbolExists := false
-			for _, existingSym := range edge.Symbols {
-				if existingSym == symDep.Symbol {
-					symbolExists = true
-					break
-				}
+		// Add symbol to the edge (avoiding duplicates)
+		symbolExists := false
+		for _, existingSym := range edge.Symbols {
+			if existingSym == symDep.Symbol {
+				symbolExists = true
+				break
 			}
-			if !symbolExists {
-				edge.Symbols = append(edge.Symbols, symDep.Symbol)
-			}
+		}
+		if !symbolExists {
+			edge.Symbols = append(edge.Symbols, symDep.Symbol)
 		}
 	}
 
@@ -1523,4 +1517,3 @@ func (s *Server) Start(port int) error {
 	handler := logging.RequestIDMiddleware(s.router)
 	return http.ListenAndServe(addr, handler)
 }
-
