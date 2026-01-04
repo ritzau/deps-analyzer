@@ -28,3 +28,9 @@ workspace.json
 module.json
 test-bazel-xml
 example/deps-analyzer
+
+# Frontend build artifacts (when using TypeScript)
+# Uncomment these lines after migrating to TypeScript:
+# pkg/web/static/*.js
+# pkg/web/static/*.js.map
+# !pkg/web/static/src/
