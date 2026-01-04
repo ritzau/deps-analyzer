@@ -1113,16 +1113,14 @@ func buildTargetSelectedGraph(module *model.Module, selectedTarget *model.Target
 	// Add file-to-file edges from compile dependencies (.d files)
 	// Build a reverse map from normalized paths to original source paths
 	normalizedToOriginal := make(map[string]string)
-	if module != nil {
-		for _, target := range module.Targets {
-			for _, src := range target.Sources {
-				normalized := strings.ReplaceAll(strings.TrimPrefix(src, "//"), ":", "/")
-				normalizedToOriginal[normalized] = src
-			}
-			for _, hdr := range target.Headers {
-				normalized := strings.ReplaceAll(strings.TrimPrefix(hdr, "//"), ":", "/")
-				normalizedToOriginal[normalized] = hdr
-			}
+	for _, target := range module.Targets {
+		for _, src := range target.Sources {
+			normalized := strings.ReplaceAll(strings.TrimPrefix(src, "//"), ":", "/")
+			normalizedToOriginal[normalized] = src
+		}
+		for _, hdr := range target.Headers {
+			normalized := strings.ReplaceAll(strings.TrimPrefix(hdr, "//"), ":", "/")
+			normalizedToOriginal[normalized] = hdr
 		}
 	}
 

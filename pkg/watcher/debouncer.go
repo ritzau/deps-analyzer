@@ -2,9 +2,10 @@ package watcher
 
 import (
 	"context"
-	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"sync"
 	"time"
+
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 )
 
 // Debouncer batches rapid file system events to avoid excessive re-analysis
@@ -136,4 +137,3 @@ func (d *Debouncer) run(ctx context.Context) {
 func (d *Debouncer) Output() <-chan ChangeEvent {
 	return d.output
 }
-
