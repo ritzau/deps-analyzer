@@ -66,16 +66,19 @@ pre-commit:
           git add "$file"
         done
 
-  # Run golangci-lint if available
-  scripts:
-    "go-lint":
-      runner: bash
-      script: |
-        if command -v golangci-lint > /dev/null 2>&1; then
-          golangci-lint run --fix
-        else
-          echo "Info: golangci-lint not installed. Skipping Go linting."
+    # Run golangci-lint (mandatory)
+    go-lint:
+      glob: "*.go"
+      run: |
+        if ! command -v golangci-lint > /dev/null 2>&1; then
+          echo "Error: golangci-lint not installed. Linting is mandatory."
           echo "Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+          exit 1
+        fi
+        golangci-lint run --fix
+        if [ $? -ne 0 ]; then
+          echo "Error: golangci-lint found issues that could not be auto-fixed."
+          exit 1
         fi
 
 # Optional: Run formatters on all files (not just staged)
