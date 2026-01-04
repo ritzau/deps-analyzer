@@ -611,11 +611,12 @@ func buildBinaryGraphData(binaryInfos []*binaries.BinaryInfo) *GraphData {
 
 	// Create nodes for all binaries
 	for _, bin := range binaryInfos {
-		nodeType := bin.Kind
 		// Use specific type for binaries vs shared libraries
-		if bin.Kind == "cc_binary" {
+		nodeType := bin.Kind
+		switch bin.Kind {
+		case "cc_binary":
 			nodeType = "cc_binary"
-		} else if bin.Kind == "cc_shared_library" {
+		case "cc_shared_library":
 			nodeType = "cc_shared_library"
 		}
 
