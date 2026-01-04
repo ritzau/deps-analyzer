@@ -14,25 +14,33 @@ const viewStateLogger = new Logger();
 
 class ViewStateManager {
   constructor() {
+    // Try to load saved state from localStorage
+    const savedState = loadViewState();
+
     this.state = {
       // Layer 1: Default lens
-      defaultLens: cloneLens(DEFAULT_PACKAGE_LENS),
+      defaultLens: savedState?.defaultLens || cloneLens(DEFAULT_PACKAGE_LENS),
 
       // Layer 2: Detail lens
-      detailLens: cloneLens(DEFAULT_DETAIL_LENS),
-      selectedNodes: new Set(),
+      detailLens: savedState?.detailLens || cloneLens(DEFAULT_DETAIL_LENS),
+      selectedNodes: new Set(),  // Never persist selection
 
       // Navigation filters
-      navigationFilters: {
+      navigationFilters: savedState?.navigationFilters || {
         ruleTypes: new Set(['cc_binary', 'cc_library', 'cc_shared_library']),
         searchText: ''
       },
 
       // UI state
-      activeTab: 'tree'  // 'tree' | 'default' | 'detail'
+      activeTab: savedState?.activeTab || 'tree'  // 'tree' | 'default' | 'detail'
     };
 
     this.listeners = [];
+
+    // Log if we restored state
+    if (savedState) {
+      viewStateLogger.debug('[ViewState] Restored state from localStorage');
+    }
   }
 
   /**
@@ -55,6 +63,9 @@ class ViewStateManager {
     });
     this.state.navigationFilters.ruleTypes = ruleTypes;
     this.state.navigationFilters.searchText = searchText;
+
+    // Save to localStorage
+    saveViewState(this.state);
 
     // Re-render navigation list only (don't trigger graph re-fetch)
     if (window.filterAndRenderNavigationList) {
@@ -179,6 +190,9 @@ class ViewStateManager {
    * @private
    */
   notifyListeners() {
+    // Save state to localStorage
+    saveViewState(this.state);
+
     this.listeners.forEach(callback => {
       try {
         callback(this.state);

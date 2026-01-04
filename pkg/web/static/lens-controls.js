@@ -21,6 +21,96 @@ function initializeLensControls() {
   setupResetControls();
   setupDefaultLensControls();
   setupDetailLensControls();
+
+  // Sync UI controls with restored state
+  syncUIWithState();
+}
+
+/**
+ * Sync UI controls with current view state
+ * Called on initialization to reflect any restored state from localStorage
+ */
+function syncUIWithState() {
+  const state = viewStateManager.getState();
+
+  // Sync active tab
+  document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+  const activeTabButton = document.querySelector(`.tab-button[data-tab="${state.activeTab}"]`);
+  if (activeTabButton) {
+    activeTabButton.classList.add('active');
+  }
+
+  document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+  const activeTabPane = document.getElementById(state.activeTab + 'Tab');
+  if (activeTabPane) {
+    activeTabPane.classList.add('active');
+  }
+
+  // Sync global filters (default lens)
+  const filters = state.defaultLens.globalFilters;
+  const hideExternalCheckbox = document.getElementById('hideExternal');
+  if (hideExternalCheckbox) {
+    hideExternalCheckbox.checked = filters.hideExternal || false;
+  }
+
+  const hideUncoveredCheckbox = document.getElementById('hideUncovered');
+  if (hideUncoveredCheckbox) {
+    hideUncoveredCheckbox.checked = filters.hideUncovered || false;
+  }
+
+  const hideSystemLibsCheckbox = document.getElementById('hideSystemLibs');
+  if (hideSystemLibsCheckbox) {
+    hideSystemLibsCheckbox.checked = filters.hideSystemLibs || false;
+  }
+
+  // Sync edge type checkboxes
+  const edgeTypes = state.defaultLens.edgeRules.types;
+  const showStaticCheckbox = document.getElementById('showStatic');
+  if (showStaticCheckbox) {
+    showStaticCheckbox.checked = edgeTypes.has('static');
+  }
+
+  const showDynamicCheckbox = document.getElementById('showDynamic');
+  if (showDynamicCheckbox) {
+    showDynamicCheckbox.checked = edgeTypes.has('dynamic');
+  }
+
+  const showDataCheckbox = document.getElementById('showData');
+  if (showDataCheckbox) {
+    showDataCheckbox.checked = edgeTypes.has('data');
+  }
+
+  const showCompileCheckbox = document.getElementById('showCompile');
+  if (showCompileCheckbox) {
+    showCompileCheckbox.checked = edgeTypes.has('compile');
+  }
+
+  const showSymbolCheckbox = document.getElementById('showSymbol');
+  if (showSymbolCheckbox) {
+    showSymbolCheckbox.checked = edgeTypes.has('symbol');
+  }
+
+  // Sync collapse edge types checkbox
+  const collapseEdgeTypesCheckbox = document.getElementById('collapseEdgeTypes');
+  if (collapseEdgeTypesCheckbox) {
+    collapseEdgeTypesCheckbox.checked = state.defaultLens.edgeRules.collapseEdgeTypes || false;
+  }
+
+  // Sync collapse level radio buttons
+  const collapseLevel = state.defaultLens.distanceRules[0]?.collapseLevel || 2;
+  const collapseLevelRadio = document.querySelector(`input[name="collapseLevel"][value="${collapseLevel}"]`);
+  if (collapseLevelRadio) {
+    collapseLevelRadio.checked = true;
+  }
+
+  // Sync navigation filters (rule types)
+  const ruleTypes = state.navigationFilters.ruleTypes;
+  const ruleTypeCheckboxes = document.querySelectorAll('#ruleTypeMenu input[type="checkbox"]');
+  ruleTypeCheckboxes.forEach(checkbox => {
+    checkbox.checked = ruleTypes.has(checkbox.value);
+  });
+
+  lensLogger.debug('[LensControls] UI synced with restored state');
 }
 
 /**

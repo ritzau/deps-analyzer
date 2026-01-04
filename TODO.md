@@ -2,9 +2,7 @@
 
 ## Prioritized backlog
 
-1. Store the view settings in local storage.
-
-2. Combine the view and details tab into the view tab.
+1. Combine the view and details tab into the view tab.
 
 ## Unclear
 
@@ -224,6 +222,49 @@ Assets:
 
 **Result**: Clear attribution and license information for all third-party
 software used in the project.
+
+## LocalStorage persistence for view settings
+
+Implemented automatic persistence of user view preferences using browser's
+localStorage, so settings are restored across page reloads.
+
+**Implementation**:
+
+1. **storage.js module**: Created with save/load functions
+   - `saveViewState()`: Serializes state to JSON and stores in localStorage
+   - `loadViewState()`: Deserializes and restores state on page load
+   - Handles Set↔Array conversion for JSON compatibility
+   - Version check to handle future schema changes
+
+2. **ViewStateManager integration**:
+   - Constructor loads saved state from localStorage
+   - `notifyListeners()` automatically saves state on every change
+   - Navigation filter updates also trigger saves
+
+3. **UI synchronization**:
+   - Added `syncUIWithState()` function in lens-controls.js
+   - Syncs all checkboxes, radio buttons, and tab selection with restored state
+   - Called during initialization to reflect loaded settings
+
+**Persisted settings**:
+- Default lens configuration (collapse level, filters, edge types)
+- Detail lens configuration
+- Navigation filters (rule types, search text)
+- Active tab selection
+
+**Not persisted**:
+- Selected nodes (intentionally cleared on page load)
+
+**Files created**:
+- [storage.js](pkg/web/static/storage.js) - LocalStorage persistence module
+
+**Files modified**:
+- [view-state.js](pkg/web/static/view-state.js) - Load/save integration
+- [lens-controls.js](pkg/web/static/lens-controls.js) - UI sync function
+- [index.html](pkg/web/static/index.html) - Added storage.js script tag
+
+**Result**: User preferences persist across browser sessions, providing a
+seamless experience when returning to the application.
 
 ## LICENSES directory creation
 
