@@ -56,41 +56,27 @@
  * Default lens: Package-level view
  * Shows targets but hides individual files
  */
-const DEFAULT_PACKAGE_LENS = {
-  name: "Package View",
-  baseSet: { type: "full-graph" },
+const _DEFAULT_PACKAGE_LENS = {
+  name: 'Package View',
+  baseSet: { type: 'full-graph' },
   distanceRules: [
     {
-      distance: "infinite",
+      distance: 'infinite',
       nodeVisibility: {
-        targetTypes: ["cc_binary", "cc_shared_library", "cc_library"],
-        fileTypes: ["none"], // Hide files by default
+        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
+        fileTypes: ['none'], // Hide files by default
         showUncovered: false,
         showExternal: true, // Show external dependencies
         showSystemLibraries: true,
       },
       collapseLevel: 2, // Show targets but hide files (default)
       showEdges: true,
-      edgeTypes: [
-        "static",
-        "dynamic",
-        "system_link",
-        "data",
-        "compile",
-        "symbol",
-      ],
+      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol'],
     },
   ],
   globalFilters: {},
   edgeRules: {
-    types: new Set([
-      "static",
-      "dynamic",
-      "system_link",
-      "data",
-      "compile",
-      "symbol",
-    ]),
+    types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
     aggregateCollapsed: true,
     collapseEdgeTypes: false,
   },
@@ -101,55 +87,41 @@ const DEFAULT_PACKAGE_LENS = {
  * Shows files in selected nodes (distance 0), hides files in neighbors (distance 1),
  * and hides rest of graph (distance infinite)
  */
-const DEFAULT_DETAIL_LENS = {
-  name: "Detail View",
-  baseSet: { type: "full-graph" },
+const _DEFAULT_DETAIL_LENS = {
+  name: 'Detail View',
+  baseSet: { type: 'full-graph' },
   distanceRules: [
     {
       distance: 0, // Selected nodes
       nodeVisibility: {
-        targetTypes: ["cc_binary", "cc_shared_library", "cc_library"],
-        fileTypes: ["all"], // Show all files
+        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
+        fileTypes: ['all'], // Show all files
         showUncovered: true,
         showExternal: true, // Show external dependencies
         showSystemLibraries: true,
       },
       collapseLevel: 3, // Show down to file level
       showEdges: true,
-      edgeTypes: [
-        "static",
-        "dynamic",
-        "system_link",
-        "data",
-        "compile",
-        "symbol",
-      ],
+      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol'],
     },
     {
       distance: 1, // Neighbors (direct dependencies)
       nodeVisibility: {
-        targetTypes: ["cc_binary", "cc_shared_library", "cc_library"],
-        fileTypes: ["none"], // Hide files by default
+        targetTypes: ['cc_binary', 'cc_shared_library', 'cc_library'],
+        fileTypes: ['none'], // Hide files by default
         showUncovered: false,
         showExternal: true, // Show external dependencies
         showSystemLibraries: true,
       },
       collapseLevel: 2, // Show targets but hide files
       showEdges: true,
-      edgeTypes: [
-        "static",
-        "dynamic",
-        "system_link",
-        "data",
-        "compile",
-        "symbol",
-      ],
+      edgeTypes: ['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol'],
     },
     {
-      distance: "infinite", // Rest of graph - HIDE EVERYTHING
+      distance: 'infinite', // Rest of graph - HIDE EVERYTHING
       nodeVisibility: {
         targetTypes: [], // Empty array = hide all targets
-        fileTypes: ["none"], // Hide all files
+        fileTypes: ['none'], // Hide all files
         showUncovered: false,
         showExternal: false, // Keep hidden for infinite distance
         showSystemLibraries: false, // Hide system libraries too
@@ -161,14 +133,7 @@ const DEFAULT_DETAIL_LENS = {
   ],
   globalFilters: {},
   edgeRules: {
-    types: new Set([
-      "static",
-      "dynamic",
-      "system_link",
-      "data",
-      "compile",
-      "symbol",
-    ]),
+    types: new Set(['static', 'dynamic', 'system_link', 'data', 'compile', 'symbol']),
     aggregateCollapsed: true,
     collapseEdgeTypes: false,
   },
@@ -179,7 +144,7 @@ const DEFAULT_DETAIL_LENS = {
  * @param {LensConfig} lens - Lens to clone
  * @returns {LensConfig} Cloned lens
  */
-function cloneLens(lens) {
+function _cloneLens(lens) {
   return {
     name: lens.name,
     baseSet: { ...lens.baseSet },

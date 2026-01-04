@@ -18,9 +18,9 @@ class ViewStateManager {
     const savedState = loadViewState();
 
     // Migrate old 'detail' tab to 'default' (tabs were merged)
-    let activeTab = savedState?.activeTab || "tree";
-    if (activeTab === "detail") {
-      activeTab = "default";
+    let activeTab = savedState?.activeTab || 'tree';
+    if (activeTab === 'detail') {
+      activeTab = 'default';
     }
 
     this.state = {
@@ -33,8 +33,8 @@ class ViewStateManager {
 
       // Navigation filters
       navigationFilters: savedState?.navigationFilters || {
-        ruleTypes: new Set(["cc_binary", "cc_library", "cc_shared_library"]),
-        searchText: "",
+        ruleTypes: new Set(['cc_binary', 'cc_library', 'cc_shared_library']),
+        searchText: '',
       },
 
       // UI state
@@ -45,7 +45,7 @@ class ViewStateManager {
 
     // Log if we restored state
     if (savedState) {
-      viewStateLogger.debug("[ViewState] Restored state from localStorage");
+      viewStateLogger.debug('[ViewState] Restored state from localStorage');
     }
   }
 
@@ -63,7 +63,7 @@ class ViewStateManager {
    * @param {string} searchText - Search text for filtering by label
    */
   updateNavigationFilters(ruleTypes, searchText) {
-    viewStateLogger.debug("[ViewState] Updating navigation filters", {
+    viewStateLogger.debug('[ViewState] Updating navigation filters', {
       ruleTypes: Array.from(ruleTypes),
       searchText,
     });
@@ -84,11 +84,8 @@ class ViewStateManager {
    * @param {LensConfig} lens - New default lens
    */
   updateDefaultLens(lens) {
-    viewStateLogger.debug("[ViewState] updateDefaultLens called");
-    viewStateLogger.debug(
-      "[ViewState] New lens edge types:",
-      Array.from(lens.edgeRules.types),
-    );
+    viewStateLogger.debug('[ViewState] updateDefaultLens called');
+    viewStateLogger.debug('[ViewState] New lens edge types:', Array.from(lens.edgeRules.types));
     this.state.defaultLens = lens;
     this.notifyListeners();
   }
@@ -109,9 +106,7 @@ class ViewStateManager {
    * @param {LensConfig} detailLens - New detail lens
    */
   updateBothLenses(defaultLens, detailLens) {
-    viewStateLogger.debug(
-      "[ViewState] updateBothLenses called (atomic update)",
-    );
+    viewStateLogger.debug('[ViewState] updateBothLenses called (atomic update)');
     this.state.defaultLens = defaultLens;
     this.state.detailLens = detailLens;
     this.notifyListeners(); // Only notify once
@@ -122,7 +117,7 @@ class ViewStateManager {
    * @param {string[]} nodeIds - Array of node IDs to select
    */
   setSelection(nodeIds) {
-    viewStateLogger.debug("[ViewState] setSelection called with:", nodeIds);
+    viewStateLogger.debug('[ViewState] setSelection called with:', nodeIds);
     this.state.selectedNodes = new Set(nodeIds);
     this.notifyListeners();
   }
@@ -132,22 +127,16 @@ class ViewStateManager {
    * @param {string} nodeId - Node ID to toggle
    */
   toggleSelection(nodeId) {
-    viewStateLogger.debug(
-      "[ViewState] toggleSelection called with nodeId:",
-      nodeId,
-    );
+    viewStateLogger.debug('[ViewState] toggleSelection called with nodeId:', nodeId);
 
     if (this.state.selectedNodes.has(nodeId)) {
       this.state.selectedNodes.delete(nodeId);
-      viewStateLogger.debug("[ViewState] Removed from selection:", nodeId);
+      viewStateLogger.debug('[ViewState] Removed from selection:', nodeId);
     } else {
       this.state.selectedNodes.add(nodeId);
-      viewStateLogger.debug("[ViewState] Added to selection:", nodeId);
+      viewStateLogger.debug('[ViewState] Added to selection:', nodeId);
     }
-    viewStateLogger.debug(
-      "[ViewState] Selected nodes now:",
-      Array.from(this.state.selectedNodes),
-    );
+    viewStateLogger.debug('[ViewState] Selected nodes now:', Array.from(this.state.selectedNodes));
     this.notifyListeners();
   }
 
@@ -165,9 +154,7 @@ class ViewStateManager {
    * @param {LensConfig} lens - New default lens
    */
   updateDefaultLensAndClearSelection(lens) {
-    viewStateLogger.debug(
-      "[ViewState] updateDefaultLensAndClearSelection called (atomic update)",
-    );
+    viewStateLogger.debug('[ViewState] updateDefaultLensAndClearSelection called (atomic update)');
     this.state.defaultLens = lens;
     this.state.selectedNodes = new Set();
     this.notifyListeners(); // Only notify once
@@ -216,7 +203,7 @@ class ViewStateManager {
       try {
         callback(this.state);
       } catch (error) {
-        viewStateLogger.error("Error in view state listener:", error);
+        viewStateLogger.error('Error in view state listener:', error);
       }
     });
   }
@@ -237,35 +224,31 @@ class ViewStateManager {
     const newBase = newState.defaultLens.baseSet;
 
     if (oldBase.type !== newBase.type) {
-      viewStateLogger.debug("[ViewState] Full re-layout: baseSet type changed");
+      viewStateLogger.debug('[ViewState] Full re-layout: baseSet type changed');
       return true;
     }
 
     if (oldBase.binaryLabel !== newBase.binaryLabel) {
-      viewStateLogger.debug("[ViewState] Full re-layout: binaryLabel changed");
+      viewStateLogger.debug('[ViewState] Full re-layout: binaryLabel changed');
       return true;
     }
 
     if (oldBase.packagePath !== newBase.packagePath) {
-      viewStateLogger.debug("[ViewState] Full re-layout: packagePath changed");
+      viewStateLogger.debug('[ViewState] Full re-layout: packagePath changed');
       return true;
     }
 
     // Check if selected nodes changed (different graph structure)
-    const oldSelection = Array.from(oldState.selectedNodes).sort().join(",");
-    const newSelection = Array.from(newState.selectedNodes).sort().join(",");
+    const oldSelection = Array.from(oldState.selectedNodes).sort().join(',');
+    const newSelection = Array.from(newState.selectedNodes).sort().join(',');
     if (oldSelection !== newSelection) {
-      viewStateLogger.debug(
-        "[ViewState] Full re-layout: selected nodes changed",
-      );
+      viewStateLogger.debug('[ViewState] Full re-layout: selected nodes changed');
       return true;
     }
 
     // Changes to collapse levels, edge types, or visibility settings do NOT require full re-layout
     // These are visual changes that can use cached positions
-    viewStateLogger.debug(
-      "[ViewState] No full re-layout needed - visual change only",
-    );
+    viewStateLogger.debug('[ViewState] No full re-layout needed - visual change only');
     return false;
   }
 
@@ -285,4 +268,4 @@ class ViewStateManager {
 }
 
 // Global instance
-const viewStateManager = new ViewStateManager();
+const _viewStateManager = new ViewStateManager();

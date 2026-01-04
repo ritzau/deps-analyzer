@@ -28,9 +28,28 @@ pre-commit:
       glob: "{BUILD,*.bzl,WORKSPACE,*.bazel}"
       run: go tool buildifier -mode=fix {staged_files} && git add {staged_files}
 
-    # Format JavaScript/TypeScript files with prettier
+    # Format and lint JavaScript/TypeScript/JSON files with Biome
+    biome-format:
+      glob: "*.{js,ts,jsx,tsx,json,jsonc}"
+      run: |
+        if command -v npx > /dev/null 2>&1; then
+          npx --yes @biomejs/biome format --write {staged_files} && git add {staged_files}
+        else
+          echo "Warning: npx not found. Skipping Biome formatting."
+        fi
+
+    biome-lint:
+      glob: "*.{js,ts,jsx,tsx,json,jsonc}"
+      run: |
+        if command -v npx > /dev/null 2>&1; then
+          npx --yes @biomejs/biome lint --write {staged_files} && git add {staged_files}
+        else
+          echo "Warning: npx not found. Skipping Biome linting."
+        fi
+
+    # Format CSS/HTML/Markdown files with prettier (Biome doesn't support these)
     prettier:
-      glob: "*.{js,ts,json,css,html,md}"
+      glob: "*.{css,html,md}"
       run: |
         if command -v npx > /dev/null 2>&1; then
           npx --yes prettier --write {staged_files} && git add {staged_files}
@@ -91,10 +110,22 @@ format:
     bazel:
       run: find . \( -name "BUILD" -o -name "*.bzl" -o -name "WORKSPACE" -o -name "*.bazel" \) -not -path "*/bazel-*" -exec go tool buildifier -mode=fix {} +
 
-    js:
+    biome-format:
       run: |
         if command -v npx > /dev/null 2>&1; then
-          npx --yes prettier --write "pkg/web/static/**/*.{js,css,html}"
+          npx --yes @biomejs/biome format --write "pkg/web/static/**/*.{js,ts,jsx,tsx,json,jsonc}"
+        fi
+
+    biome-lint:
+      run: |
+        if command -v npx > /dev/null 2>&1; then
+          npx --yes @biomejs/biome lint --write "pkg/web/static/**/*.{js,ts,jsx,tsx,json,jsonc}"
+        fi
+
+    prettier:
+      run: |
+        if command -v npx > /dev/null 2>&1; then
+          npx --yes prettier --write "pkg/web/static/**/*.{css,html}" "**/*.md"
         fi
 
     whitespace:

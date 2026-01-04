@@ -5,14 +5,14 @@
  * Settings are persisted across page reloads.
  */
 
-const STORAGE_KEY = "deps-analyzer-view-settings";
+const STORAGE_KEY = 'deps-analyzer-view-settings';
 const STORAGE_VERSION = 1;
 
 /**
  * Save current view state to localStorage
  * @param {Object} state - View state to save
  */
-function saveViewState(state) {
+function _saveViewState(state) {
   try {
     const toSave = {
       version: STORAGE_VERSION,
@@ -27,7 +27,7 @@ function saveViewState(state) {
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch (e) {
-    console.warn("Failed to save view state to localStorage:", e);
+    console.warn('Failed to save view state to localStorage:', e);
   }
 }
 
@@ -35,7 +35,7 @@ function saveViewState(state) {
  * Load view state from localStorage
  * @returns {Object|null} Restored state or null if not available
  */
-function loadViewState() {
+function _loadViewState() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
@@ -46,7 +46,7 @@ function loadViewState() {
 
     // Version check - if version mismatch, ignore stored state
     if (parsed.version !== STORAGE_VERSION) {
-      console.warn("Stored view state version mismatch, using defaults");
+      console.warn('Stored view state version mismatch, using defaults');
       return null;
     }
 
@@ -60,7 +60,7 @@ function loadViewState() {
       activeTab: parsed.activeTab,
     };
   } catch (e) {
-    console.warn("Failed to load view state from localStorage:", e);
+    console.warn('Failed to load view state from localStorage:', e);
     return null;
   }
 }
@@ -118,10 +118,10 @@ function deserializeLens(serialized) {
 /**
  * Clear stored view state
  */
-function clearViewState() {
+function _clearViewState() {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (e) {
-    console.warn("Failed to clear view state from localStorage:", e);
+    console.warn('Failed to clear view state from localStorage:', e);
   }
 }
