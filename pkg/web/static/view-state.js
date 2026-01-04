@@ -17,6 +17,12 @@ class ViewStateManager {
     // Try to load saved state from localStorage
     const savedState = loadViewState();
 
+    // Migrate old 'detail' tab to 'default' (tabs were merged)
+    let activeTab = savedState?.activeTab || 'tree';
+    if (activeTab === 'detail') {
+      activeTab = 'default';
+    }
+
     this.state = {
       // Layer 1: Default lens
       defaultLens: savedState?.defaultLens || cloneLens(DEFAULT_PACKAGE_LENS),
@@ -32,7 +38,7 @@ class ViewStateManager {
       },
 
       // UI state
-      activeTab: savedState?.activeTab || 'tree'  // 'tree' | 'default' | 'detail'
+      activeTab: activeTab  // 'tree' | 'default'
     };
 
     this.listeners = [];

@@ -1070,3 +1070,26 @@ header h1 {
     font-style: italic;
     margin-bottom: 15px;
 }
+
+.detail-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.detail-controls label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.detail-controls select {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 13px;
+}

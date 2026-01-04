@@ -115,35 +115,6 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 		return finalNodes[i].ID < finalNodes[j].ID
 	})
 
-	// 14. TEMPORARY: Add distance info to labels for debugging
-	if len(selectedNodes) > 0 {
-		packagesWithDistance := 0
-		packagesWithoutState := 0
-		for i := range finalNodes {
-			state := nodeStates[finalNodes[i].ID]
-			if state != nil {
-				distStr := "∞"
-				if distInt, ok := state.Distance.(int); ok {
-					distStr = fmt.Sprintf("%d", distInt)
-				}
-				// Use parentheses instead of square brackets (which have special meaning in Cytoscape selectors)
-				finalNodes[i].Label = fmt.Sprintf("%s (d=%s)", finalNodes[i].Label, distStr)
-				if finalNodes[i].Type == "package" {
-					packagesWithDistance++
-				}
-			} else {
-				// Log nodes without state
-				logging.Warn("node has no state", "nodeID", finalNodes[i].ID, "type", finalNodes[i].Type)
-				if finalNodes[i].Type == "package" {
-					packagesWithoutState++
-				}
-			}
-		}
-		if packagesWithDistance > 0 || packagesWithoutState > 0 {
-			logging.Debug("package distance labels", "withState", packagesWithDistance, "withoutState", packagesWithoutState)
-		}
-	}
-
 	logging.Debug("final result", "nodes", len(finalNodes), "edges", len(visibleEdges))
 
 	return &GraphData{

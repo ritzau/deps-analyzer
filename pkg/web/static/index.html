@@ -52,7 +52,6 @@
                 <div class="tab-header">
                     <button class="tab-button active" data-tab="tree">Tree</button>
                     <button class="tab-button" data-tab="default">View</button>
-                    <button class="tab-button" data-tab="detail">Detail</button>
                 </div>
 
                 <!-- Tab Content -->
@@ -84,7 +83,7 @@
                         </div>
                     </div>
 
-                    <!-- Default Config Tab -->
+                    <!-- View Config Tab -->
                     <div id="defaultTab" class="tab-pane">
                         <h4>Hierarchy Level</h4>
                         <label>
@@ -129,30 +128,30 @@
                         <label>
                             <input type="checkbox" id="collapseEdgeTypes"> Collapse to single edge
                         </label>
-                    </div>
 
-                    <!-- Detail Config Tab -->
-                    <div id="detailTab" class="tab-pane">
+                        <h4>Selected Nodes</h4>
                         <p class="hint">Configure what to show when nodes are selected</p>
 
-                        <h4>Distance 0 (Selected)</h4>
-                        <select id="detailD0Files">
-                            <option value="all" selected>All Files</option>
-                            <option value="none">No Files</option>
-                        </select>
+                        <div class="detail-controls">
+                            <label>Selected</label>
+                            <select id="detailD0Files">
+                                <option value="all" selected>All Files</option>
+                                <option value="none">No Files</option>
+                            </select>
 
-                        <h4>Distance 1 (Neighbors)</h4>
-                        <select id="detailD1Files">
-                            <option value="all">All Files</option>
-                            <option value="none" selected>No Files</option>
-                        </select>
+                            <label>Neighbors</label>
+                            <select id="detailD1Files">
+                                <option value="all">All Files</option>
+                                <option value="none" selected>No Files</option>
+                            </select>
 
-                        <h4>Distance 2+ (Rest)</h4>
-                        <select id="detailInfiniteView">
-                            <option value="hide" selected>Hide Completely</option>
-                            <option value="collapsed">Show Collapsed</option>
-                            <option value="default">Same as Default</option>
-                        </select>
+                            <label>Rest</label>
+                            <select id="detailInfiniteView">
+                                <option value="hide" selected>Hide Completely</option>
+                                <option value="collapsed">Show Collapsed</option>
+                                <option value="default">Same as Default</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>

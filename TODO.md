@@ -2,8 +2,6 @@
 
 ## Prioritized backlog
 
-1. Combine the view and details tab into the view tab.
-
 ## Unclear
 
 1. What can we do with a CLI in this case. Can it be used to find
@@ -265,6 +263,38 @@ localStorage, so settings are restored across page reloads.
 
 **Result**: User preferences persist across browser sessions, providing a
 seamless experience when returning to the application.
+
+## Merged View and Detail tabs
+
+Simplified the UI by combining the View and Detail tabs into a single unified
+View tab, reducing cognitive load and making all settings accessible in one
+place.
+
+**Changes**:
+
+1. **Tab structure**: Removed Detail tab, kept only Tree and View tabs
+
+2. **Merged controls**: Added Selected Nodes section to View tab containing:
+   - Selected: File visibility for selected nodes
+   - Neighbors: File visibility for direct neighbors
+   - Rest: Visibility for remaining graph nodes
+
+3. **Label simplification**: Removed distance numbers from labels for clarity
+   - "Distance 0 (Selected)" → "Selected"
+   - "Distance 1 (Neighbors)" → "Neighbors"
+   - "Distance 2+ (Rest)" → "Rest"
+
+4. **Migration handling**: ViewStateManager automatically converts stored
+   'detail' tab selection to 'default' for backward compatibility
+
+**Files modified**:
+- [index.html](pkg/web/static/index.html) - Merged tab structure and controls
+- [styles.css](pkg/web/static/styles.css) - Added detail-controls styling
+- [view-state.js](pkg/web/static/view-state.js) - Tab migration logic
+- TODO.md - Documented change and moved to archive
+
+**Result**: Simpler, more intuitive interface with all view settings in one
+location.
 
 ## LICENSES directory creation
 

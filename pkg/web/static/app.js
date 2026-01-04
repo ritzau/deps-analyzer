@@ -309,11 +309,6 @@ function displayDependencyGraph(graphData) {
     const elements = [
         // Nodes
         ...graphData.nodes.map(node => {
-            // TEMPORARY DEBUG: Log package labels
-            if (node.type === 'package' && node.label.includes('(d=')) {
-                appLogger.debug(`[Frontend] Package node: id=${node.id}, original label="${node.label}", simplified="${simplifyLabel(node.label)}"`);
-            }
-
             const nodeData = {
                 id: node.id,
                 label: simplifyLabel(node.label),
@@ -1354,7 +1349,7 @@ function enrichGraphWithOverlappingInfo(graph, binaries) {
     });
 
     // Mark shared library nodes that have overlapping deps
-    // Use node.id for matching because node.label may have distance annotations
+    // Use node.id for matching because node.label may be simplified
     binaries.forEach(binary => {
         if (binary.kind === 'cc_shared_library' && binary.overlappingDeps) {
             const overlappingCount = Object.keys(binary.overlappingDeps).length;
