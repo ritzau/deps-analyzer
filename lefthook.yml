@@ -11,12 +11,7 @@ pre-commit:
 
     go-imports:
       glob: "*.go"
-      run: |
-        if command -v goimports > /dev/null 2>&1; then
-          goimports -w {staged_files} && git add {staged_files}
-        else
-          echo "Warning: goimports not found. Install with: go install golang.org/x/tools/cmd/goimports@latest"
-        fi
+      run: go tool goimports -w {staged_files} && git add {staged_files}
 
     # Format C++ files
     clang-format:
@@ -31,13 +26,7 @@ pre-commit:
     # Format Bazel/Starlark files
     buildifier:
       glob: "{BUILD,*.bzl,WORKSPACE,*.bazel}"
-      run: |
-        BUILDIFIER=$(go env GOPATH)/bin/buildifier
-        if [ -x "$BUILDIFIER" ]; then
-          "$BUILDIFIER" -mode=fix {staged_files} && git add {staged_files}
-        else
-          echo "Warning: buildifier not found. Install with: go install github.com/bazelbuild/buildtools/buildifier@latest"
-        fi
+      run: go tool buildifier -mode=fix {staged_files} && git add {staged_files}
 
     # Format JavaScript/TypeScript files with prettier
     prettier:
@@ -89,10 +78,7 @@ format:
       run: gofmt -w .
 
     go-imports:
-      run: |
-        if command -v goimports > /dev/null 2>&1; then
-          find . -name "*.go" -not -path "*/bazel-*" -exec goimports -w {} +
-        fi
+      run: find . -name "*.go" -not -path "*/bazel-*" -exec go tool goimports -w {} +
 
     cpp:
       run: |
@@ -101,11 +87,7 @@ format:
         fi
 
     bazel:
-      run: |
-        BUILDIFIER=$(go env GOPATH)/bin/buildifier
-        if [ -x "$BUILDIFIER" ]; then
-          find . \( -name "BUILD" -o -name "*.bzl" -o -name "WORKSPACE" -o -name "*.bazel" \) -not -path "*/bazel-*" -exec "$BUILDIFIER" -mode=fix {} +
-        fi
+      run: find . \( -name "BUILD" -o -name "*.bzl" -o -name "WORKSPACE" -o -name "*.bazel" \) -not -path "*/bazel-*" -exec go tool buildifier -mode=fix {} +
 
     js:
       run: |
@@ -120,3 +102,4 @@ format:
           sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$file"
           echo "" >> "$file"
         done
+

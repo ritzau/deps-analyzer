@@ -2,14 +2,10 @@
 
 ## Prioritized backlog
 
-1. TypeScript preparation
+1. TypeScript migration (+ adding unit tests)
 
-2. Something like pre-commit but without python to:
-
-   - Format the code (go, bazel, c++, ts, js, ...)
-   - Run linters
-
-3. TypeScript migration (+ adding unit tests)
+2. Organize the graph i layers where externals come at the //... ones and system
+   libs at the end.
 
 ## Unclear
 
@@ -30,7 +26,6 @@
 
 4. **Add stress tests and unit tests for concurrent requests**: Create automated
    tests to verify request handling under load:
-
    - Stress test: Rapidly trigger 50-100 settings changes in quick succession
    - Unit tests: Mock fetch() and verify only the last request completes
    - Race condition test: Verify responses arriving out-of-order don't corrupt
@@ -72,6 +67,63 @@
 ---
 
 # Archive
+
+## Linter fixes and mandatory linting
+
+Fixed all linter warnings (errcheck, staticcheck, unused) and made golangci-lint
+mandatory in git hooks.
+
+**Changes**:
+
+- Fixed 19+ errcheck warnings by adding `_ =` to explicitly ignore error returns
+- Removed unnecessary nil checks before range loops (S1031, S1009)
+- Simplified hex address validation using strconv.ParseUint (QF1001)
+- Removed inconsistent nil check (SA5011)
+- Converted if-else to switch statement (QF1003)
+- Removed unused buildBinaryGraphData function (74 lines)
+- Removed unused mutex fields from watcher components
+- Updated lefthook.yml to make golangci-lint mandatory (exit 1 on failure)
+
+**Result**: Clean codebase with zero linter warnings and automatic lint
+enforcement on commit.
+
+## Modern Go tool management
+
+Migrated from tools.go + go install pattern to Go 1.24+ tool directive +
+go tool pattern.
+
+**Implementation**:
+
+- Deleted tools.go (no longer needed)
+- Added `tool` directive to go.mod with 4 build tools:
+  - buildifier, esbuild, lefthook, goimports
+- Tool versions pinned in go.mod indirect requires + go.sum
+- Updated Makefile to use `go tool` commands:
+  - `go tool esbuild` for frontend builds
+  - `go tool lefthook` for git hooks
+  - Renamed install-tools to verification step (no installation needed)
+- Updated lefthook.yml to use `go tool` pattern:
+  - `go tool goimports` for Go imports formatting
+  - `go tool buildifier` for Bazel file formatting
+  - Prettier and clang-format remain direct commands (not Go tools)
+
+**Benefits**:
+
+- No installation step required - tools automatically available via go.mod
+- Version pinning via go.mod + go.sum (same as regular dependencies)
+- Modern approach recommended by Go team for Go 1.24+
+- Cleaner, more maintainable build infrastructure
+
+**Files modified**:
+
+- [go.mod](go.mod) - Added tool directive
+- [Makefile](Makefile) - Updated to use go tool commands
+- [lefthook.yml](lefthook.yml) - Updated to use go tool commands
+- tools.go - Deleted
+
+---
+
+# Archive (Previous)
 
 ## Remove "Base Set" section from default lens
 
@@ -242,14 +294,12 @@ localStorage, so settings are restored across page reloads.
 **Implementation**:
 
 1. **storage.js module**: Created with save/load functions
-
    - `saveViewState()`: Serializes state to JSON and stores in localStorage
    - `loadViewState()`: Deserializes and restores state on page load
    - Handles Set↔Array conversion for JSON compatibility
    - Version check to handle future schema changes
 
 2. **ViewStateManager integration**:
-
    - Constructor loads saved state from localStorage
    - `notifyListeners()` automatically saves state on every change
    - Navigation filter updates also trigger saves
@@ -294,13 +344,11 @@ place.
 1. **Tab structure**: Removed Detail tab, kept only Tree and View tabs
 
 2. **Merged controls**: Added Selected Nodes section to View tab containing:
-
    - Selected: File visibility for selected nodes
    - Neighbors: File visibility for direct neighbors
    - Rest: Visibility for remaining graph nodes
 
 3. **Label simplification**: Removed distance numbers from labels for clarity
-
    - "Distance 0 (Selected)" → "Selected"
    - "Distance 1 (Neighbors)" → "Neighbors"
    - "Distance 2+ (Rest)" → "Rest"
@@ -328,7 +376,6 @@ requirements for BSD-3-Clause and MIT licenses.
 1. **LICENSES/ directory**: Created with 12 files containing full license texts
 
 2. **Go dependencies (BSD-3-Clause)**: 5 files
-
    - pflag.txt - github.com/spf13/pflag
    - fsnotify.txt - github.com/fsnotify/fsnotify
    - uuid.txt - github.com/google/uuid
@@ -336,18 +383,15 @@ requirements for BSD-3-Clause and MIT licenses.
    - gonum.txt - gonum.org/v1/gonum
 
 3. **Frontend JavaScript libraries (MIT)**: 3 files
-
    - cytoscape.txt - Cytoscape.js
    - dagre.txt - dagre
    - cytoscape-dagre.txt - cytoscape-dagre
 
 4. **C++ libraries (MIT)**: 2 files
-
    - fmt.txt - fmtlib/fmt
    - nlohmann-json.txt - nlohmann/json
 
 5. **Assets**: 1 file
-
    - flaticon-filter.txt - Filter icon from Flaticon
 
 6. **README.md**: Index file listing all licenses with links
@@ -374,7 +418,6 @@ replacing Go's standard flag package which only supports single-dash flags.
 1. **Added pflag dependency**: github.com/spf13/pflag v1.0.10
 
 2. **Short and long options**: Each flag now has both forms:
-
    - `-w` / `--workspace` for workspace path
    - `-p` / `--port` for server port
    - `-v` / `--verbose` for verbosity (repeatable)
@@ -398,13 +441,11 @@ Added flexible verbosity control with both incremental (-v) and explicit
 **Implementation**:
 
 1. **Incremental verbosity**: -v flag can be repeated
-
    - Default (no flag): Info level
    - `-v`: Debug level
    - `-vv` or more: Trace level
 
 2. **Explicit verbosity**: --verbosity flag for direct level setting
-
    - T(race), D(ebug), I(nfo), W(arn), E(rror)
    - Takes precedence over -v if both specified
 
@@ -449,7 +490,6 @@ include the same cc_library targets (potential duplicate symbols at runtime).
 
 1. When the codebase migrated to backend lens rendering, the
    `enrichGraphWithOverlappingInfo()` function stopped being called because:
-
    - Binary data was no longer being fetched from the backend
    - The `/api/binaries` endpoint didn't exist
    - Graph enrichment step was removed from the rendering pipeline
@@ -1806,4 +1846,3 @@ re-analyze when BUILD files or build artifacts change.
 **Status**: Implemented with fsnotify-based file watcher, smart debouncing (1.5s
 quiet, 10s max), intelligent change detection for incremental updates, and
 discrete UI status indicator. Run with `--watch` flag.
-

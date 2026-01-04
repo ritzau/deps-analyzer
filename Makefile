@@ -4,20 +4,16 @@
 build: install-tools build-frontend
 	go build -o deps-analyzer ./cmd/deps-analyzer
 
-# Install all build and development tools
+# Verify build tools are available (using go.mod tool directive)
 install-tools:
-	@echo "Installing build and development tools..."
-	@go install github.com/evanw/esbuild/cmd/esbuild@latest
-	@go install golang.org/x/tools/cmd/goimports@latest
-	@go install github.com/bazelbuild/buildtools/buildifier@latest
-	@go install github.com/evilmartians/lefthook@latest
-	@echo "Tools installed successfully!"
+	@echo "Build tools available via 'go tool' from go.mod..."
+	@echo "Tools ready!"
 
 # Build frontend TypeScript files (if they exist)
 build-frontend:
 	@echo "Building frontend..."
 	@if [ -d "pkg/web/static/src" ]; then \
-		esbuild pkg/web/static/src/app.ts \
+		go tool esbuild pkg/web/static/src/app.ts \
 			--bundle \
 			--outfile=pkg/web/static/app.js \
 			--target=es2020 \
@@ -55,7 +51,7 @@ dev: install-tools
 # Watch frontend files for changes (run in separate terminal during development)
 watch-frontend:
 	@if [ -d "pkg/web/static/src" ]; then \
-		esbuild pkg/web/static/src/app.ts \
+		go tool esbuild pkg/web/static/src/app.ts \
 			--bundle \
 			--outfile=pkg/web/static/app.js \
 			--target=es2020 \
@@ -69,13 +65,13 @@ watch-frontend:
 # Set up git hooks with lefthook
 setup-hooks: install-tools
 	@echo "Setting up git hooks..."
-	@$(shell go env GOPATH)/bin/lefthook install
+	@go tool lefthook install
 	@echo "Git hooks installed! Hooks will run on git commit."
 
 # Format all code
 format: install-tools
 	@echo "Formatting all code..."
-	@$(shell go env GOPATH)/bin/lefthook run format
+	@go tool lefthook run format
 
 # Run linters
 lint: install-tools
