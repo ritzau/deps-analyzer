@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -40,17 +41,12 @@ type SymbolDependency struct {
 
 // isHexAddress checks if a string looks like a hexadecimal address
 func isHexAddress(s string) bool {
-	if len(s) == 0 {
-		return false
+	if len(s) < 8 {
+		return false // Addresses are typically 8 or 16 hex digits
 	}
-	// Hex addresses are all hex digits (0-9, a-f, A-F)
-	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return false
-		}
-	}
-	// Also check it's a reasonable length (typically 8 or 16 hex digits)
-	return len(s) >= 8
+	// Try to parse as hexadecimal - if it succeeds, it's all hex digits
+	_, err := strconv.ParseUint(s, 16, 64)
+	return err == nil
 }
 
 // ParseNMOutput parses the output of nm command for a single object file
