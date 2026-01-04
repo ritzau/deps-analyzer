@@ -110,16 +110,10 @@ format:
     bazel:
       run: find . \( -name "BUILD" -o -name "*.bzl" -o -name "WORKSPACE" -o -name "*.bazel" \) -not -path "*/bazel-*" -exec go tool buildifier -mode=fix {} +
 
-    biome-format:
+    biome:
       run: |
         if command -v npx > /dev/null 2>&1; then
-          npx --yes @biomejs/biome format --write "pkg/web/static/**/*.{js,ts,jsx,tsx,json,jsonc}"
-        fi
-
-    biome-lint:
-      run: |
-        if command -v npx > /dev/null 2>&1; then
-          npx --yes @biomejs/biome lint --write "pkg/web/static/**/*.{js,ts,jsx,tsx,json,jsonc}"
+          find pkg/web/static -type f \( -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" -o -name "*.json" -o -name "*.jsonc" \) -exec npx --yes @biomejs/biome format --write {} +
         fi
 
     prettier:
