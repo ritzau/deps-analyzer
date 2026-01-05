@@ -56,6 +56,8 @@
  * Default lens: Package-level view
  * Shows targets but hides individual files
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: Used from view-state.js
 const DEFAULT_PACKAGE_LENS = {
   name: 'Package View',
   baseSet: { type: 'full-graph' },
@@ -87,6 +89,8 @@ const DEFAULT_PACKAGE_LENS = {
  * Shows files in selected nodes (distance 0), hides files in neighbors (distance 1),
  * and hides rest of graph (distance infinite)
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: Used from view-state.js
 const DEFAULT_DETAIL_LENS = {
   name: 'Detail View',
   baseSet: { type: 'full-graph' },
@@ -144,6 +148,8 @@ const DEFAULT_DETAIL_LENS = {
  * @param {LensConfig} lens - Lens to clone
  * @returns {LensConfig} Cloned lens
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: Used from other files
 function cloneLens(lens) {
   return {
     name: lens.name,

@@ -268,4 +268,5 @@ class ViewStateManager {
 }
 
 // Global instance
+// biome-ignore lint/correctness/noUnusedVariables: Used globally
 const viewStateManager = new ViewStateManager();

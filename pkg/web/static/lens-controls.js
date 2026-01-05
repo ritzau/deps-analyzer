@@ -16,6 +16,8 @@ const lensLogger = new Logger();
  * Initialize all lens controls
  * Call this after DOM is loaded
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: Used from app.js
 function initializeLensControls() {
   setupTabSwitching();
   setupResetControls();
@@ -41,7 +43,7 @@ function syncUIWithState() {
   }
 
   document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
-  const activeTabPane = document.getElementById(state.activeTab + 'Tab');
+  const activeTabPane = document.getElementById(`${state.activeTab}Tab`);
   if (activeTabPane) {
     activeTabPane.classList.add('active');
   }
@@ -128,7 +130,7 @@ function setupTabSwitching() {
       // Update active pane
       const tabName = button.getAttribute('data-tab');
       document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
-      const tabPane = document.getElementById(tabName + 'Tab');
+      const tabPane = document.getElementById(`${tabName}Tab`);
       if (tabPane) {
         tabPane.classList.add('active');
       }
@@ -225,7 +227,7 @@ function setupDefaultLensControls() {
   collapseLevelRadios.forEach((radio) => {
     radio.addEventListener('change', (e) => {
       if (e.target.checked) {
-        const level = parseInt(e.target.value);
+        const level = parseInt(e.target.value, 10);
         lensLogger.debug('[LensControls] Collapse level changed to:', level);
         const currentLens = cloneLens(viewStateManager.getState().defaultLens);
 

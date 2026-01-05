@@ -12,6 +12,8 @@ const STORAGE_VERSION = 1;
  * Save current view state to localStorage
  * @param {Object} state - View state to save
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: Used in view-state.js
 function saveViewState(state) {
   try {
     const toSave = {
@@ -35,6 +37,8 @@ function saveViewState(state) {
  * Load view state from localStorage
  * @returns {Object|null} Restored state or null if not available
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: Use in view-state.js
 function loadViewState() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -113,15 +117,4 @@ function deserializeLens(serialized) {
       minimumCount: serialized.edgeRules.minimumCount,
     },
   };
-}
-
-/**
- * Clear stored view state
- */
-function clearViewState() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (e) {
-    console.warn('Failed to clear view state from localStorage:', e);
-  }
 }
