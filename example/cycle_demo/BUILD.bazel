@@ -8,4 +8,5 @@ cc_library(
         "a.h",
         "b.h",
     ],
+    visibility = ["//visibility:public"],
 )

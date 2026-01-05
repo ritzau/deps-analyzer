@@ -1,5 +1,6 @@
 cc_binary(
     name = "foobar",
+    srcs = ["foobar.c"],
     linkopts = ["-ldl"],
     deps = [
         "//cycle_demo",
