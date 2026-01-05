@@ -268,4 +268,4 @@ class ViewStateManager {
 }
 
 // Global instance
-const _viewStateManager = new ViewStateManager();
+const viewStateManager = new ViewStateManager();

@@ -12,7 +12,7 @@ const STORAGE_VERSION = 1;
  * Save current view state to localStorage
  * @param {Object} state - View state to save
  */
-function _saveViewState(state) {
+function saveViewState(state) {
   try {
     const toSave = {
       version: STORAGE_VERSION,
@@ -35,7 +35,7 @@ function _saveViewState(state) {
  * Load view state from localStorage
  * @returns {Object|null} Restored state or null if not available
  */
-function _loadViewState() {
+function loadViewState() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
@@ -118,7 +118,7 @@ function deserializeLens(serialized) {
 /**
  * Clear stored view state
  */
-function _clearViewState() {
+function clearViewState() {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (e) {

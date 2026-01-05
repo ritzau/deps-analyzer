@@ -16,7 +16,7 @@ const lensLogger = new Logger();
  * Initialize all lens controls
  * Call this after DOM is loaded
  */
-function _initializeLensControls() {
+function initializeLensControls() {
   setupTabSwitching();
   setupResetControls();
   setupDefaultLensControls();
@@ -41,7 +41,7 @@ function syncUIWithState() {
   }
 
   document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
-  const activeTabPane = document.getElementById(`${state.activeTab}Tab`);
+  const activeTabPane = document.getElementById(state.activeTab + 'Tab');
   if (activeTabPane) {
     activeTabPane.classList.add('active');
   }
@@ -128,7 +128,7 @@ function setupTabSwitching() {
       // Update active pane
       const tabName = button.getAttribute('data-tab');
       document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
-      const tabPane = document.getElementById(`${tabName}Tab`);
+      const tabPane = document.getElementById(tabName + 'Tab');
       if (tabPane) {
         tabPane.classList.add('active');
       }
@@ -225,7 +225,7 @@ function setupDefaultLensControls() {
   collapseLevelRadios.forEach((radio) => {
     radio.addEventListener('change', (e) => {
       if (e.target.checked) {
-        const level = parseInt(e.target.value, 10);
+        const level = parseInt(e.target.value);
         lensLogger.debug('[LensControls] Collapse level changed to:', level);
         const currentLens = cloneLens(viewStateManager.getState().defaultLens);
 

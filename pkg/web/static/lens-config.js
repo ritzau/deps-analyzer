@@ -56,7 +56,7 @@
  * Default lens: Package-level view
  * Shows targets but hides individual files
  */
-const _DEFAULT_PACKAGE_LENS = {
+const DEFAULT_PACKAGE_LENS = {
   name: 'Package View',
   baseSet: { type: 'full-graph' },
   distanceRules: [
@@ -87,7 +87,7 @@ const _DEFAULT_PACKAGE_LENS = {
  * Shows files in selected nodes (distance 0), hides files in neighbors (distance 1),
  * and hides rest of graph (distance infinite)
  */
-const _DEFAULT_DETAIL_LENS = {
+const DEFAULT_DETAIL_LENS = {
   name: 'Detail View',
   baseSet: { type: 'full-graph' },
   distanceRules: [
@@ -144,7 +144,7 @@ const _DEFAULT_DETAIL_LENS = {
  * @param {LensConfig} lens - Lens to clone
  * @returns {LensConfig} Cloned lens
  */
-function _cloneLens(lens) {
+function cloneLens(lens) {
   return {
     name: lens.name,
     baseSet: { ...lens.baseSet },

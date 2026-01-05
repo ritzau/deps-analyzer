@@ -260,34 +260,6 @@ function showNotification(message, duration = 3000) {
   }, duration);
 }
 
-function _displayUncoveredFiles(files) {
-  const listEl = document.getElementById('uncoveredList');
-  listEl.innerHTML = '';
-
-  files.forEach((file) => {
-    const fileDiv = document.createElement('div');
-    fileDiv.className = 'file-item';
-
-    const pathDiv = document.createElement('div');
-    pathDiv.className = 'file-path';
-    pathDiv.textContent = file.Path;
-
-    const packageDiv = document.createElement('div');
-    packageDiv.className = 'file-package';
-    packageDiv.textContent = `Package: ${file.Package}`;
-
-    const suggestionDiv = document.createElement('div');
-    suggestionDiv.className = 'file-suggestion';
-    suggestionDiv.textContent = '💡 Add to BUILD.bazel or remove if unused';
-
-    fileDiv.appendChild(pathDiv);
-    fileDiv.appendChild(packageDiv);
-    fileDiv.appendChild(suggestionDiv);
-
-    listEl.appendChild(fileDiv);
-  });
-}
-
 // Position caching is no longer needed - we do incremental Cytoscape updates
 // Nodes that already exist keep their positions automatically when we only add/remove changed elements
 
@@ -1053,34 +1025,6 @@ function setupEventHandlers() {
   });
 }
 
-/**
- * Apply collapse states to parent nodes in the graph
- * Collapsed parent nodes will have their children hidden
- */
-function _applyCollapseStates(nodeStates) {
-  if (!cy || !nodeStates) return;
-
-  appLogger.debug('[CollapseStates] Applying collapse states to graph');
-
-  // First, show all nodes (reset state)
-  cy.nodes().show();
-
-  // Then hide descendants of collapsed parent nodes
-  cy.nodes(':parent').forEach((parentNode) => {
-    const parentId = parentNode.data('id');
-    const state = nodeStates.get(parentId);
-
-    if (state?.collapsed) {
-      // Hide all descendants (children and their children recursively)
-      const descendants = parentNode.descendants();
-      descendants.hide();
-      appLogger.debug(
-        `[CollapseStates] Collapsed ${parentId}, hiding ${descendants.length} descendants`
-      );
-    }
-  });
-}
-
 // Update Cytoscape canvas size based on actual container dimensions
 function updateCytoscapeSize() {
   const container = document.getElementById('cy');
@@ -1118,18 +1062,6 @@ let analysisComplete = false;
 let connectionLost = false;
 let lastSuccessfulRequest = Date.now();
 
-// Map workspace status state to loading step
-const _statusToStep = {
-  initializing: 1,
-  bazel_querying: 1,
-  analyzing_deps: 2,
-  analyzing_symbols: 3,
-  discovering_files: 4,
-  targets_ready: 5,
-  analyzing_binaries: 5,
-  ready: 6,
-};
-
 // Handle connection lost
 function handleConnectionLost(source) {
   if (connectionLost) {
@@ -1150,11 +1082,6 @@ function showConnectionLostModal() {
 
   messageEl.textContent = 'The backend server is not running. Restart the server to continue.';
   modal.style.display = 'flex';
-}
-
-// Hide connection lost modal
-function _hideConnectionLostModal() {
-  document.getElementById('connectionLostModal').style.display = 'none';
 }
 
 // Wrapper for fetch that detects connection failures
@@ -1631,98 +1558,6 @@ document.addEventListener('DOMContentLoaded', () => {
   subscribeToTargetGraph();
 });
 
-// Modal functions for showing target details
-async function _showTargetDetails(targetLabel) {
-  try {
-    // Encode the target label for URL
-    const encodedLabel = encodeURIComponent(targetLabel);
-    const response = await monitoredFetch(`/api/target/${encodedLabel}`);
-
-    if (!response.ok) {
-      appLogger.error('Failed to fetch target details');
-      return;
-    }
-
-    const details = await response.json();
-    displayTargetModal(details);
-  } catch (error) {
-    appLogger.error('Error fetching target details:', error);
-  }
-}
-
-function displayTargetModal(details) {
-  const modal = document.getElementById('targetModal');
-  const labelEl = document.getElementById('modalTargetLabel');
-  const filesEl = document.getElementById('modalFiles');
-  const incomingEl = document.getElementById('modalIncoming');
-  const outgoingEl = document.getElementById('modalOutgoing');
-
-  // Set title
-  labelEl.textContent = simplifyLabel(details.targetLabel);
-
-  // Display files in target
-  filesEl.innerHTML = '';
-  if (details.files && details.files.length > 0) {
-    details.files.forEach((file) => {
-      const fileDiv = document.createElement('div');
-      fileDiv.className = `modal-file-item ${file.type}`;
-      fileDiv.textContent = file.path;
-      filesEl.appendChild(fileDiv);
-    });
-  } else {
-    filesEl.innerHTML = '<div class="modal-empty">No files found (may need .d files)</div>';
-  }
-
-  // Display incoming dependencies
-  incomingEl.innerHTML = '';
-  if (details.incomingFileDeps && details.incomingFileDeps.length > 0) {
-    details.incomingFileDeps.forEach((dep) => {
-      const depDiv = document.createElement('div');
-      depDiv.className = 'modal-dep-item';
-
-      const fileDiv = document.createElement('div');
-      fileDiv.className = 'modal-dep-file';
-      fileDiv.textContent = `${dep.sourceFile} → ${dep.targetFile}`;
-
-      const targetDiv = document.createElement('div');
-      targetDiv.className = 'modal-dep-target';
-      targetDiv.textContent = `From: ${dep.sourceTarget}`;
-
-      depDiv.appendChild(fileDiv);
-      depDiv.appendChild(targetDiv);
-      incomingEl.appendChild(depDiv);
-    });
-  } else {
-    incomingEl.innerHTML = '<div class="modal-empty">No incoming dependencies</div>';
-  }
-
-  // Display outgoing dependencies
-  outgoingEl.innerHTML = '';
-  if (details.outgoingFileDeps && details.outgoingFileDeps.length > 0) {
-    details.outgoingFileDeps.forEach((dep) => {
-      const depDiv = document.createElement('div');
-      depDiv.className = 'modal-dep-item';
-
-      const fileDiv = document.createElement('div');
-      fileDiv.className = 'modal-dep-file';
-      fileDiv.textContent = `${dep.sourceFile} → ${dep.targetFile}`;
-
-      const targetDiv = document.createElement('div');
-      targetDiv.className = 'modal-dep-target';
-      targetDiv.textContent = `To: ${dep.targetTarget}`;
-
-      depDiv.appendChild(fileDiv);
-      depDiv.appendChild(targetDiv);
-      outgoingEl.appendChild(depDiv);
-    });
-  } else {
-    outgoingEl.innerHTML = '<div class="modal-empty">No outgoing dependencies</div>';
-  }
-
-  // Show modal
-  modal.style.display = 'block';
-}
-
 // Close modal handlers
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('targetModal');
@@ -1745,11 +1580,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // Tree Browser Implementation
 // ============================================================================
 
-const _treeData = null;
 let analysisData = null; // Store full analysis data
 let packageGraph = null; // Store the original package-level graph
 let binaryData = null; // Store binary analysis data for overlapping dependency detection
-const _binaryGraph = null; // Store the binary-level graph
 let cy = null; // Store the Cytoscape instance
 let allTargetNodes = []; // Store all target nodes for client-side filtering
 
@@ -1942,9 +1775,6 @@ function applyGraphDiff(currentGraph, diff) {
   };
 }
 
-// Track previous state for detecting when full re-layout is needed
-let _previousViewState = null;
-
 // Update navigation item highlighting based on selection
 function updateNavigationHighlighting(selectedNodes) {
   const navItems = document.querySelectorAll('.nav-item');
@@ -1986,7 +1816,7 @@ viewStateManager.addListener(async (newState) => {
   updateNavigationHighlighting(newState.selectedNodes);
 
   // Deep clone the state to avoid reference issues
-  _previousViewState = {
+  previousViewState = {
     ...newState,
     selectedNodes: new Set(newState.selectedNodes),
     defaultLens: JSON.parse(JSON.stringify(newState.defaultLens)),
