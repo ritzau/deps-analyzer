@@ -76,13 +76,13 @@ type Package struct {
 
 // PackageDependency represents dependencies between two packages
 type PackageDependency struct {
-	From         string                    `json:"from"`         // Source package path
-	To           string                    `json:"to"`           // Target package path
-	Dependencies map[DependencyType][]Edge `json:"dependencies"` // Grouped by type
+	From         string                            `json:"from"`         // Source package path
+	To           string                            `json:"to"`           // Target package path
+	Dependencies map[DependencyType][]InternalEdge `json:"dependencies"` // Grouped by type
 }
 
-// Edge represents a single dependency edge between targets
-type Edge struct {
+// InternalEdge represents a single dependency edge between targets
+type InternalEdge struct {
 	FromTarget string `json:"fromTarget"` // Source target label
 	ToTarget   string `json:"toTarget"`   // Target dependency label
 }
@@ -164,13 +164,13 @@ func (m *Module) GetPackageDependencies(packagePath string) []PackageDependency 
 			pkgDep = &PackageDependency{
 				From:         packagePath,
 				To:           toTarget.Package,
-				Dependencies: make(map[DependencyType][]Edge),
+				Dependencies: make(map[DependencyType][]InternalEdge),
 			}
 			depsByPackage[toTarget.Package] = pkgDep
 		}
 
 		// Add edge
-		edge := Edge{
+		edge := InternalEdge{
 			FromTarget: dep.From,
 			ToTarget:   dep.To,
 		}
@@ -213,13 +213,13 @@ func (m *Module) GetAllPackageDependencies() []PackageDependency {
 			pkgDep = &PackageDependency{
 				From:         fromTarget.Package,
 				To:           toTarget.Package,
-				Dependencies: make(map[DependencyType][]Edge),
+				Dependencies: make(map[DependencyType][]InternalEdge),
 			}
 			depsByPair[key] = pkgDep
 		}
 
 		// Add edge
-		edge := Edge{
+		edge := InternalEdge{
 			FromTarget: dep.From,
 			ToTarget:   dep.To,
 		}
