@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ritzau/deps-analyzer/pkg/analysis/api"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
 	"github.com/ritzau/deps-analyzer/pkg/config"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
@@ -18,8 +19,8 @@ import (
 type AnalysisRunner struct {
 	workspace string
 	server    *web.Server
-	mu        sync.Mutex // Prevent concurrent analysis runs
-	Sources   []Source   // Registered sources
+	mu        sync.Mutex   // Prevent concurrent analysis runs
+	Sources   []api.Source // Registered sources
 	Config    *config.Config
 	Graph     *model.Graph
 
@@ -51,12 +52,12 @@ func NewAnalysisRunner(workspace string, server *web.Server, cfg *config.Config)
 		server:    server,
 		Config:    cfg,
 		Graph:     model.NewGraph(),
-		Sources:   make([]Source, 0),
+		Sources:   make([]api.Source, 0),
 	}
 }
 
 // RegisterSource adds a source to the runner
-func (ar *AnalysisRunner) RegisterSource(s Source) {
+func (ar *AnalysisRunner) RegisterSource(s api.Source) {
 	ar.Sources = append(ar.Sources, s)
 }
 

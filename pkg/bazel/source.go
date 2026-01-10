@@ -3,20 +3,20 @@ package bazel
 import (
 	"context"
 
-	"github.com/ritzau/deps-analyzer/pkg/analysis"
+	"github.com/ritzau/deps-analyzer/pkg/analysis/api"
 	"github.com/ritzau/deps-analyzer/pkg/config"
 	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"github.com/ritzau/deps-analyzer/pkg/model"
 )
 
-// TargetSource implements analysis.Source for Bazel targets
+// TargetSource implements api.Source for Bazel targets
 type TargetSource struct {
 	executor *Executor
 	parser   *Parser
 }
 
 // NewTargetSource creates a new Bazel target source
-func NewTargetSource() analysis.Source {
+func NewTargetSource() api.Source {
 	return &TargetSource{
 		executor: NewExecutor(),
 		parser:   NewParser(),
