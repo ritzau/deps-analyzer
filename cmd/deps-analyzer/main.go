@@ -15,6 +15,7 @@ import (
 	"github.com/ritzau/deps-analyzer/pkg/config"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/logging"
+	"github.com/ritzau/deps-analyzer/pkg/symbols"
 	"github.com/ritzau/deps-analyzer/pkg/watcher"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 	"github.com/spf13/pflag"
@@ -105,6 +106,7 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 
 	// Register new modular sources
 	runner.RegisterSource(deps.NewCompileDepsSource())
+	runner.RegisterSource(symbols.NewSymbolSource())
 	// runner.RegisterSource(bazel.NewTargetSource()) // Not yet enabling to avoid dupes/perf hit, or maybe we should?
 	// For now, let's enable CompileDepsSource as it maps to Graph, while legacy maps to Module.
 	// They don't conflict in data structures (Graph vs Module), but they duplicate work.
