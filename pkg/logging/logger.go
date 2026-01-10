@@ -11,29 +11,37 @@ type contextKey string
 
 const requestIDKey contextKey = "requestID"
 
-var logger *slog.Logger
+var (
+	logger       *slog.Logger
+	programLevel = new(slog.LevelVar) // Info by default
+)
 
 func init() {
+	programLevel.Set(slog.LevelInfo)
 	// Initialize with compact handler for readable console output
-	// Can be replaced with JSON handler for production
 	handler := NewCompactHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo, // Default level
+		Level: programLevel,
 	})
 	logger = slog.New(handler)
 }
 
-// SetLevel changes the logging level
+// New creates a new logger instance with a specific tag
+func New(tag string) *slog.Logger {
+	return logger.With("tag", tag)
+}
+
+// SetLevel changes the logging level dynamically for all loggers
 func SetLevel(level slog.Level) {
-	handler := NewCompactHandler(os.Stdout, &slog.HandlerOptions{
-		Level: level,
-	})
-	logger = slog.New(handler)
+	programLevel.Set(level)
 }
 
 // SetJSONOutput switches to JSON format output
+// Note: This replaces the root logger, so derived loggers created before this
+// will continue to use the old handler. Call this early!
 func SetJSONOutput(level slog.Level) {
+	programLevel.Set(level)
 	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: level,
+		Level: programLevel,
 	})
 	logger = slog.New(handler)
 }
