@@ -12,6 +12,7 @@ import (
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
+	"github.com/ritzau/deps-analyzer/pkg/config"
 	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"github.com/ritzau/deps-analyzer/pkg/watcher"
 	"github.com/ritzau/deps-analyzer/pkg/web"
@@ -80,7 +81,17 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 	}
 
 	// Create analysis runner
-	runner := analysis.NewAnalysisRunner(workspace, server)
+	// Create analysis runner
+	config := &config.Config{
+		Workspace:   workspace,
+		WebMode:     true,
+		Port:        port,
+		Watch:       watch,
+		OpenBrowser: open,
+	}
+	// TODO: Replace manual config construction with config.Load(flagSet) once refactor is complete
+
+	runner := analysis.NewAnalysisRunner(workspace, server, config)
 
 	// Inject legacy dependencies to avoid import cycles / decouple implementation
 	runner.FnQueryWorkspace = bazel.QueryWorkspace

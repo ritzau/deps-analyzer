@@ -48,3 +48,18 @@ func (g *Graph) AddEdge(edge *Edge) {
 	}
 	g.Edges = append(g.Edges, edge)
 }
+
+// Merge merges another graph into this graph.
+// Nodes with the same ID are updated (last write wins).
+// Edges are appended.
+func (g *Graph) Merge(other *Graph) {
+	if other == nil {
+		return
+	}
+	for _, node := range other.Nodes {
+		g.AddNode(node)
+	}
+	for _, edge := range other.Edges {
+		g.AddEdge(edge)
+	}
+}

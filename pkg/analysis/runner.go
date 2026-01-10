@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
+	"github.com/ritzau/deps-analyzer/pkg/config"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"github.com/ritzau/deps-analyzer/pkg/model"
@@ -19,6 +20,8 @@ type AnalysisRunner struct {
 	server    *web.Server
 	mu        sync.Mutex // Prevent concurrent analysis runs
 	Sources   []Source   // Registered sources
+	Config    *config.Config
+	Graph     *model.Graph
 
 	// Dependency Injection functions to break import cycles
 	// These placeholders allow main.go to inject implementations from pkg/bazel
@@ -42,10 +45,12 @@ type AnalysisOptions struct {
 }
 
 // NewAnalysisRunner creates a new analysis runner
-func NewAnalysisRunner(workspace string, server *web.Server) *AnalysisRunner {
+func NewAnalysisRunner(workspace string, server *web.Server, cfg *config.Config) *AnalysisRunner {
 	return &AnalysisRunner{
 		workspace: workspace,
 		server:    server,
+		Config:    cfg,
+		Graph:     model.NewGraph(),
 		Sources:   make([]Source, 0),
 	}
 }
@@ -62,6 +67,18 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	defer ar.mu.Unlock()
 
 	logging.Info("starting analysis", "reason", opts.Reason)
+
+	// Run registered sources
+	for _, src := range ar.Sources {
+		logging.Info("running source", "name", src.Name())
+		graph, err := src.Run(ctx, ar.Config)
+		if err != nil {
+			logging.Error("source failed", "name", src.Name(), "error", err)
+			continue
+		}
+		ar.Graph.Merge(graph)
+		logging.Info("source complete", "name", src.Name())
+	}
 
 	// Phase 1: Bazel Query
 	module := ar.server.GetModule()
@@ -227,4 +244,9 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 
 	logging.Info("analysis complete", "reason", opts.Reason)
 	return nil
+}
+
+// GetGraph returns the current unified graph
+func (ar *AnalysisRunner) GetGraph() *model.Graph {
+	return ar.Graph
 }
