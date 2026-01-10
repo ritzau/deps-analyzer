@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ritzau/deps-analyzer/pkg/bazel"
 	"github.com/ritzau/deps-analyzer/pkg/binaries"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
 	"github.com/ritzau/deps-analyzer/pkg/logging"
+	"github.com/ritzau/deps-analyzer/pkg/model"
 	"github.com/ritzau/deps-analyzer/pkg/symbols"
 	"github.com/ritzau/deps-analyzer/pkg/web"
 )
@@ -18,6 +18,17 @@ type AnalysisRunner struct {
 	workspace string
 	server    *web.Server
 	mu        sync.Mutex // Prevent concurrent analysis runs
+	Sources   []Source   // Registered sources
+
+	// Dependency Injection functions to break import cycles
+	// These placeholders allow main.go to inject implementations from pkg/bazel
+	// without this package depending on pkg/bazel.
+	FnQueryWorkspace        func(workspace string) (*model.Module, error)
+	FnAddCompileDeps        func(module *model.Module, workspace string) error
+	FnNormalizeSourcePath   func(path string) string
+	FnDiscoverSourceFiles   func(workspace string) (map[string]bool, error)
+	FnFindUncoveredFiles    func(discovered map[string]bool, fileToTarget map[string]string) []string
+	FnAddSymbolDependencies func(module *model.Module, workspace string) error
 }
 
 // AnalysisOptions configures which analysis phases to run
@@ -35,7 +46,13 @@ func NewAnalysisRunner(workspace string, server *web.Server) *AnalysisRunner {
 	return &AnalysisRunner{
 		workspace: workspace,
 		server:    server,
+		Sources:   make([]Source, 0),
 	}
+}
+
+// RegisterSource adds a source to the runner
+func (ar *AnalysisRunner) RegisterSource(s Source) {
+	ar.Sources = append(ar.Sources, s)
 }
 
 // Run executes the analysis with the given options
@@ -49,20 +66,24 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	// Phase 1: Bazel Query
 	module := ar.server.GetModule()
 	if !opts.SkipBazelQuery {
-		_ = ar.server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 6)
-		logging.Info("querying bazel module")
+		if ar.FnQueryWorkspace != nil {
+			_ = ar.server.PublishWorkspaceStatus("bazel_querying", "Querying Bazel workspace...", 1, 6)
+			logging.Info("querying bazel module")
 
-		var err error
-		module, err = bazel.QueryWorkspace(ar.workspace)
-		if err != nil {
-			logging.Error("bazel query failed", "error", err)
-			_ = ar.server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 6)
-			return fmt.Errorf("bazel query failed: %w", err)
+			var err error
+			module, err = ar.FnQueryWorkspace(ar.workspace)
+			if err != nil {
+				logging.Error("bazel query failed", "error", err)
+				_ = ar.server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 6)
+				return fmt.Errorf("bazel query failed: %w", err)
+			}
+
+			logging.Info("bazel query complete", "targets", len(module.Targets), "dependencies", len(module.Dependencies))
+			ar.server.SetModule(module)
+			_ = ar.server.PublishTargetGraph("partial_data", false)
+		} else {
+			logging.Warn("FnQueryWorkspace not set, skipping bazel query")
 		}
-
-		logging.Info("bazel query complete", "targets", len(module.Targets), "dependencies", len(module.Dependencies))
-		ar.server.SetModule(module)
-		_ = ar.server.PublishTargetGraph("partial_data", false)
 	}
 
 	// Phase 2: Compile Dependencies
@@ -80,10 +101,12 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		}
 
 		// Add target-level compile dependencies
-		if err := bazel.AddCompileDependencies(module, ar.workspace); err != nil {
-			logging.Warn("could not add compile dependencies", "error", err)
-		} else {
-			logging.Info("added compile dependencies", "totalDependencies", len(module.Dependencies))
+		if ar.FnAddCompileDeps != nil {
+			if err := ar.FnAddCompileDeps(module, ar.workspace); err != nil {
+				logging.Warn("could not add compile dependencies", "error", err)
+			} else {
+				logging.Info("added compile dependencies", "totalDependencies", len(module.Dependencies))
+			}
 		}
 		_ = ar.server.PublishTargetGraph("partial_data", false)
 	}
@@ -96,44 +119,53 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		// Build file-to-target map for symbol analysis and file dependencies
 		fileToTarget := make(map[string]string)
 		targetToKind := make(map[string]string)
+
+		// We need normalization function
+		normalize := func(p string) string { return p }
+		if ar.FnNormalizeSourcePath != nil {
+			normalize = ar.FnNormalizeSourcePath
+		}
+
 		for _, target := range module.Targets {
 			targetToKind[target.Label] = string(target.Kind)
 			// Map source files
 			for _, src := range target.Sources {
-				filePath := bazel.NormalizeSourcePath(src)
+				filePath := normalize(src)
 				fileToTarget[filePath] = target.Label
 			}
 			// Map header files
 			for _, hdr := range target.Headers {
-				filePath := bazel.NormalizeSourcePath(hdr)
+				filePath := normalize(hdr)
 				fileToTarget[filePath] = target.Label
 			}
 		}
 		ar.server.SetFileToTargetMap(fileToTarget)
 
 		// Discover source files in workspace
-		logging.Info("discovering source files in workspace")
-		_ = ar.server.PublishWorkspaceStatus("discovering_files", "Discovering source files...", 4, 6)
+		if ar.FnDiscoverSourceFiles != nil && ar.FnFindUncoveredFiles != nil {
+			logging.Info("discovering source files in workspace")
+			_ = ar.server.PublishWorkspaceStatus("discovering_files", "Discovering source files...", 4, 6)
 
-		discovered, err := bazel.DiscoverSourceFiles(ar.workspace)
-		if err != nil {
-			logging.Warn("failed to discover source files", "error", err)
-			discovered = make(map[string]bool)
-		}
-
-		// Find uncovered files
-		uncoveredFiles := bazel.FindUncoveredFiles(discovered, fileToTarget)
-		if len(uncoveredFiles) > 0 {
-			logging.Info("found uncovered files", "count", len(uncoveredFiles))
-			for _, file := range uncoveredFiles {
-				logging.Debug("uncovered file", "path", file)
+			discovered, err := ar.FnDiscoverSourceFiles(ar.workspace)
+			if err != nil {
+				logging.Warn("failed to discover source files", "error", err)
+				discovered = make(map[string]bool)
 			}
-		} else {
-			logging.Info("all source files are covered by targets")
-		}
 
-		// Store for web API
-		ar.server.SetUncoveredFiles(uncoveredFiles)
+			// Find uncovered files
+			uncoveredFiles := ar.FnFindUncoveredFiles(discovered, fileToTarget)
+			if len(uncoveredFiles) > 0 {
+				logging.Info("found uncovered files", "count", len(uncoveredFiles))
+				for _, file := range uncoveredFiles {
+					logging.Debug("uncovered file", "path", file)
+				}
+			} else {
+				logging.Info("all source files are covered by targets")
+			}
+
+			// Store for web API
+			ar.server.SetUncoveredFiles(uncoveredFiles)
+		}
 
 		// Build symbol graph and store file-level symbol dependencies
 		symbolDeps, err := symbols.BuildSymbolGraph(ar.workspace, fileToTarget, targetToKind)
@@ -145,14 +177,16 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		}
 
 		// Add target-level symbol dependencies
-		if err := bazel.AddSymbolDependencies(module, ar.workspace); err != nil {
-			logging.Warn("could not add symbol dependencies", "error", err)
-		} else {
-			logging.Info("module analysis complete", "totalDependencies", len(module.Dependencies))
-			if len(module.Issues) > 0 {
-				logging.Warn("found dependency issues", "count", len(module.Issues))
-				for _, issue := range module.Issues {
-					logging.Debug("dependency issue detail", "severity", issue.Severity, "from", issue.From, "to", issue.To, "types", issue.Types)
+		if ar.FnAddSymbolDependencies != nil {
+			if err := ar.FnAddSymbolDependencies(module, ar.workspace); err != nil {
+				logging.Warn("could not add symbol dependencies", "error", err)
+			} else {
+				logging.Info("module analysis complete", "totalDependencies", len(module.Dependencies))
+				if len(module.Issues) > 0 {
+					logging.Warn("found dependency issues", "count", len(module.Issues))
+					for _, issue := range module.Issues {
+						logging.Debug("dependency issue detail", "severity", issue.Severity, "from", issue.From, "to", issue.To, "types", issue.Types)
+					}
 				}
 			}
 		}

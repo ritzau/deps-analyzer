@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
+	"github.com/ritzau/deps-analyzer/pkg/bazel"
 	"github.com/ritzau/deps-analyzer/pkg/logging"
 	"github.com/ritzau/deps-analyzer/pkg/watcher"
 	"github.com/ritzau/deps-analyzer/pkg/web"
@@ -80,6 +81,16 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 
 	// Create analysis runner
 	runner := analysis.NewAnalysisRunner(workspace, server)
+
+	// Inject legacy dependencies to avoid import cycles / decouple implementation
+	runner.FnQueryWorkspace = bazel.QueryWorkspace
+	runner.FnAddCompileDeps = bazel.AddCompileDependencies
+	runner.FnNormalizeSourcePath = bazel.NormalizeSourcePath
+	runner.FnDiscoverSourceFiles = bazel.DiscoverSourceFiles
+	runner.FnFindUncoveredFiles = bazel.FindUncoveredFiles
+	// FnAddSymbolDependencies points to the legacy wrapper in pkg/bazel
+	runner.FnAddSymbolDependencies = bazel.AddSymbolDependencies
+
 	ctx := context.Background()
 
 	// Run initial analysis in background
@@ -188,7 +199,7 @@ func openBrowser(url string) {
 	switch runtime.GOOS {
 	case "darwin":
 		cmd = "open"
-		args = []string{url}
+		args = []string{"-a", "Google Chrome", url}
 	case "linux":
 		cmd = "xdg-open"
 		args = []string{url}
@@ -287,6 +298,12 @@ func printLicenses() {
 			author:  "The Gonum Authors",
 			license: "BSD-3-Clause",
 			url:     "https://gonum.org/v1/gonum",
+		},
+		{
+			name:    "koanf",
+			author:  "Kailash Nadh",
+			license: "MIT",
+			url:     "https://github.com/knadh/koanf",
 		},
 
 		// Frontend JavaScript libraries
