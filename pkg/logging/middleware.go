@@ -63,6 +63,11 @@ type responseWriter struct {
 	statusCode int
 }
 
+var (
+	_ http.ResponseWriter = (*responseWriter)(nil)
+	_ http.Flusher        = (*responseWriter)(nil)
+)
+
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)

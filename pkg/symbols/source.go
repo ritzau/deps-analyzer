@@ -10,11 +10,15 @@ import (
 )
 
 // SymbolSource implements api.Source for symbol-level dependencies (nm analysis)
-type SymbolSource struct{}
+type SymbolSource struct {
+	client Client
+}
 
 // NewSymbolSource creates a new symbol dependencies source
 func NewSymbolSource() api.Source {
-	return &SymbolSource{}
+	return &SymbolSource{
+		client: NewClient(),
+	}
 }
 
 func (s *SymbolSource) Name() string {
@@ -28,7 +32,7 @@ func (s *SymbolSource) Run(ctx context.Context, cfg *config.Config) (*model.Grap
 	// Note: We currently pass nil/nil for fileToTarget and targetToKind maps.
 	// This means we won't calculate linkage types (Static/Dynamic) in this isolated mode.
 	// To support that, we'd need to share target context between sources.
-	symbolDeps, err := BuildSymbolGraph(cfg.Workspace, nil, nil)
+	symbolDeps, err := s.client.BuildSymbolGraph(cfg.Workspace, nil, nil)
 	if err != nil {
 		return nil, err
 	}

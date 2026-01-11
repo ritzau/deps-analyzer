@@ -101,8 +101,23 @@ func ParseNMOutput(objectFile string, nmOutput string) []Symbol {
 	return symbols
 }
 
+// Client handles interaction with the build system and nm
+type Client interface {
+	FindObjectFiles(workspaceRoot string) ([]string, error)
+	RunNM(objectFile string) ([]Symbol, error)
+	BuildSymbolGraph(workspaceRoot string, fileToTarget map[string]string, targetToKind map[string]string) ([]SymbolDependency, error)
+}
+
+// DefaultClient uses actual filesystem and nm command
+type DefaultClient struct{}
+
+// NewClient creates a new default client
+func NewClient() Client {
+	return &DefaultClient{}
+}
+
 // RunNM runs nm on an object file and returns the parsed symbols
-func RunNM(objectFile string) ([]Symbol, error) {
+func (c *DefaultClient) RunNM(objectFile string) ([]Symbol, error) {
 	// Use -C to demangle C++ symbol names for better readability
 	cmd := exec.Command("nm", "-C", objectFile)
 	output, err := cmd.CombinedOutput()
@@ -114,8 +129,7 @@ func RunNM(objectFile string) ([]Symbol, error) {
 }
 
 // FindObjectFiles searches for .o files in the bazel output directories
-// Typically in bazel-out/darwin-fastbuild/bin/... or similar
-func FindObjectFiles(workspaceRoot string) ([]string, error) {
+func (c *DefaultClient) FindObjectFiles(workspaceRoot string) ([]string, error) {
 	var objectFiles []string
 
 	// Common Bazel output paths
@@ -151,11 +165,33 @@ func FindObjectFiles(workspaceRoot string) ([]string, error) {
 	return objectFiles, nil
 }
 
+// Wrapper for existing legacy calls (optional, can be removed if not needed by legacy runner)
+func RunNM(objectFile string) ([]Symbol, error) {
+	client := &DefaultClient{}
+	return client.RunNM(objectFile)
+}
+
+func FindObjectFiles(workspaceRoot string) ([]string, error) {
+	client := &DefaultClient{}
+	return client.FindObjectFiles(workspaceRoot)
+}
+
 // BuildSymbolGraph analyzes all object files and builds symbol dependencies
 // It also determines which binary/library each object file belongs to and the linkage type
 func BuildSymbolGraph(workspaceRoot string, fileToTarget map[string]string, targetToKind map[string]string) ([]SymbolDependency, error) {
+	client := NewClient()
+	return client.BuildSymbolGraph(workspaceRoot, fileToTarget, targetToKind)
+}
+
+// BuildSymbolGraph on Client allows mocking
+func (c *DefaultClient) BuildSymbolGraph(workspaceRoot string, fileToTarget map[string]string, targetToKind map[string]string) ([]SymbolDependency, error) {
+	return buildSymbolGraphInternal(c, workspaceRoot, fileToTarget, targetToKind)
+}
+
+// buildSymbolGraphInternal is the core logic decoupled from implementation
+func buildSymbolGraphInternal(client Client, workspaceRoot string, fileToTarget map[string]string, targetToKind map[string]string) ([]SymbolDependency, error) {
 	// Find all .o files
-	objectFiles, err := FindObjectFiles(workspaceRoot)
+	objectFiles, err := client.FindObjectFiles(workspaceRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +208,7 @@ func BuildSymbolGraph(workspaceRoot string, fileToTarget map[string]string, targ
 
 	// Process all object files
 	for _, objFile := range objectFiles {
-		symbols, err := RunNM(objFile)
+		symbols, err := client.RunNM(objFile)
 		if err != nil {
 			// Skip files we can't process
 			continue

@@ -11,7 +11,7 @@ import (
 
 // TargetSource implements api.Source for Bazel targets
 type TargetSource struct {
-	executor *Executor
+	executor Executor
 	parser   *Parser
 }
 

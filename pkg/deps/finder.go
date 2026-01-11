@@ -77,3 +77,20 @@ func ParseAllDFiles(workspaceRoot string) ([]*FileDependency, error) {
 
 	return deps, nil
 }
+
+// Client abstracts the finding and parsing of .d files
+type Client interface {
+	ParseAllDFiles(workspaceRoot string) ([]*FileDependency, error)
+}
+
+// DefaultClient uses the actual filesystem
+type DefaultClient struct{}
+
+// NewClient creates a new default client
+func NewClient() Client {
+	return &DefaultClient{}
+}
+
+func (c *DefaultClient) ParseAllDFiles(workspaceRoot string) ([]*FileDependency, error) {
+	return ParseAllDFiles(workspaceRoot)
+}

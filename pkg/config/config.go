@@ -51,8 +51,8 @@ func Load(f *pflag.FlagSet) (*Config, error) {
 	// 3. Environment Variables
 	// Prefix: DEPS_ANALYZER_ (e.g., DEPS_ANALYZER_PORT=9090)
 	if err := k.Load(env.Provider("DEPS_ANALYZER_", ".", func(s string) string {
-		return strings.Replace(strings.ToLower(
-			strings.TrimPrefix(s, "DEPS_ANALYZER_")), "_", ".", -1)
+		return strings.ReplaceAll(strings.ToLower(
+			strings.TrimPrefix(s, "DEPS_ANALYZER_")), "_", ".")
 	}), nil); err != nil {
 		return nil, fmt.Errorf("failed to load env vars: %w", err)
 	}

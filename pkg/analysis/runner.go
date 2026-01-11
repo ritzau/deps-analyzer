@@ -70,6 +70,31 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	logging.Info("starting analysis", "reason", opts.Reason)
 
 	// Run registered sources
+	ar.runRegisteredSources(ctx, opts.Reason)
+
+	// Phase 1: Bazel Query
+	module, err := ar.runLegacyBazelQuery(opts)
+	if err != nil {
+		return err
+	}
+
+	// Phase 2: Compile Dependencies
+	ar.runLegacyCompileDeps(opts, module)
+
+	// Phase 3: Symbol Dependencies
+	ar.runLegacySymbolDeps(opts, module)
+
+	// Phase 4: Binary Derivation
+	ar.runLegacyBinaryDerivation(opts, module)
+
+	// Publish final ready state
+	_ = ar.server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
+
+	logging.Info("analysis complete", "reason", opts.Reason)
+	return nil
+}
+
+func (ar *AnalysisRunner) runRegisteredSources(ctx context.Context, reason string) {
 	for _, src := range ar.Sources {
 		logging.Info("running source", "name", src.Name())
 		graph, err := src.Run(ctx, ar.Config)
@@ -80,8 +105,9 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		ar.Graph.Merge(graph)
 		logging.Info("source complete", "name", src.Name())
 	}
+}
 
-	// Phase 1: Bazel Query
+func (ar *AnalysisRunner) runLegacyBazelQuery(opts AnalysisOptions) (*model.Module, error) {
 	module := ar.server.GetModule()
 	if !opts.SkipBazelQuery {
 		if ar.FnQueryWorkspace != nil {
@@ -93,7 +119,7 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 			if err != nil {
 				logging.Error("bazel query failed", "error", err)
 				_ = ar.server.PublishWorkspaceStatus("error", fmt.Sprintf("Error querying workspace: %v", err), 1, 6)
-				return fmt.Errorf("bazel query failed: %w", err)
+				return nil, fmt.Errorf("bazel query failed: %w", err)
 			}
 
 			logging.Info("bazel query complete", "targets", len(module.Targets), "dependencies", len(module.Dependencies))
@@ -103,8 +129,10 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 			logging.Warn("FnQueryWorkspace not set, skipping bazel query")
 		}
 	}
+	return module, nil
+}
 
-	// Phase 2: Compile Dependencies
+func (ar *AnalysisRunner) runLegacyCompileDeps(opts AnalysisOptions, module *model.Module) {
 	if !opts.SkipCompileDeps {
 		_ = ar.server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 6)
 		logging.Info("adding compile dependencies from .d files")
@@ -128,8 +156,9 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		}
 		_ = ar.server.PublishTargetGraph("partial_data", false)
 	}
+}
 
-	// Phase 3: Symbol Dependencies
+func (ar *AnalysisRunner) runLegacySymbolDeps(opts AnalysisOptions, module *model.Module) {
 	if !opts.SkipSymbolDeps {
 		_ = ar.server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 6)
 		logging.Info("adding symbol dependencies from nm analysis")
@@ -214,8 +243,9 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		_ = ar.server.PublishWorkspaceStatus("targets_ready", "Target analysis complete", 5, 6)
 		_ = ar.server.PublishTargetGraph("complete", true)
 	}
+}
 
-	// Phase 4: Binary Derivation
+func (ar *AnalysisRunner) runLegacyBinaryDerivation(opts AnalysisOptions, module *model.Module) {
 	if !opts.SkipBinaryDeriv {
 		_ = ar.server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 6, 6)
 		logging.Info("deriving binary information from module")
@@ -239,12 +269,6 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 		logging.Info("analysis complete",
 			"targets", len(module.Targets), "dependencies", len(module.Dependencies), "packages", module.GetPackageCount())
 	}
-
-	// Publish final ready state
-	_ = ar.server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
-
-	logging.Info("analysis complete", "reason", opts.Reason)
-	return nil
 }
 
 // GetGraph returns the current unified graph

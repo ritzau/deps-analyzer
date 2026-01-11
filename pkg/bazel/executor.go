@@ -7,16 +7,21 @@ import (
 )
 
 // Executor handles the execution of Bazel commands
-type Executor struct{}
+type Executor interface {
+	RunQuery(ctx context.Context, workspacePath string, query string) ([]byte, error)
+}
 
-// NewExecutor creates a new Bazel executor
-func NewExecutor() *Executor {
-	return &Executor{}
+// DefaultExecutor is the default implementation of Executor that runs actual commands
+type DefaultExecutor struct{}
+
+// NewExecutor creates a new default Bazel executor
+func NewExecutor() Executor {
+	return &DefaultExecutor{}
 }
 
 // RunQuery executes a Bazel query and returns the raw XML output.
 // It respects the provided context for cancellation.
-func (e *Executor) RunQuery(ctx context.Context, workspacePath string, query string) ([]byte, error) {
+func (e *DefaultExecutor) RunQuery(ctx context.Context, workspacePath string, query string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "bazel", "query", query, "--output=xml")
 	cmd.Dir = workspacePath
 

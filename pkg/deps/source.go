@@ -10,11 +10,15 @@ import (
 )
 
 // CompileDepsSource implements api.Source for compile-time dependencies (.d files)
-type CompileDepsSource struct{}
+type CompileDepsSource struct {
+	client Client
+}
 
 // NewCompileDepsSource creates a new compile dependencies source
 func NewCompileDepsSource() api.Source {
-	return &CompileDepsSource{}
+	return &CompileDepsSource{
+		client: NewClient(),
+	}
 }
 
 func (s *CompileDepsSource) Name() string {
@@ -25,8 +29,8 @@ func (s *CompileDepsSource) Run(ctx context.Context, cfg *config.Config) (*model
 	logger := logging.New("source.compile_deps")
 	logger.Info("Starting compile dependencies analysis", "workspace", cfg.Workspace)
 
-	// Reuse existing logic to parse all .d files
-	deps, err := ParseAllDFiles(cfg.Workspace)
+	// Reuse existing logic to parse all .d files via client
+	deps, err := s.client.ParseAllDFiles(cfg.Workspace)
 	if err != nil {
 		return nil, err
 	}
