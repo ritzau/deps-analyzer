@@ -29,15 +29,50 @@ func TestParseNMOutput(t *testing.T) {
 			},
 		},
 		{
-			name:       "Names With Spaces",
-			objectFile: "space.o",
+			name:       "GNU Linux Output",
+			objectFile: "linux.o",
 			output: `
-0000000000001000 T Operator Name With Spaces
-                 U Undefined Symbol With Spaces
+000000000040052d T main
+                 U puts
+0000000000601038 B __bss_start
+`,
+			// Note: Linux nm often omits leading underscores for C symbols compared to macOS
+			want: []Symbol{
+				{File: "linux.o", Name: "main", Type: "T", Address: "000000000040052d"},
+				{File: "linux.o", Name: "puts", Type: "U"},
+				{File: "linux.o", Name: "__bss_start", Type: "B", Address: "0000000000601038"},
+			},
+		},
+		{
+			name:       "BSD macOS Output",
+			objectFile: "mac.o",
+			output: `
+0000000100003f90 T _main
+                 U _puts
+0000000100008000 B _bss_start
 `,
 			want: []Symbol{
-				{File: "space.o", Name: "Operator Name With Spaces", Type: "T", Address: "0000000000001000"},
-				{File: "space.o", Name: "Undefined Symbol With Spaces", Type: "U"},
+				{File: "mac.o", Name: "_main", Type: "T", Address: "0000000100003f90"},
+				{File: "mac.o", Name: "_puts", Type: "U"},
+				{File: "mac.o", Name: "_bss_start", Type: "B", Address: "0000000100008000"},
+			},
+		},
+		{
+			name:       "Comparison with Address but no Hex (invalid)",
+			objectFile: "invalid_addr.o",
+			output: `
+zzzzzzzz T main
+`,
+			// "zzzzzzzz" is not hex.
+			// Logic: len=3. isHex(zzzzzzzz) -> false.
+			// else -> Type=parts[0]="zzzzzzzz", Name="T main" ...
+			// This seems like a potential edge case if nm output is corrupted or wildly different.
+			// Current parser:
+			// if len>=3:
+			//   if isHex(p[0]): defined
+			//   else: undefined-like (p[0]=Type, p[1:]=Name)
+			want: []Symbol{
+				{File: "invalid_addr.o", Name: "T main", Type: "zzzzzzzz"},
 			},
 		},
 		{
