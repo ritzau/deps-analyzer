@@ -75,7 +75,7 @@ func TestQueryWorkspace(t *testing.T) {
 
 	// Check static deps (should have core, util, graphics_impl)
 	staticDeps := getDepsFrom("//main:test_app", model.DependencyStatic)
-	expectedStatic := []string{"//core:core", "//util:util", "//graphics:graphics_impl"}
+	expectedStatic := []string{"//config:config", "//core:core", "//formatter:formatter", "//graphics:graphics_impl", "//util:util"}
 	if len(staticDeps) != len(expectedStatic) {
 		t.Errorf("test_app static deps: got %d, want %d", len(staticDeps), len(expectedStatic))
 	}

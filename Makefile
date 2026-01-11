@@ -77,5 +77,20 @@ lint:
 		echo "golangci-lint not installed. Install with:"; \
 		echo "  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi
+	
+# Generate coverage report (requires lcov)
+coverage:
+	@echo "Running tests with coverage..."
+	@go test -coverprofile=coverage.out ./...
+	@echo "Converting to LCOV format..."
+	@if ! command -v gcov2lcov > /dev/null 2>&1; then \
+		echo "gcov2lcov not found. Installing locally..."; \
+		go install github.com/jandelgado/gcov2lcov@latest; \
+	fi
+	@$(shell go env GOPATH)/bin/gcov2lcov -infile=coverage.out -outfile=coverage.lcov
+	@echo "Generating HTML report..."
+	@genhtml coverage.lcov -o coverage_report
+	@echo "Coverage report generated at coverage_report/index.html"
+	@open coverage_report/index.html
 
 .DEFAULT_GOAL := build

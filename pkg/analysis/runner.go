@@ -73,19 +73,19 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	ar.runRegisteredSources(ctx, opts.Reason)
 
 	// Phase 1: Bazel Query
-	module, err := ar.runLegacyBazelQuery(opts)
+	module, err := ar.runBazelQueryPhase(opts)
 	if err != nil {
 		return err
 	}
 
 	// Phase 2: Compile Dependencies
-	ar.runLegacyCompileDeps(opts, module)
+	ar.runCompileDepsPhase(opts, module)
 
 	// Phase 3: Symbol Dependencies
-	ar.runLegacySymbolDeps(opts, module)
+	ar.runSymbolDepsPhase(opts, module)
 
 	// Phase 4: Binary Derivation
-	ar.runLegacyBinaryDerivation(opts, module)
+	ar.runBinaryDerivationPhase(opts, module)
 
 	// Publish final ready state
 	_ = ar.server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
@@ -107,7 +107,7 @@ func (ar *AnalysisRunner) runRegisteredSources(ctx context.Context, reason strin
 	}
 }
 
-func (ar *AnalysisRunner) runLegacyBazelQuery(opts AnalysisOptions) (*model.Module, error) {
+func (ar *AnalysisRunner) runBazelQueryPhase(opts AnalysisOptions) (*model.Module, error) {
 	module := ar.server.GetModule()
 	if !opts.SkipBazelQuery {
 		if ar.FnQueryWorkspace != nil {
@@ -132,7 +132,7 @@ func (ar *AnalysisRunner) runLegacyBazelQuery(opts AnalysisOptions) (*model.Modu
 	return module, nil
 }
 
-func (ar *AnalysisRunner) runLegacyCompileDeps(opts AnalysisOptions, module *model.Module) {
+func (ar *AnalysisRunner) runCompileDepsPhase(opts AnalysisOptions, module *model.Module) {
 	if !opts.SkipCompileDeps {
 		_ = ar.server.PublishWorkspaceStatus("analyzing_deps", "Adding compile dependencies...", 2, 6)
 		logging.Info("adding compile dependencies from .d files")
@@ -158,7 +158,7 @@ func (ar *AnalysisRunner) runLegacyCompileDeps(opts AnalysisOptions, module *mod
 	}
 }
 
-func (ar *AnalysisRunner) runLegacySymbolDeps(opts AnalysisOptions, module *model.Module) {
+func (ar *AnalysisRunner) runSymbolDepsPhase(opts AnalysisOptions, module *model.Module) {
 	if !opts.SkipSymbolDeps {
 		_ = ar.server.PublishWorkspaceStatus("analyzing_symbols", "Adding symbol dependencies...", 3, 6)
 		logging.Info("adding symbol dependencies from nm analysis")
@@ -245,7 +245,7 @@ func (ar *AnalysisRunner) runLegacySymbolDeps(opts AnalysisOptions, module *mode
 	}
 }
 
-func (ar *AnalysisRunner) runLegacyBinaryDerivation(opts AnalysisOptions, module *model.Module) {
+func (ar *AnalysisRunner) runBinaryDerivationPhase(opts AnalysisOptions, module *model.Module) {
 	if !opts.SkipBinaryDeriv {
 		_ = ar.server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 6, 6)
 		logging.Info("deriving binary information from module")

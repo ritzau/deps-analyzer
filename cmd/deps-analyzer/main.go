@@ -71,13 +71,13 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 		}
 	}()
 
-	// Wait a moment for server to start
-	time.Sleep(500 * time.Millisecond)
-
-	// Open browser if requested
+	// Open browser if requested (in background, giving server time to start)
 	if open {
-		fmt.Println("Opening browser...")
-		openBrowser(url)
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			fmt.Println("Opening browser...")
+			openBrowser(url)
+		}()
 	} else {
 		fmt.Printf("Server ready at %s (use --open to auto-open browser)\n", url)
 	}
