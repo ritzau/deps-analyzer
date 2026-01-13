@@ -39,6 +39,7 @@ type GlobalFilters struct {
 	HideExternal   bool `json:"hideExternal,omitempty"`
 	HideUncovered  bool `json:"hideUncovered,omitempty"`
 	HideSystemLibs bool `json:"hideSystemLibs,omitempty"`
+	ShowOnlyLdd    bool `json:"showOnlyLdd,omitempty"`
 }
 
 // EdgeDisplayRules control which edges are shown

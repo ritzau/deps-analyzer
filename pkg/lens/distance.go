@@ -6,10 +6,11 @@ import (
 
 // GraphNode represents a node in the dependency graph (temporary, mirrors web.GraphNode)
 type GraphNode struct {
-	ID     string
-	Label  string
-	Type   string
-	Parent string
+	ID              string
+	Label           string
+	Type            string
+	Parent          string
+	LddDependencies []string
 }
 
 // GraphEdge represents an edge in the dependency graph (temporary, mirrors web.GraphEdge)

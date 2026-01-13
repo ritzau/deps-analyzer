@@ -2,6 +2,7 @@ package binaries
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -18,6 +19,8 @@ type BinaryInfo struct {
 	RegularDeps     []string            `json:"regularDeps"`     // Direct cc_library dependencies
 	InternalTargets []string            `json:"internalTargets"` // All cc_library targets this binary depends on
 	OverlappingDeps map[string][]string `json:"overlappingDeps"` // Map of binary -> overlapping cc_library targets (potential duplicate symbols)
+	LddDependencies []string            `json:"lddDependencies"` // Shared libraries found via ldd/otool
+	OutputFile      string              `json:"outputFile"`      // The actual build output file (absolute or relative to execroot)
 }
 
 // QueryAllBinaries finds all cc_binary and cc_shared_library targets
@@ -107,7 +110,39 @@ func GetBinaryInfo(workspace string, label string) (*BinaryInfo, error) {
 	fmt.Printf("  - Querying direct dependencies...\n")
 	info.RegularDeps = queryDirectDeps(workspace, label)
 
+	// Get output file path
+	fmt.Printf("  - Querying output file...\n")
+	info.OutputFile = queryOutputFile(workspace, label)
+
 	return info, nil
+}
+
+// queryOutputFile finds the output file path for a target
+func queryOutputFile(workspace string, label string) string {
+	fmt.Fprintf(os.Stderr, "DEBUG BINARIES: queryOutputFile called for label=%s\n", label)
+	// Use cquery --output=files to get the actual output path
+	cmd := exec.Command("bazel", "cquery", "--output=files", label)
+	cmd.Dir = workspace
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Warning: failed to query output file for %s: %v\n", label, err)
+		return ""
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Filter out Bazel status messages to find the actual file path
+		if line != "" &&
+			!strings.HasPrefix(line, "INFO:") &&
+			!strings.HasPrefix(line, "Loading:") &&
+			!strings.HasPrefix(line, "Computing") &&
+			!strings.HasPrefix(line, "Analyzing:") &&
+			!strings.Contains(line, "Computing main repo mapping") {
+			return line // Return the first valid line
+		}
+	}
+	return ""
 }
 
 // queryDirectDeps finds direct cc_library dependencies (depth 1)
@@ -316,8 +351,9 @@ func toSet(slice []string) map[string]bool {
 }
 
 // DeriveBinaryInfoFromModule creates BinaryInfo for all binaries and shared libraries from the Module
-// This is much faster than running separate Bazel queries for each binary
-func DeriveBinaryInfoFromModule(module *model.Module) []*BinaryInfo {
+// This is much faster than running separate Bazel queries for each binary.
+// It also queries for the output file path for each binary to ensure correct LDD scanning.
+func DeriveBinaryInfoFromModule(module *model.Module, workspace string) []*BinaryInfo {
 	var result []*BinaryInfo
 
 	// Process each binary and shared library target
@@ -336,6 +372,9 @@ func DeriveBinaryInfoFromModule(module *model.Module) []*BinaryInfo {
 			InternalTargets: make([]string, 0),
 			OverlappingDeps: make(map[string][]string),
 		}
+
+		// Query for the actual output file path
+		info.OutputFile = queryOutputFile(workspace, target.Label)
 
 		// Collect dependencies from module.Dependencies
 		allLibraries := make(map[string]bool)    // All transitive cc_library dependencies

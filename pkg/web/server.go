@@ -25,11 +25,12 @@ var staticFiles embed.FS
 
 // GraphNode represents a node in the dependency graph
 type GraphNode struct {
-	ID       string `json:"id"`
-	Label    string `json:"label"`
-	Type     string `json:"type"`     // "cc_library", "cc_binary", "source", "header", "external"
-	Parent   string `json:"parent"`   // Parent node ID for grouping (optional)
-	IsPublic bool   `json:"isPublic"` // Whether target has public visibility
+	ID              string   `json:"id"`
+	Label           string   `json:"label"`
+	Type            string   `json:"type"`     // "cc_library", "cc_binary", "source", "header", "external"
+	Parent          string   `json:"parent"`   // Parent node ID for grouping (optional)
+	IsPublic        bool     `json:"isPublic"` // Whether target has public visibility
+	LddDependencies []string `json:"lddDependencies,omitempty"`
 }
 
 // GraphEdge represents an edge in the dependency graph
@@ -110,6 +111,13 @@ func (s *Server) GetModule() *model.Module {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.module
+}
+
+// GetBinaries retrieves the current binaries
+func (s *Server) GetBinaries() []*binaries.BinaryInfo {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.binaries
 }
 
 // SetFileDependencies stores file-level compile dependencies from .d files
@@ -307,7 +315,7 @@ func (s *Server) handleModuleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build target-level graph from module with file-level details
-	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
+	graphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles, s.binaries)
 	_ = json.NewEncoder(w).Encode(graphData)
 }
 
@@ -417,7 +425,7 @@ func (s *Server) handleModuleGraphWithLens(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Build raw graph data
-	rawGraphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles)
+	rawGraphData := buildModuleGraphData(s.module, s.fileDeps, s.symbolDeps, s.fileToTarget, s.uncoveredFiles, s.binaries)
 
 	// Convert web.GraphData to lens.GraphData
 	lensGraphData := convertToLensGraphData(rawGraphData)
@@ -606,20 +614,34 @@ func (s *Server) handleFrontendLogs(w http.ResponseWriter, r *http.Request) {
 // This would show files within a target and their compile-time dependencies to other targets
 
 // buildModuleGraphData creates a graph visualization from the Module model
-func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string, uncoveredFiles []string) *GraphData {
+func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency, symbolDeps []symbols.SymbolDependency, fileToTarget map[string]string, uncoveredFiles []string, binaryList []*binaries.BinaryInfo) *GraphData {
 	graphData := &GraphData{
 		Nodes: make([]GraphNode, 0),
 		Edges: make([]GraphEdge, 0),
 	}
 
+	// Create map of binaries for quick lookup
+	binaryMap := make(map[string]*binaries.BinaryInfo)
+	// Populate binary list
+	for _, bin := range binaryList {
+		binaryMap[bin.Label] = bin
+	}
+
 	// Create nodes for all targets
 	for _, target := range module.Targets {
-		graphData.Nodes = append(graphData.Nodes, GraphNode{
+		node := GraphNode{
 			ID:       target.Label,
 			Label:    target.Label,
 			Type:     string(target.Kind),
 			IsPublic: target.IsPublic(),
-		})
+		}
+
+		// Populate LDD dependencies if available
+		if bin, ok := binaryMap[target.Label]; ok {
+			node.LddDependencies = bin.LddDependencies
+		}
+
+		graphData.Nodes = append(graphData.Nodes, node)
 
 		// Create file nodes as children of this target
 		// Build a set of all files from this target (for later edge matching)
@@ -919,6 +941,38 @@ func buildModuleGraphData(module *model.Module, fileDeps []*deps.FileDependency,
 				Type:   nodeType,
 				Parent: parentPackage, // Parent is the package, not a target
 			})
+		}
+	}
+
+	// Add edges for LDD dependencies
+	for _, bin := range binaryList {
+		if len(bin.LddDependencies) > 0 {
+			for _, depPath := range bin.LddDependencies {
+				// Extract library name from path (e.g. /lib/x86_64-linux-gnu/libc.so.6 -> libc.so.6)
+				parts := strings.Split(depPath, "/")
+				libName := parts[len(parts)-1]
+
+				// Use system library ID format
+				targetID := "system:" + libName
+
+				// Ensure the node exists (if not created by linkopts)
+				if !systemLibs[libName] {
+					systemLibs[libName] = true
+					graphData.Nodes = append(graphData.Nodes, GraphNode{
+						ID:    targetID,
+						Label: libName,
+						Type:  "system_library",
+					})
+				}
+
+				graphData.Edges = append(graphData.Edges, GraphEdge{
+					Source:      bin.Label,
+					Target:      targetID,
+					Type:        "dynamic", // New edge type for LDD
+					SourceLabel: bin.Label,
+					TargetLabel: libName,
+				})
+			}
 		}
 	}
 
@@ -1280,10 +1334,11 @@ func convertToLensGraphData(webGraph *GraphData) *lens.GraphData {
 	lensNodes := make([]lens.GraphNode, len(webGraph.Nodes))
 	for i, node := range webGraph.Nodes {
 		lensNodes[i] = lens.GraphNode{
-			ID:     node.ID,
-			Label:  node.Label,
-			Type:   node.Type,
-			Parent: node.Parent,
+			ID:              node.ID,
+			Label:           node.Label,
+			Type:            node.Type,
+			Parent:          node.Parent,
+			LddDependencies: node.LddDependencies,
 		}
 	}
 

@@ -65,6 +65,11 @@ function syncUIWithState() {
     hideSystemLibsCheckbox.checked = filters.hideSystemLibs || false;
   }
 
+  const showOnlyLddCheckbox = document.getElementById('showOnlyLdd');
+  if (showOnlyLddCheckbox) {
+    showOnlyLddCheckbox.checked = filters.showOnlyLdd || false;
+  }
+
   // Sync edge type checkboxes
   const edgeTypes = state.defaultLens.edgeRules.types;
   const showStaticCheckbox = document.getElementById('showStatic');
@@ -153,7 +158,7 @@ function setupResetControls() {
  */
 function setupDefaultLensControls() {
   // Global filters
-  const filterIds = ['hideExternal', 'hideUncovered', 'hideSystemLibs'];
+  const filterIds = ['hideExternal', 'hideUncovered', 'hideSystemLibs', 'showOnlyLdd'];
   filterIds.forEach((id) => {
     const checkbox = document.getElementById(id);
     if (checkbox) {
@@ -165,6 +170,8 @@ function setupDefaultLensControls() {
           document.getElementById('hideUncovered')?.checked || false;
         currentLens.globalFilters.hideSystemLibs =
           document.getElementById('hideSystemLibs')?.checked || false;
+        currentLens.globalFilters.showOnlyLdd =
+          document.getElementById('showOnlyLdd')?.checked || false;
         viewStateManager.updateDefaultLens(currentLens);
       });
     }

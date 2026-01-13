@@ -3,6 +3,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis/api"
@@ -33,16 +34,18 @@ type AnalysisRunner struct {
 	FnDiscoverSourceFiles   func(workspace string) (map[string]bool, error)
 	FnFindUncoveredFiles    func(discovered map[string]bool, fileToTarget map[string]string) []string
 	FnAddSymbolDependencies func(module *model.Module, workspace string) error
+	FnScanBinary            func(path string) ([]string, error)
 }
 
 // AnalysisOptions configures which analysis phases to run
 type AnalysisOptions struct {
-	FullAnalysis    bool
-	SkipBazelQuery  bool
-	SkipCompileDeps bool
-	SkipSymbolDeps  bool
-	SkipBinaryDeriv bool
-	Reason          string // e.g., "initial analysis", "BUILD changed"
+	FullAnalysis        bool
+	SkipBazelQuery      bool
+	SkipCompileDeps     bool
+	SkipSymbolDeps      bool
+	SkipBinaryDeriv     bool
+	SkipDynamicAnalysis bool
+	Reason              string // e.g., "initial analysis", "BUILD changed"
 }
 
 // NewAnalysisRunner creates a new analysis runner
@@ -87,11 +90,79 @@ func (ar *AnalysisRunner) Run(ctx context.Context, opts AnalysisOptions) error {
 	// Phase 4: Binary Derivation
 	ar.runBinaryDerivationPhase(opts, module)
 
+	// Phase 5: Dynamic Analysis (LDD)
+	ar.runDynamicAnalysisPhase(opts)
+
 	// Publish final ready state
 	_ = ar.server.PublishWorkspaceStatus("ready", "Analysis complete", 6, 6)
 
 	logging.Info("analysis complete", "reason", opts.Reason)
 	return nil
+}
+
+func (ar *AnalysisRunner) runDynamicAnalysisPhase(opts AnalysisOptions) {
+	if !opts.SkipDynamicAnalysis && ar.FnScanBinary != nil {
+		_ = ar.server.PublishWorkspaceStatus("analyzing_dynamic", "Scanning binaries (ldd)...", 6, 6)
+		logging.Info("running dynamic analysis on binaries")
+
+		bins := ar.server.GetBinaries()
+		if len(bins) == 0 {
+			logging.Info("no binaries to scan")
+			return
+		}
+
+		// Iterate over binaries and scan them
+		for _, bin := range bins {
+			// Construct path: prefer explicit OutputFile from cquery
+			// Otherwise fall back to guessing (legacy behavior)
+			var fullPath string
+			if bin.OutputFile != "" {
+				// cquery --output=files returns absolute path or relative to execroot?
+				// Usually relative to workspace/execroot. Ideally absolute if in bazel-bin.
+				// However, if we run bazel from workspace, it might be outputting relative path?
+				// Let's assume it's relative to workspace if it doesn't start with /
+				if strings.HasPrefix(bin.OutputFile, "/") {
+					fullPath = bin.OutputFile
+				} else {
+					fullPath = fmt.Sprintf("%s/%s", ar.workspace, bin.OutputFile)
+				}
+			} else {
+				// Fallback logic
+				label := bin.Label
+				if label == "" {
+					continue
+				}
+
+				// Remove // prefix
+				path := label
+				if len(path) > 2 && path[:2] == "//" {
+					path = path[2:]
+				}
+
+				// Replace : with /
+				path = strings.ReplaceAll(path, ":", "/")
+
+				// Full path
+				fullPath = fmt.Sprintf("%s/bazel-bin/%s", ar.workspace, path)
+			}
+
+			// Scan
+			libs, err := ar.FnScanBinary(fullPath)
+			if err != nil {
+				// Don't fail the whole analysis, just log
+				logging.Debug("failed to scan binary", "label", bin.Label, "path", fullPath, "error", err)
+				continue
+			}
+
+			if len(libs) > 0 {
+				logging.Info("found dynamic dependencies", "label", bin.Label, "count", len(libs))
+				bin.LddDependencies = libs
+			}
+		}
+
+		// Update server with modified binaries
+		ar.server.SetBinaries(bins)
+	}
 }
 
 func (ar *AnalysisRunner) runRegisteredSources(ctx context.Context, reason string) {
@@ -250,7 +321,7 @@ func (ar *AnalysisRunner) runBinaryDerivationPhase(opts AnalysisOptions, module 
 		_ = ar.server.PublishWorkspaceStatus("analyzing_binaries", "Deriving binary info...", 6, 6)
 		logging.Info("deriving binary information from module")
 
-		binaryInfos := binaries.DeriveBinaryInfoFromModule(module)
+		binaryInfos := binaries.DeriveBinaryInfoFromModule(module, ar.workspace)
 		logging.Info("found binaries", "count", len(binaryInfos))
 		for _, bin := range binaryInfos {
 			logging.Debug("binary", "label", bin.Label, "kind", bin.Kind)

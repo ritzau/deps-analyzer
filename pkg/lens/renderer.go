@@ -28,8 +28,24 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 	}
 	logging.Debug("nodes using detail lens", "count", detailCount)
 
+	// Pre-calculation for ShowOnlyLdd: Identify packages that MUST be visible
+	// because they contain visible binaries.
+	neededPackages := make(map[string]bool)
+	if defaultLens.GlobalFilters.ShowOnlyLdd || detailLens.GlobalFilters.ShowOnlyLdd {
+		for _, node := range rawGraph.Nodes {
+			// Include packages for all binaries/shared libs, not just those with deps
+			if node.Type == "cc_binary" || node.Type == "cc_shared_library" {
+				// The parent of a binary is its package
+				parentID := extractParentID(node.ID)
+				if parentID != "" {
+					neededPackages[parentID] = true
+				}
+			}
+		}
+	}
+
 	// 3. Apply lens rules to determine visibility and collapse state
-	nodeStates := applyLensRules(rawGraph, nodeLensMap, distances, defaultLens, detailLens)
+	nodeStates := applyLensRules(rawGraph, nodeLensMap, distances, defaultLens, detailLens, neededPackages)
 
 	// 4. Extract and create synthetic package nodes from ALL targets
 	allPackageNodes := extractPackageNodes(rawGraph)
@@ -58,7 +74,7 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 			collapsed := shouldNodeBeCollapsed(pkgNode, rule)
 
 			// Check visibility using the same logic as regular nodes
-			visible := isNodeVisibleByRule(&pkgNode, rule, lens)
+			visible := isNodeVisibleByRule(&pkgNode, rule, lens, neededPackages)
 
 			// TEMPORARY DEBUG: Log package visibility decisions
 			targetTypes := []string{}
@@ -147,7 +163,8 @@ func assignLensesToNodes(distances map[string]interface{}, selectedNodes []strin
 }
 
 // applyLensRules applies lens rules to determine visibility and collapse state for each node
-func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances map[string]interface{}, defaultLens, detailLens *LensConfig) map[string]*NodeState {
+// applyLensRules determines the visibility and state of each node based on the lens configuration
+func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances map[string]interface{}, defaultLens, detailLens *LensConfig, neededPackages map[string]bool) map[string]*NodeState {
 	nodeStates := make(map[string]*NodeState)
 
 	for _, node := range graph.Nodes {
@@ -172,7 +189,7 @@ func applyLensRules(graph *GraphData, nodeLensMap map[string]string, distances m
 		rule := findDistanceRule(lens, distance)
 
 		// Check visibility
-		visible := isNodeVisibleByRule(&node, rule, lens)
+		visible := isNodeVisibleByRule(&node, rule, lens, neededPackages)
 
 		// TEMPORARY DEBUG: Log package visibility decisions
 		if node.Type == "package" {
@@ -261,7 +278,7 @@ func compareDistance(a, b interface{}) bool {
 }
 
 // isNodeVisibleByRule determines if a node is visible according to the lens rule
-func isNodeVisibleByRule(node *GraphNode, rule *DistanceRule, lens *LensConfig) bool {
+func isNodeVisibleByRule(node *GraphNode, rule *DistanceRule, lens *LensConfig, neededPackages map[string]bool) bool {
 	if rule == nil {
 		return false
 	}
@@ -269,6 +286,22 @@ func isNodeVisibleByRule(node *GraphNode, rule *DistanceRule, lens *LensConfig) 
 	vis := rule.NodeVisibility
 
 	// Check global filters first
+	if lens.GlobalFilters.ShowOnlyLdd {
+		// Show any binary, shared library, or system library
+		if node.Type == "cc_binary" || node.Type == "cc_shared_library" || node.Type == "system_library" {
+			// Also show dependent nodes for context?
+			// For now, the user requested "shared libraries, cc_binaries and system libs"
+			return true
+		}
+
+		// Show necessary packages (parents of visible nodes)
+		if neededPackages[node.ID] {
+			return true
+		}
+
+		return false
+	}
+
 	if lens.GlobalFilters.HideExternal && (node.Type == "external" || strings.Contains(node.ID, "@")) {
 		return false
 	}

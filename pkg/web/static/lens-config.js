@@ -34,6 +34,7 @@
  * @property {boolean} [hideExternal] - Hide external dependencies
  * @property {boolean} [hideUncovered] - Hide uncovered files
  * @property {boolean} [hideSystemLibs] - Hide system libraries
+ * @property {boolean} [showOnlyLdd] - Show only LDD dependencies
  */
 
 /**

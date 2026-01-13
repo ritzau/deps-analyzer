@@ -1,0 +1,180 @@
+Starting web server on http://localhost:8080
+23:27:11/I/S starting analysis | reason="initial analysis"
+23:27:11/I/S starting web server | url=http://localhost:8080
+23:27:11/I/S running source | name=CompileDeps
+23:27:11/I/S Starting compile dependencies analysis | workspace=example
+23:27:11/I/S Parsed .d files | count=14
+23:27:11/I/S Compile deps analysis complete | nodes=27 edges=29
+23:27:11/I/S source complete | name=CompileDeps
+23:27:11/I/S running source | name=SymbolDeps
+23:27:11/I/S Starting symbol dependency analysis | workspace=example
+Opening browser...
+23:27:12/I/S request started | req=09a33212 method=GET path=/ remoteAddr=[::1]:54800
+23:27:12/I/S request completed | req=09a33212 method=GET path=/ status=200 duration=9ms
+23:27:12/I/S request started | req=8bad2c3c method=GET path=/styles.css remoteAddr=[::1]:54800
+23:27:12/I/S request completed | req=8bad2c3c method=GET path=/styles.css status=200 duration=0ms
+23:27:12/I/S request started | req=26d65c80 method=GET path=/filter.png remoteAddr=[::1]:54800
+23:27:12/I/S request completed | req=26d65c80 method=GET path=/filter.png status=200 duration=0ms
+23:27:12/I/S request started | req=fe608b83 method=GET path=/logger.js remoteAddr=[::1]:54801
+23:27:12/I/S request completed | req=fe608b83 method=GET path=/logger.js status=200 duration=0ms
+23:27:12/I/S request started | req=e0f278bc method=GET path=/storage.js remoteAddr=[::1]:54800
+23:27:12/I/S request started | req=0120564d method=GET path=/lens-config.js remoteAddr=[::1]:54801
+23:27:12/I/S request completed | req=0120564d method=GET path=/lens-config.js status=200 duration=0ms
+23:27:12/I/S request completed | req=e0f278bc method=GET path=/storage.js status=200 duration=0ms
+23:27:12/I/S request started | req=4701f602 method=GET path=/view-state.js remoteAddr=[::1]:54802
+23:27:12/I/S request completed | req=4701f602 method=GET path=/view-state.js status=200 duration=0ms
+23:27:12/I/S request started | req=c729ad2f method=GET path=/lens-controls.js remoteAddr=[::1]:54803
+23:27:12/I/S request completed | req=c729ad2f method=GET path=/lens-controls.js status=200 duration=0ms
+23:27:12/I/S request started | req=1e1b2b6c method=GET path=/app.js remoteAddr=[::1]:54804
+23:27:12/I/S request completed | req=1e1b2b6c method=GET path=/app.js status=200 duration=0ms
+23:27:13/I/S request started | req=5a926922 method=GET path=/api/subscribe/target_graph remoteAddr=[::1]:54803
+23:27:13/I/S request started | req=d910fa96 method=GET path=/api/subscribe/workspace_status remoteAddr=[::1]:54804
+23:27:13/I/S Found symbol dependencies | count=78
+23:27:13/I/S Symbol analysis complete | nodes=16 edges=78
+23:27:13/I/S source complete | name=SymbolDeps
+23:27:13/I/S querying bazel module
+23:27:17/I/S bazel query complete | targets=14 dependencies=16
+23:27:17/I/S adding compile dependencies from .d files
+23:27:17/I/S parsed file dependencies | count=14
+23:27:17/I/S added compile dependencies | totalDependencies=25
+23:27:17/I/S adding symbol dependencies from nm analysis
+23:27:17/I/S discovering source files in workspace
+23:27:17/I/S found uncovered files | count=3
+23:27:17/I/S request started | req=e13cadcd method=POST path=/api/logs remoteAddr=[::1]:54802
+23:27:17/I/C Starting SSE subscriptions... | req=e13cadcd
+23:27:17/I/C [App] Navigation filters initialized | req=e13cadcd
+23:27:17/I/C Activity-based connection monitoring enabled | req=e13cadcd
+23:27:17/I/C Workspace status: | req=e13cadcd data=[bazel_querying - Querying Bazel workspace...]
+23:27:17/I/C Workspace status: | req=e13cadcd data=[analyzing_deps - Adding compile dependencies...]
+23:27:17/I/C Workspace status: | req=e13cadcd data=[analyzing_symbols - Adding symbol dependencies...]
+23:27:17/I/C Workspace status: | req=e13cadcd data=[discovering_files - Discovering source files...]
+23:27:17/I/S request completed | req=e13cadcd method=POST path=/api/logs status=204 duration=0ms
+23:27:18/I/S found symbol dependencies | count=78
+23:27:20/I/S module analysis complete | totalDependencies=33
+23:27:20/I/S deriving binary information from module
+23:27:20/I/S found binaries | count=5
+23:27:20/I/S analysis complete | targets=14 dependencies=33 packages=12
+23:27:20/I/S running dynamic analysis on binaries
+23:27:20/I/S request started | req=56b8ada3 method=GET path=/api/module/graph remoteAddr=[::1]:54802
+23:27:20/I/S request completed | req=56b8ada3 method=GET path=/api/module/graph status=200 duration=0ms
+23:27:20/I/S request started | req=76ee8719 method=POST path=/api/module/graph/lens remoteAddr=[::1]:54802
+23:27:20/I/S sending full graph | req=76ee8719 nodes=11 edges=4
+23:27:20/I/S request completed | req=76ee8719 method=POST path=/api/module/graph/lens status=200 duration=1ms
+23:27:20/I/S found dynamic dependencies | label=//foobar:foobar count=4
+23:27:20/I/S found dynamic dependencies | label=//main:test_app count=5
+23:27:20/I/S request started | req=b5ebd8c5 method=GET path=/api/module remoteAddr=[::1]:54802
+23:27:20/I/S request completed | req=b5ebd8c5 method=GET path=/api/module status=200 duration=0ms
+23:27:20/I/S request started | req=e63975c9 method=GET path=/api/binaries remoteAddr=[::1]:54802
+23:27:20/I/S request completed | req=e63975c9 method=GET path=/api/binaries status=200 duration=0ms
+23:27:20/I/S request started | req=43558939 method=POST path=/api/logs remoteAddr=[::1]:54802
+23:27:20/I/C Workspace status: | req=43558939 data=[targets_ready - Target analysis complete]
+23:27:20/I/C Workspace status: | req=43558939 data=[analyzing_binaries - Deriving binary info...]
+23:27:20/I/C Workspace status: | req=43558939 data=[analyzing_dynamic - Scanning binaries (ldd)...]
+23:27:20/I/C Module graph response status: | req=43558939 data=200
+23:27:20/I/C Loaded graph with | req=43558939 data=[45 nodes]
+23:27:20/I/C Graph loaded, rendering through backend lens API | req=43558939
+23:27:20/I/C [App] Fetching rendered graph from backend lens API | req=43558939
+23:27:20/I/C [App] Received full graph from backend: | req=43558939 data=[11 nodes, 4 edges]
+23:27:20/I/C Loaded binary data: | req=43558939 data=[5 binaries]
+23:27:20/I/C [App] Cancelling previous request | req=43558939
+23:27:20/I/S request completed | req=43558939 method=POST path=/api/logs status=204 duration=0ms
+23:27:20/I/S request started | req=e0bca9ab method=POST path=/api/module/graph/lens remoteAddr=[::1]:54801
+23:27:20/I/S sending full graph | req=e0bca9ab nodes=16 edges=13
+23:27:20/I/S request completed | req=e0bca9ab method=POST path=/api/module/graph/lens status=200 duration=1ms
+23:27:20/I/S analysis complete | reason="initial analysis"
+23:27:20/I/S request started | req=45c7b94e method=GET path=/api/module/graph remoteAddr=[::1]:54801
+23:27:20/I/S request completed | req=45c7b94e method=GET path=/api/module/graph status=200 duration=0ms
+23:27:20/I/S request started | req=2aec5407 method=POST path=/api/module/graph/lens remoteAddr=[::1]:54801
+23:27:20/I/S sending full graph | req=2aec5407 nodes=16 edges=13
+23:27:20/I/S request completed | req=2aec5407 method=POST path=/api/module/graph/lens status=200 duration=0ms
+23:27:20/I/S request started | req=084e2549 method=GET path=/api/module remoteAddr=[::1]:54801
+23:27:20/I/S request completed | req=084e2549 method=GET path=/api/module status=200 duration=0ms
+23:27:20/I/S request started | req=22cec0d6 method=GET path=/api/binaries remoteAddr=[::1]:54801
+23:27:20/I/S request completed | req=22cec0d6 method=GET path=/api/binaries status=200 duration=0ms
+23:27:20/I/S request started | req=d59be516 method=POST path=/api/logs remoteAddr=[::1]:54801
+23:27:20/I/C [App] Fetching rendered graph from backend lens API | req=d59be516
+23:27:20/I/C [App] Received full graph from backend: | req=d59be516 data=[16 nodes, 13 edges]
+23:27:20/I/C Workspace status: | req=d59be516 data=[ready - Analysis complete]
+23:27:20/I/C Module graph response status: | req=d59be516 data=200
+23:27:20/I/C Loaded graph with | req=d59be516 data=[50 nodes]
+23:27:20/I/C Graph loaded, rendering through backend lens API | req=d59be516
+23:27:20/I/C [App] Cancelling previous request | req=d59be516
+23:27:20/I/C [App] Fetching rendered graph from backend lens API | req=d59be516
+23:27:20/I/C [App] Received full graph from backend: | req=d59be516 data=[16 nodes, 13 edges]
+23:27:20/I/C Loaded binary data: | req=d59be516 data=[5 binaries]
+23:27:20/I/S request completed | req=d59be516 method=POST path=/api/logs status=204 duration=0ms
+23:27:20/I/S request started | req=5d6e13cd method=POST path=/api/module/graph/lens remoteAddr=[::1]:54802
+23:27:20/I/S sending full graph | req=5d6e13cd nodes=16 edges=13
+23:27:20/I/S request completed | req=5d6e13cd method=POST path=/api/module/graph/lens status=200 duration=1ms
+23:27:23/I/S request started | req=f5da36f7 method=HEAD path=/api/module remoteAddr=[::1]:54802
+23:27:23/I/S request completed | req=f5da36f7 method=HEAD path=/api/module status=200 duration=0ms
+23:27:25/I/S request started | req=5445310b method=POST path=/api/logs remoteAddr=[::1]:54802
+23:27:25/I/C [App] Cancelling previous request | req=5445310b
+23:27:25/I/C [App] Fetching rendered graph from backend lens API | req=5445310b
+23:27:25/I/C [App] Received full graph from backend: | req=5445310b data=[16 nodes, 13 edges]
+23:27:25/I/S request completed | req=5445310b method=POST path=/api/logs status=204 duration=0ms
+23:27:28/I/S request started | req=681b5fea method=HEAD path=/api/module remoteAddr=[::1]:54802
+23:27:28/I/S request completed | req=681b5fea method=HEAD path=/api/module status=200 duration=0ms
+23:27:33/I/S request started | req=98b18a53 method=HEAD path=/api/module remoteAddr=[::1]:54802
+23:27:33/I/S request completed | req=98b18a53 method=HEAD path=/api/module status=200 duration=0ms
+23:27:34/I/S request started | req=c345e1a1 method=POST path=/api/module/graph/lens remoteAddr=[::1]:54802
+23:27:34/I/S request started | req=3ae9afd4 method=POST path=/api/module/graph/lens remoteAddr=[::1]:54801
+23:27:34/I/S sending full graph | req=c345e1a1 nodes=16 edges=13
+23:27:34/I/S request completed | req=c345e1a1 method=POST path=/api/module/graph/lens status=200 duration=1ms
+23:27:34/I/S sending full graph | req=3ae9afd4 nodes=16 edges=13
+23:27:34/I/S request completed | req=3ae9afd4 method=POST path=/api/module/graph/lens status=200 duration=0ms
+23:27:35/I/S request started | req=084262ea method=POST path=/api/module/graph/lens remoteAddr=[::1]:54801
+23:27:35/I/S request started | req=c3a4d3f9 method=POST path=/api/logs remoteAddr=[::1]:54802
+23:27:35/I/C [App] Cancelling previous request | req=c3a4d3f9
+23:27:35/I/C [App] Fetching rendered graph from backend lens API | req=c3a4d3f9
+23:27:35/I/C [App] Cancelling previous request | req=c3a4d3f9
+23:27:35/I/C [App] Fetching rendered graph from backend lens API | req=c3a4d3f9
+23:27:35/I/C [App] Request cancelled (new request started) | req=c3a4d3f9
+23:27:35/I/C [App] Received full graph from backend: | req=c3a4d3f9 data=[16 nodes, 13 edges]
+23:27:35/I/C [App] Cancelling previous request | req=c3a4d3f9
+23:27:35/I/C [App] Fetching rendered graph from backend lens API | req=c3a4d3f9
+23:27:35/I/C [App] Cancelling previous request | req=c3a4d3f9
+23:27:35/I/C [App] Fetching rendered graph from backend lens API | req=c3a4d3f9
+23:27:35/I/S request completed | req=c3a4d3f9 method=POST path=/api/logs status=204 duration=0ms
+23:27:35/I/S request started | req=c7ccd63e method=POST path=/api/module/graph/lens remoteAddr=[::1]:54800
+23:27:35/I/S sending full graph | req=084262ea nodes=16 edges=13
+23:27:35/I/S request completed | req=084262ea method=POST path=/api/module/graph/lens status=200 duration=1ms
+23:27:35/I/S sending full graph | req=c7ccd63e nodes=16 edges=13
+23:27:35/I/S request completed | req=c7ccd63e method=POST path=/api/module/graph/lens status=200 duration=1ms
+23:27:36/I/S request started | req=2f20ab9b method=HEAD path=/api/module remoteAddr=[::1]:54800
+23:27:36/I/S request completed | req=2f20ab9b method=HEAD path=/api/module status=200 duration=0ms
+23:27:36/I/S request started | req=99534723 method=POST path=/api/module/graph/lens remoteAddr=[::1]:54800
+23:27:36/I/S request started | req=e954f787 method=POST path=/api/module/graph/lens remoteAddr=[::1]:54801
+23:27:36/I/S sending full graph | req=99534723 nodes=16 edges=13
+23:27:36/I/S request completed | req=99534723 method=POST path=/api/module/graph/lens status=200 duration=0ms
+23:27:36/I/S sending full graph | req=e954f787 nodes=16 edges=13
+23:27:36/I/S request completed | req=e954f787 method=POST path=/api/module/graph/lens status=200 duration=0ms
+23:27:37/I/S request started | req=d0c78a64 method=POST path=/api/logs remoteAddr=[::1]:54801
+23:27:37/I/C [App] Request cancelled (new request started) | req=d0c78a64
+23:27:37/I/C [App] Received full graph from backend: | req=d0c78a64 data=[16 nodes, 13 edges]
+23:27:37/I/C [App] Cancelling previous request | req=d0c78a64
+23:27:37/I/C [App] Fetching rendered graph from backend lens API | req=d0c78a64
+23:27:37/I/S request started | req=8ba10e6c method=POST path=/api/module/graph/lens remoteAddr=[::1]:54800
+23:27:37/I/C [App] Cancelling previous request | req=d0c78a64
+23:27:37/I/C [App] Fetching rendered graph from backend lens API | req=d0c78a64
+23:27:37/I/C [App] Request cancelled (new request started) | req=d0c78a64
+23:27:37/I/C [App] Received full graph from backend: | req=d0c78a64 data=[16 nodes, 13 edges]
+23:27:37/I/C [App] Cancelling previous request | req=d0c78a64
+23:27:37/I/C [App] Fetching rendered graph from backend lens API | req=d0c78a64
+23:27:37/I/S request completed | req=d0c78a64 method=POST path=/api/logs status=204 duration=1ms
+23:27:37/I/S request started | req=fe9006cc method=POST path=/api/module/graph/lens remoteAddr=[::1]:54802
+23:27:37/I/S sending full graph | req=fe9006cc nodes=16 edges=13
+23:27:37/I/S request completed | req=fe9006cc method=POST path=/api/module/graph/lens status=200 duration=1ms
+23:27:37/I/S sending full graph | req=8ba10e6c nodes=16 edges=13
+23:27:37/I/S request completed | req=8ba10e6c method=POST path=/api/module/graph/lens status=200 duration=2ms
+23:27:40/I/S request started | req=17346f44 method=HEAD path=/api/module remoteAddr=[::1]:54800
+23:27:40/I/S request completed | req=17346f44 method=HEAD path=/api/module status=200 duration=0ms
+23:27:42/I/S request started | req=dd07b8e9 method=POST path=/api/logs remoteAddr=[::1]:54800
+23:27:42/I/C [App] Cancelling previous request | req=dd07b8e9
+23:27:42/I/C [App] Fetching rendered graph from backend lens API | req=dd07b8e9
+23:27:42/I/C [App] Request cancelled (new request started) | req=dd07b8e9
+23:27:42/I/C [App] Received full graph from backend: | req=dd07b8e9 data=[16 nodes, 13 edges]
+23:27:42/I/S request completed | req=dd07b8e9 method=POST path=/api/logs status=204 duration=0ms
+23:27:49/I/S request started | req=cdfc972d method=HEAD path=/api/module remoteAddr=[::1]:54800
+23:27:49/I/S request completed | req=cdfc972d method=HEAD path=/api/module status=200 duration=0ms
+signal: killed

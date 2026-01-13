@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ritzau/deps-analyzer/pkg/analysis"
+	"github.com/ritzau/deps-analyzer/pkg/analysis/ldd"
 	"github.com/ritzau/deps-analyzer/pkg/bazel"
 	"github.com/ritzau/deps-analyzer/pkg/config"
 	"github.com/ritzau/deps-analyzer/pkg/deps"
@@ -103,6 +104,10 @@ func startWebServerAsync(workspace string, port int, watch bool, open bool) {
 	runner.FnFindUncoveredFiles = bazel.FindUncoveredFiles
 	// FnAddSymbolDependencies points to the legacy wrapper in pkg/bazel
 	runner.FnAddSymbolDependencies = bazel.AddSymbolDependencies
+
+	// Inject LDD scanner for dynamic analysis
+	lddScanner := ldd.NewScanner()
+	runner.FnScanBinary = lddScanner.ScanBinary
 
 	// Register new modular sources
 	runner.RegisterSource(deps.NewCompileDepsSource())
