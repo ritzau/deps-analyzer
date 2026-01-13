@@ -287,19 +287,29 @@ func isNodeVisibleByRule(node *GraphNode, rule *DistanceRule, lens *LensConfig, 
 
 	// Check global filters first
 	if lens.GlobalFilters.ShowOnlyLdd {
-		// Show any binary, shared library, or system library
-		if node.Type == "cc_binary" || node.Type == "cc_shared_library" || node.Type == "system_library" {
-			// Also show dependent nodes for context?
-			// For now, the user requested "shared libraries, cc_binaries and system libs"
-			return true
+		// Strict whitelist for LDD mode: Binaries, Shared Libs, System Libs, or their Packages
+		isLddCandidate := (node.Type == "cc_binary" || node.Type == "cc_shared_library" || node.Type == "system_library")
+
+		if !isLddCandidate && neededPackages[node.ID] {
+			isLddCandidate = true
 		}
 
-		// Show necessary packages (parents of visible nodes)
-		if neededPackages[node.ID] {
-			return true
+		if !isLddCandidate {
+			return false
 		}
 
-		return false
+		// Apply Global Filters (Blacklists)
+		if lens.GlobalFilters.HideSystemLibs && node.Type == "system_library" {
+			return false
+		}
+		if lens.GlobalFilters.HideExternal && (node.Type == "external" || strings.Contains(node.ID, "@")) {
+			return false
+		}
+		if lens.GlobalFilters.HideUncovered && (node.Type == "uncovered_source" || node.Type == "uncovered_header") {
+			return false
+		}
+
+		return true
 	}
 
 	if lens.GlobalFilters.HideExternal && (node.Type == "external" || strings.Contains(node.ID, "@")) {
