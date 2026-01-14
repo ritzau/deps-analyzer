@@ -36,10 +36,10 @@ type NodeVisibility struct {
 
 // GlobalFilters are always-applied visibility filters
 type GlobalFilters struct {
-	HideExternal   bool `json:"hideExternal,omitempty"`
-	HideUncovered  bool `json:"hideUncovered,omitempty"`
-	HideSystemLibs bool `json:"hideSystemLibs,omitempty"`
-	ShowOnlyLdd    bool `json:"showOnlyLdd,omitempty"`
+	HideExternal    bool `json:"hideExternal,omitempty"`
+	HideUncovered   bool `json:"hideUncovered,omitempty"`
+	HideSystemLibs  bool `json:"hideSystemLibs,omitempty"`
+	HideNonBinaries bool `json:"hideNonBinaries,omitempty"`
 }
 
 // EdgeDisplayRules control which edges are shown

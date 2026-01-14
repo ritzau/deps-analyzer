@@ -170,8 +170,8 @@ function setupDefaultLensControls() {
           document.getElementById('hideUncovered')?.checked || false;
         currentLens.globalFilters.hideSystemLibs =
           document.getElementById('hideSystemLibs')?.checked || false;
-        currentLens.globalFilters.showOnlyLdd =
-          document.getElementById('showOnlyLdd')?.checked || false;
+        currentLens.globalFilters.hideNonBinaries =
+          document.getElementById('hideNonBinaries')?.checked || false;
         viewStateManager.updateDefaultLens(currentLens);
       });
     }

@@ -28,10 +28,10 @@ func RenderGraph(rawGraph *GraphData, defaultLens, detailLens *LensConfig, selec
 	}
 	logging.Debug("nodes using detail lens", "count", detailCount)
 
-	// Pre-calculation for ShowOnlyLdd: Identify packages that MUST be visible
+	// Pre-calculation for HideNonBinaries: Identify packages that MUST be visible
 	// because they contain visible binaries.
 	neededPackages := make(map[string]bool)
-	if defaultLens.GlobalFilters.ShowOnlyLdd || detailLens.GlobalFilters.ShowOnlyLdd {
+	if defaultLens.GlobalFilters.HideNonBinaries || detailLens.GlobalFilters.HideNonBinaries {
 		for _, node := range rawGraph.Nodes {
 			// Include packages for all binaries/shared libs, not just those with deps
 			if node.Type == "cc_binary" || node.Type == "cc_shared_library" {
@@ -286,7 +286,7 @@ func isNodeVisibleByRule(node *GraphNode, rule *DistanceRule, lens *LensConfig, 
 	vis := rule.NodeVisibility
 
 	// Check global filters first
-	if lens.GlobalFilters.ShowOnlyLdd {
+	if lens.GlobalFilters.HideNonBinaries {
 		// Strict whitelist for LDD mode: Binaries, Shared Libs, System Libs, or their Packages
 		isLddCandidate := (node.Type == "cc_binary" || node.Type == "cc_shared_library" || node.Type == "system_library")
 
