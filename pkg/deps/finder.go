@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 )
 
 // FindDFiles finds all .d dependency files in the bazel-out directory
@@ -23,6 +25,8 @@ func FindDFiles(workspaceRoot string) ([]string, error) {
 		}
 		return nil, fmt.Errorf("resolving bazel-out symlink: %w", err)
 	}
+
+	logging.Debug("searching for .d files", "path", resolvedPath)
 
 	err = filepath.Walk(resolvedPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -51,6 +55,7 @@ func FindDFiles(workspaceRoot string) ([]string, error) {
 		return nil, fmt.Errorf("walking bazel-out directory: %w", err)
 	}
 
+	logging.Debug("found .d files", "count", len(dfiles))
 	return dfiles, nil
 }
 
@@ -61,20 +66,24 @@ func ParseAllDFiles(workspaceRoot string) ([]*FileDependency, error) {
 		return nil, err
 	}
 
+	// Parse
 	var deps []*FileDependency
 	for _, dfile := range dfiles {
 		dep, err := ParseDFile(dfile)
 		if err != nil {
-			// Skip files that can't be parsed (could be non-C++ .d files)
+			logging.Debug("failed to parse dfile", "path", dfile, "error", err)
 			continue
 		}
 
 		// Only include if we found a source file
 		if dep.SourceFile != "" {
 			deps = append(deps, dep)
+		} else {
+			logging.Debug("parsed dfile but no source file found", "path", dfile)
 		}
 	}
 
+	logging.Debug("successfully parsed d files", "count", len(deps))
 	return deps, nil
 }
 

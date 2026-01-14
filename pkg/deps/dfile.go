@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ritzau/deps-analyzer/pkg/logging"
 )
 
 // FileDependency represents dependencies for a single source file
@@ -28,6 +30,7 @@ func ParseDFile(path string) (*FileDependency, error) {
 	scanner := bufio.NewScanner(file)
 	var currentLine strings.Builder
 
+	logging.Debug("parsing .d file", "path", path)
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -46,12 +49,15 @@ func ParseDFile(path string) (*FileDependency, error) {
 		// Format: "target.o: dep1 dep2 dep3"
 		if idx := strings.Index(fullLine, ":"); idx != -1 {
 			depsStr := strings.TrimSpace(fullLine[idx+1:])
+			logging.Debug("found deps string", "deps", depsStr)
 			depParts := strings.Fields(depsStr)
 
 			for _, dep := range depParts {
 				// Skip external dependencies (system includes)
 				// Only include workspace files (relative paths without absolute markers)
-				if !isWorkspaceFile(dep) {
+				isWorkspace := isWorkspaceFile(dep)
+				logging.Debug("analyzing dep", "dep", dep, "isWorkspace", isWorkspace)
+				if !isWorkspace {
 					continue
 				}
 
